@@ -25,7 +25,7 @@ micromamba install -c conda-forge pycrdt
 
 You first need to clone the repository:
 ```bash
-git clone https://github.com/jupyter-server/pycrdt.git
+git clone https://github.com/y-crdt/pycrdt.git
 cd pycrdt
 ```
 We recommend working in a conda environment. In order to build `pycrdt`, you will need

@@ -53,7 +53,7 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/jupyter-server/pycrdt"
+Homepage = "https://github.com/y-crdt/pycrdt"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
