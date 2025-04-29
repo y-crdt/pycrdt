@@ -3,11 +3,13 @@ from ._array import ArrayEvent as ArrayEvent
 from ._array import TypedArray as TypedArray
 from ._awareness import Awareness as Awareness
 from ._awareness import is_awareness_disconnect_message as is_awareness_disconnect_message
+from ._channel import Channel as Channel
 from ._doc import Doc as Doc
 from ._doc import TypedDoc as TypedDoc
 from ._map import Map as Map
 from ._map import MapEvent as MapEvent
 from ._map import TypedMap as TypedMap
+from ._provider import Provider as Provider
 from ._pycrdt import StackItem as StackItem
 from ._pycrdt import SubdocsEvent as SubdocsEvent
 from ._pycrdt import Subscription as Subscription

@@ -37,7 +37,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-    "pytest >=7.4.2,<8",
+    "pytest >=8.3.5,<9",
     "pytest-mypy-testing",
     "anyio",
     "trio >=0.25.1,<0.30",
