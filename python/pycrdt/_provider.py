@@ -8,13 +8,11 @@ from anyio import (
     TASK_STATUS_IGNORED,
     Event,
     Lock,
-    create_memory_object_stream,
     create_task_group,
 )
 from anyio.abc import TaskGroup, TaskStatus
 
 from ._doc import Doc
-from ._pycrdt import TransactionEvent
 from ._sync import (
     YMessageType,
     YSyncMessageType,
@@ -97,9 +95,6 @@ class Provider:
         self._doc = doc
         self._channel = channel
         self.log = log or getLogger(__name__)
-        self._update_send_stream, self._update_receive_stream = create_memory_object_stream[bytes](
-            max_buffer_size=65536
-        )
         self.started = Event()
         self._start_lock = Lock()
         self._task_group: TaskGroup | None = None
@@ -113,7 +108,7 @@ class Provider:
         )
         await self._channel.send(sync_message)
         assert self._task_group is not None
-        self._task_group.start_soon(self._send)
+        self._task_group.start_soon(self._send_updates)
         async for message in self._channel:
             if message[0] == YMessageType.SYNC:
                 self.log.debug(
@@ -130,10 +125,10 @@ class Provider:
                     )
                     await self._channel.send(reply)
 
-    async def _send(self):
-        async with self._update_receive_stream:
-            async for update in self._update_receive_stream:
-                message = create_update_message(update)
+    async def _send_updates(self):
+        async with self._doc.events() as events:
+            async for event in events:
+                message = create_update_message(event.update)
                 await self._channel.send(message)
 
     async def __aenter__(self) -> Provider:
@@ -160,10 +155,6 @@ class Provider:
         async with create_task_group() as tg:
             yield tg
 
-    def _send_updates(self, event: TransactionEvent) -> None:
-        update = event.update
-        self._update_send_stream.send_nowait(update)
-
     async def start(
         self,
         *,
@@ -174,8 +165,6 @@ class Provider:
         Args:
             task_status: The status to set when the task has started.
         """
-        self._subscription = self._doc.observe(self._send_updates)
-
         async with self._start_lock:
             async with self._get_or_create_task_group() as self._task_group:
                 task_status.started()
@@ -184,9 +173,6 @@ class Provider:
 
     async def stop(self) -> None:
         """Stop the provider."""
-        await self._update_receive_stream.aclose()
-        await self._update_send_stream.aclose()
         assert self._task_group is not None
         self._task_group.cancel_scope.cancel()
         self._task_group = None
-        self._doc.unobserve(self._subscription)
