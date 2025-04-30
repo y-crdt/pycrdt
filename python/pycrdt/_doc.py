@@ -308,14 +308,14 @@ class Doc(BaseDoc, Generic[T]):
     @overload
     def events(
         self,
-        subdocs: Literal[False],
+        subdocs: Literal[False] = False,
         max_buffer_size: float = float("inf"),
     ) -> MemoryObjectReceiveStream[TransactionEvent]: ...
 
     @overload
     def events(
         self,
-        subdocs: Literal[True],
+        subdocs: Literal[True] = True,
         max_buffer_size: float = float("inf"),
     ) -> MemoryObjectReceiveStream[list[SubdocsEvent]]: ...
 

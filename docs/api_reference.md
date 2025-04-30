@@ -9,12 +9,14 @@
       - Array
       - ArrayEvent
       - Awareness
+      - Channel
       - Decoder
       - Doc
       - Encoder
       - Map
       - MapEvent
       - NewTransaction
+      - Provider
       - ReadTransaction
       - StackItem
       - Subscription
