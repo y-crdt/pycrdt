@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.16
+
+- Add `Provider` and `Channel`.
+
 ## 0.12.15
 
 - Upgrade `pyo3` to v0.24.2.
