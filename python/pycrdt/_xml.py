@@ -312,7 +312,7 @@ class XmlText(_XmlTraitMixin):
 
 
 class XmlEvent(BaseEvent):
-    __slots__ = ["children_changed", "target", "path", "delta", "keys"]
+    __slots__ = ["children_changed", "target", "path", "delta", "keys", "transaction"]
 
 
 class XmlAttributesView:

@@ -363,9 +363,10 @@ class MapEvent(BaseEvent):
         target (Map): The changed map.
         delta (list[dict[str, Any]]): A list of items describing the changes.
         path (list[int | str]): A list with the indices pointing to the map that was changed.
+        transaction (Transaction): The transaction related to the change.
     """
 
-    __slots__ = "target", "keys", "path"
+    __slots__ = "target", "keys", "path", "transaction"
 
 
 base_types[_Map] = Map
