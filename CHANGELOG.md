@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.20
+
+- Upgrade `yrs` to v0.23.4.
+
 ## 0.12.19
 
 - Upgrade `yrs` to v0.23.3.
