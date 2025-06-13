@@ -11,4 +11,4 @@ crate-type = ["cdylib"]
 yrs = "0.23.4"
 
 [dependencies.pyo3]
-version = "0.25.0"
+version = "0.25.1"

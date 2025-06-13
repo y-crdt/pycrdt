@@ -399,7 +399,7 @@ class ArrayIterator:
         self.idx = 0
 
     def __iter__(self) -> ArrayIterator:
-        return self
+        return self  # pragma: nocover
 
     def __next__(self) -> Any:
         if self.idx == self.length:
