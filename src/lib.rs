@@ -13,6 +13,7 @@ mod type_conversions;
 mod undo;
 mod update;
 mod xml;
+mod sticky_index;
 use crate::doc::Doc;
 use crate::doc::TransactionEvent;
 use crate::doc::SubdocsEvent;
@@ -23,6 +24,7 @@ use crate::transaction::Transaction;
 use crate::subscription::Subscription;
 use crate::undo::{StackItem, UndoManager};
 use crate::update::{get_state, get_update, merge_updates};
+use crate::sticky_index::{PyStickyIndex};
 
 #[pymodule]
 fn _pycrdt(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -33,6 +35,7 @@ fn _pycrdt(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<TextEvent>()?;
     m.add_class::<Array>()?;
     m.add_class::<ArrayEvent>()?;
+    m.add_class::<PyStickyIndex>()?;
     m.add_class::<Map>()?;
     m.add_class::<MapEvent>()?;
     m.add_class::<Transaction>()?;

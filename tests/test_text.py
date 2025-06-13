@@ -1,7 +1,7 @@
 import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group
 from anyio.abc import TaskStatus
-from pycrdt import Array, Doc, Map, Text
+from pycrdt import Array, Doc, Map, Text, PyStickyIndex
 
 pytestmark = pytest.mark.anyio
 
@@ -196,3 +196,13 @@ async def test_iterate_events():
     assert len(deltas) == 2
     assert deltas[0] == [{"insert": "Hello"}]
     assert deltas[1] == [{"retain": 5}, {"insert": ", World!"}]
+
+def test_sticky_index():
+    doc = Doc()
+    text = Text("foo")
+
+    doc["text"] = text
+    with doc.transaction():
+        idx = text.sticky_index(0, 0)
+        assert idx is not None
+        assert isinstance(idx, PyStickyIndex)

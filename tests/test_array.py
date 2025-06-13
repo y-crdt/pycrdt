@@ -4,7 +4,7 @@ from functools import partial
 import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group
 from anyio.abc import TaskStatus
-from pycrdt import Array, Doc, Map, Text
+from pycrdt import Array, Doc, Map, Text, PyStickyIndex
 
 pytestmark = pytest.mark.anyio
 
@@ -297,3 +297,13 @@ async def test_iterate_events():
     assert len(deltas_deep) == 1
     assert deltas_deep[0] == [{"retain": 1}, {"insert": ["Good"]}]
     assert paths_deep[0] == [1]
+
+def test_sticky_index():
+    doc = Doc()
+    array = Array([0, "foo", 2])
+
+    doc["array"] = array
+    with doc.transaction():
+        idx = array.sticky_index(0, 0)
+        assert idx is not None
+        assert isinstance(idx, PyStickyIndex)
