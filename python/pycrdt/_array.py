@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, cast, overloa
 from ._base import BaseDoc, BaseEvent, BaseType, Typed, base_types, event_types
 from ._pycrdt import Array as _Array
 from ._pycrdt import ArrayEvent as _ArrayEvent
+from ._pycrdt import PyStickyIndex
 from ._pycrdt import Subscription
 
 if TYPE_CHECKING:
@@ -92,6 +93,21 @@ class Array(BaseType, Generic[T]):
         """
         with self.doc.transaction():
             self += [value]
+
+    def sticky_index(self, index: int, assoc: int) -> PyStickyIndex | None:
+        """
+        Returns a sticky index for a given human-readable index.
+
+        Args:
+            index: The human-readable index (0-based).
+            assoc: The association type, usually 0 (Before) or 1 (After).
+
+        Returns:
+            A `PyStickyIndex` instance if the index is valid, otherwise `None`.
+        """
+        with self.doc.transaction() as txn:
+            res = self.integrated.sticky_index(txn._txn, index, assoc)
+            return res
 
     def extend(self, value: list[T]) -> None:
         """

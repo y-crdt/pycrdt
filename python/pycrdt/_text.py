@@ -6,6 +6,7 @@ from ._base import BaseEvent, BaseType, base_types, event_types
 from ._pycrdt import Subscription
 from ._pycrdt import Text as _Text
 from ._pycrdt import TextEvent as _TextEvent
+from ._pycrdt import PyStickyIndex
 
 if TYPE_CHECKING:
     from ._doc import Doc
@@ -306,6 +307,20 @@ class Text(BaseType):
         """
         return super().observe(cast(Callable[[BaseEvent], None], callback))
 
+    def sticky_index(self, index: int, assoc: int) -> PyStickyIndex | None:
+        """
+        Returns a sticky index for a given human-readable index.
+
+        Args:
+            index: The human-readable index (0-based).
+            assoc: The association type, usually 0 (Before) or 1 (After).
+
+        Returns:
+            A `PyStickyIndex` instance if the index is valid, otherwise `None`.
+        """
+        with self.doc.transaction() as txn:
+            res = self.integrated.sticky_index(txn._txn, index, assoc)
+            return res
 
 class TextEvent(BaseEvent):
     """

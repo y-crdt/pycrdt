@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
 use pyo3::types::{PyAny, PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyIterator, PyList, PyInt, PyString};
 use yrs::types::{Attrs, Change, EntryChange, Delta, Events, Path, PathSegment};
-use yrs::{Any, Out, TransactionMut, XmlOut};
+use yrs::{Any, Assoc, Out, TransactionMut, XmlOut};
 use std::collections::{VecDeque, HashMap};
 use std::sync::Arc;
 use crate::text::{Text, TextEvent};
@@ -280,4 +280,12 @@ pub(crate) fn py_to_attrs<'py>(
         let value = item.get_item(1).map(|v| py_to_any(&v))?;
         Ok((Arc::from(key.to_str()?), value))
     })).collect::<PyResult<Attrs>>()
+}
+
+pub fn int_to_assoc(val: i32) -> Result<Assoc, &'static str> {
+    match val {
+        0 => Ok(yrs::Assoc::After),
+        -1 => Ok(yrs::Assoc::Before),
+        _ => Err("Invalid assoc"),
+    }
 }
