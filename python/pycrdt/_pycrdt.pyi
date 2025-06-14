@@ -51,6 +51,10 @@ class Doc:
         """Subscribes a callback to be called with the shared document subdoc change event.
         Returns a subscription that can be used to unsubscribe."""
 
+class PyStickyIndex:
+    """Represents a StickyIndex."""
+    pass
+
 class Subscription:
     """Observer subscription."""
 
@@ -148,6 +152,9 @@ class Text:
         """Unsubscribes previously subscribed event callback identified by given
         `subscription`."""
 
+    def sticky_index(self, index: int, assoc: int) -> PyStickyIndex | None:
+        """Returns a sticky index for a given human-readable index."""
+
 class Array:
     """Shared array."""
 
@@ -181,6 +188,9 @@ class Array:
     def unobserve(self, subscription: Subscription) -> None:
         """Unsubscribes previously subscribed event callback identified by given
         `subscription`."""
+
+    def sticky_index(self, index: int, assoc: int) -> PyStickyIndex | None:
+        """Returns a sticky index for a given human-readable index."""
 
 class Map:
     """Shared map."""
