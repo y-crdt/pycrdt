@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Iterator, cast
 
-from ._base import BaseEvent, BaseType, base_types, event_types
+from ._base import BaseEvent, Sequence, base_types, event_types
 from ._pycrdt import Subscription
 from ._pycrdt import Text as _Text
 from ._pycrdt import TextEvent as _TextEvent
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from ._doc import Doc
 
 
-class Text(BaseType):
+class Text(Sequence):
     """
     A shared data type used for collaborative text editing, similar to a Python `str`.
     """

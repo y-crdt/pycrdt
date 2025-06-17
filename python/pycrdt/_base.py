@@ -23,6 +23,7 @@ from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStre
 from ._pycrdt import Doc as _Doc
 from ._pycrdt import Subscription
 from ._pycrdt import Transaction as _Transaction
+from ._sticky_index import Assoc, StickyIndex
 from ._transaction import ReadTransaction, Transaction
 
 if TYPE_CHECKING:
@@ -265,6 +266,24 @@ class BaseType(ABC):
             send_streams.remove(send_stream)
         if not send_streams:
             self.unobserve(self._event_subscription[deep])
+
+
+class Sequence(BaseType):
+    def sticky_index(self, index: int, assoc: Assoc = Assoc.AFTER) -> StickyIndex:
+        """
+        A permanent position that sticks to the same place even when
+        concurrent updates are made.
+
+        Args:
+            index: The index at which to stick.
+            assoc: The [Assoc][pycrdt.Assoc] specifying whether to stick to the location
+                before or after the index.
+
+        Returns:
+            A [StickyIndex][pycrdt.StickyIndex] that can be used to retrieve the index after
+            an update was applied.
+        """
+        return StickyIndex(self, index, assoc)
 
 
 def observe_callback(

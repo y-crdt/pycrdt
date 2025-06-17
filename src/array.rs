@@ -3,7 +3,16 @@ use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyValueError, PyTypeError};
 use pyo3::types::{PyList, PyString};
 use yrs::{
-    Any, Array as _Array, ArrayRef, DeepObservable, Doc as _Doc, Observable, TransactionMut, XmlFragmentPrelim
+    Any,
+    Array as _Array,
+    ArrayRef,
+    Assoc,
+    DeepObservable,
+    Doc as _Doc,
+    IndexedSequence,
+    Observable,
+    TransactionMut,
+    XmlFragmentPrelim,
 };
 use yrs::types::ToJson;
 use yrs::types::text::TextPrelim;
@@ -16,6 +25,7 @@ use crate::text::Text;
 use crate::map::Map;
 use crate::doc::Doc;
 use crate::xml::XmlFragment;
+use crate::sticky_index::StickyIndex;
 
 
 #[pyclass]
@@ -134,6 +144,19 @@ impl Array {
         let mut s = String::new();
         self.array.to_json(t).to_json(&mut s);
         PyString::new(py, s.as_str())
+    }
+
+    fn sticky_index<'py>(&self, py: Python<'py>, txn: &mut Transaction, index: u32, assoc: i8) -> PyResult<Py<StickyIndex>> {
+        let mut _t = txn.transaction();
+        let t = _t.as_mut().unwrap().as_mut();
+        let _assoc: Assoc;
+        match assoc {
+            0 => _assoc = Assoc::After,
+            _ => _assoc = Assoc::Before,
+        }
+        let sticky_index = self.array.sticky_index(t, index, _assoc);
+        let s: Py<StickyIndex> = Py::new(py, StickyIndex::from(sticky_index))?;
+        Ok(s)
     }
 
     pub fn observe(&mut self, py: Python<'_>, f: PyObject) -> PyResult<Py<Subscription>> {
