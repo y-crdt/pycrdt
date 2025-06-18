@@ -4,7 +4,7 @@ from functools import partial
 import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group
 from anyio.abc import TaskStatus
-from pycrdt import Array, Assoc, Doc, Map, Text
+from pycrdt import Array, Assoc, Doc, Map, StickyIndex, Text
 
 pytestmark = pytest.mark.anyio
 
@@ -299,7 +299,8 @@ async def test_iterate_events():
     assert paths_deep[0] == [1]
 
 
-def test_sticky_index():
+@pytest.mark.parametrize("serialize", ["to_json", "encode"])
+def test_sticky_index(serialize: str):
     first = ["$", "$", "$"]
     second = ["-", "-", "-", "-", "-", "*", "-", "-"]
     idx = second.index("*")
@@ -315,8 +316,14 @@ def test_sticky_index():
     assert array1[idx] == "*"
     sticky_index = array1.sticky_index(idx, Assoc.AFTER)
     assert sticky_index.assoc == Assoc.AFTER
+    if serialize == "to_json":
+        data = sticky_index.to_json()
+        sticky_index = StickyIndex.from_json(data, array1)
+    else:
+        data = sticky_index.encode()
+        sticky_index = StickyIndex.decode(data, array1)
 
     doc1.apply_update(doc0.get_update())
     assert array1.to_py() in (first + second, second + first)
-    new_idx = sticky_index.index
+    new_idx = sticky_index.get_offset()
     assert array1[new_idx] == "*"

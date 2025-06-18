@@ -283,7 +283,7 @@ class Sequence(BaseType):
             A [StickyIndex][pycrdt.StickyIndex] that can be used to retrieve the index after
             an update was applied.
         """
-        return StickyIndex(self, index, assoc)
+        return StickyIndex.new(self, index, assoc)
 
 
 def observe_callback(

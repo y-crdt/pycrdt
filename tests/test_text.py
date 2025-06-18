@@ -1,7 +1,7 @@
 import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group
 from anyio.abc import TaskStatus
-from pycrdt import Array, Assoc, Doc, Map, Text
+from pycrdt import Array, Assoc, Doc, Map, StickyIndex, Text
 
 pytestmark = pytest.mark.anyio
 
@@ -198,7 +198,8 @@ async def test_iterate_events():
     assert deltas[1] == [{"retain": 5}, {"insert": ", World!"}]
 
 
-def test_sticky_index():
+@pytest.mark.parametrize("serialize", ["to_json", "encode"])
+def test_sticky_index(serialize: str):
     first = "$$$"
     second = "-----*--"
     idx = second.index("*")
@@ -214,8 +215,32 @@ def test_sticky_index():
     assert text1[idx] == "*"
     sticky_index = text1.sticky_index(idx, Assoc.AFTER)
     assert sticky_index.assoc == Assoc.AFTER
+    if serialize == "to_json":
+        data = sticky_index.to_json()
+        sticky_index = StickyIndex.from_json(data, text1)
+    else:
+        data = sticky_index.encode()
+        sticky_index = StickyIndex.decode(data, text1)
 
     doc1.apply_update(doc0.get_update())
     assert str(text1) in (first + second, second + first)
-    new_idx = sticky_index.index
+    new_idx = sticky_index.get_offset()
     assert text1[new_idx] == "*"
+
+
+def test_sticky_index_transaction():
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    sticky_index = text.sticky_index(0, Assoc.BEFORE)
+    data = sticky_index.to_json()
+    sticky_index = StickyIndex.from_json(data)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        sticky_index.get_offset()
+
+    assert str(excinfo.value) == "No transaction available"
+
+    with doc.transaction() as txn:
+        idx = sticky_index.get_offset(txn)
+
+    assert idx == 0
