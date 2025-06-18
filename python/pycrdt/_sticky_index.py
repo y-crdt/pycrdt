@@ -3,7 +3,12 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING
+
+try:
+    from typing import Self
+except ImportError:  # pragma: no cover
+    from typing_extensions import Self
 
 from ._pycrdt import StickyIndex as _StickyIndex
 from ._pycrdt import decode_sticky_index, get_sticky_index_from_string
