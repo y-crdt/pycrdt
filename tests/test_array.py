@@ -325,5 +325,5 @@ def test_sticky_index(serialize: str):
 
     doc1.apply_update(doc0.get_update())
     assert array1.to_py() in (first + second, second + first)
-    new_idx = sticky_index.get_offset()
+    new_idx = sticky_index.get_index()
     assert array1[new_idx] == "*"

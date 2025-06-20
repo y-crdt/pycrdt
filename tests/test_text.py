@@ -224,7 +224,7 @@ def test_sticky_index(serialize: str):
 
     doc1.apply_update(doc0.get_update())
     assert str(text1) in (first + second, second + first)
-    new_idx = sticky_index.get_offset()
+    new_idx = sticky_index.get_index()
     assert text1[new_idx] == "*"
 
 
@@ -236,11 +236,11 @@ def test_sticky_index_transaction():
     sticky_index = StickyIndex.from_json(data)
 
     with pytest.raises(RuntimeError) as excinfo:
-        sticky_index.get_offset()
+        sticky_index.get_index()
 
     assert str(excinfo.value) == "No transaction available"
 
     with doc.transaction() as txn:
-        idx = sticky_index.get_offset(txn)
+        idx = sticky_index.get_index(txn)
 
     assert idx == 0

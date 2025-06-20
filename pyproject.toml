@@ -36,7 +36,7 @@ dependencies = [
     "typing_extensions >=4.14.0; python_version<'3.11'",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 test = [
     "pytest >=8.3.5,<9",
     "pytest-mypy-testing",

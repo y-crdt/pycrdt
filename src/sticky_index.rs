@@ -49,7 +49,7 @@ impl StickyIndex {
         Python::with_gil(|py| PyBytes::new(py, &encoded).into())
     }
 
-    pub fn to_string(&self) -> PyObject {
+    pub fn to_json_string(&self) -> PyObject {
         let encoded = serde_json::to_string(self.sticky_index.borrow_mut().as_mut().unwrap()).unwrap();
         Python::with_gil(|py| PyString::new(py, &encoded).into())
     }
@@ -71,7 +71,7 @@ pub fn decode_sticky_index<'py>(data: &Bound<'_, PyBytes>) -> StickyIndex {
 }
 
 #[pyfunction]
-pub fn get_sticky_index_from_string<'py>(data: &Bound<'_, PyString>) -> StickyIndex {
+pub fn get_sticky_index_from_json_string<'py>(data: &Bound<'_, PyString>) -> StickyIndex {
     let data: &str = data.to_str().unwrap();
     StickyIndex::from(data)
 }
