@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, cast, overload
 
-from ._base import BaseDoc, BaseEvent, BaseType, Typed, base_types, event_types
+from ._base import BaseDoc, BaseEvent, BaseType, Sequence, Typed, base_types, event_types
 from ._pycrdt import Array as _Array
 from ._pycrdt import ArrayEvent as _ArrayEvent
 from ._pycrdt import Subscription
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-class Array(BaseType, Generic[T]):
+class Array(Sequence, Generic[T]):
     """
     A collection used to store data in an indexed sequence structure, similar to a Python `list`.
     """

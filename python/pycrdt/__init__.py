@@ -14,6 +14,8 @@ from ._pycrdt import StackItem as StackItem
 from ._pycrdt import SubdocsEvent as SubdocsEvent
 from ._pycrdt import Subscription as Subscription
 from ._pycrdt import TransactionEvent as TransactionEvent
+from ._sticky_index import Assoc as Assoc
+from ._sticky_index import StickyIndex as StickyIndex
 from ._sync import Decoder as Decoder
 from ._sync import Encoder as Encoder
 from ._sync import YMessageType as YMessageType

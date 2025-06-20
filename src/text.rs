@@ -2,7 +2,9 @@ use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
 use pyo3::types::{PyDict, PyIterator, PyList, PyString, PyTuple};
 use yrs::{
+    Assoc,
     GetString,
+    IndexedSequence,
     Observable,
     TextRef,
     Text as _Text,
@@ -12,6 +14,7 @@ use yrs::types::text::{TextEvent as _TextEvent, YChange};
 use crate::transaction::Transaction;
 use crate::subscription::Subscription;
 use crate::type_conversions::{py_to_any, py_to_attrs, ToPython};
+use crate::sticky_index::StickyIndex;
 
 
 #[pyclass]
@@ -105,7 +108,7 @@ impl Text {
                     }
                     pyattrs.into_any()
                 }).unwrap_or_else(|| py.None().into_bound(py));
-                
+
                 PyTuple::new(py, [
                     diff.insert.into_py(py),
                     attrs,
@@ -113,6 +116,19 @@ impl Text {
             });
 
         PyList::new(py, iter).unwrap()
+    }
+
+    fn sticky_index<'py>(&self, py: Python<'py>, txn: &mut Transaction, index: u32, assoc: i8) -> PyResult<Py<StickyIndex>> {
+        let mut _t = txn.transaction();
+        let t = _t.as_mut().unwrap().as_mut();
+        let _assoc: Assoc;
+        match assoc {
+            0 => _assoc = Assoc::After,
+            _ => _assoc = Assoc::Before,
+        }
+        let sticky_index = self.text.sticky_index(t, index, _assoc);
+        let s: Py<StickyIndex> = Py::new(py, StickyIndex::from(sticky_index))?;
+        Ok(s)
     }
 
     fn observe(&mut self, py: Python<'_>, f: PyObject) -> PyResult<Py<Subscription>> {

@@ -41,6 +41,9 @@ jobs:
         python-version: ${{ matrix.python-version }}
         allow-prereleases: true
 
+    - name: Ensure pip >= v25.1
+      run: python -m pip install "pip >= 25.1"
+
     - name: Install rust
       uses: actions-rs/toolchain@v1
       with:
@@ -52,7 +55,7 @@ jobs:
       uses: Swatinem/rust-cache@v1
 
     - name: Build and install pycrdt
-      run: pip install -e ".[test]"
+      run: pip install --group test -e .
 
     - name: Check types
       run: mypy python
