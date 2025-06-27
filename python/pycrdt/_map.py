@@ -203,7 +203,9 @@ class Map(BaseType, Generic[T]):
         Returns:
             True if the key was found.
         """
-        return item in self.keys()
+        # use integrated.has to avoid fetching all keys
+        with self.doc.transaction() as txn:
+            return self.integrated.has(txn._txn, item)
 
     @overload
     def get(self, key: str) -> T | None: ...
@@ -224,7 +226,7 @@ class Map(BaseType, Generic[T]):
         """
         key, *default_value = args
         with self.doc.transaction():
-            if key in self.keys():
+            if self.__contains__(key):
                 return self[key]
             if not default_value:
                 return None
@@ -248,7 +250,7 @@ class Map(BaseType, Generic[T]):
         """
         key, *default_value = args
         with self.doc.transaction():
-            if key not in self.keys():
+            if not self.__contains__(key):
                 if not default_value:
                     raise KeyError
                 return default_value[0]
@@ -261,7 +263,7 @@ class Map(BaseType, Generic[T]):
     def _check_key(self, key: str) -> None:
         if not isinstance(key, str):
             raise RuntimeError("Key must be of type string")
-        if key not in self.keys():
+        if not self.__contains__(key):
             raise KeyError(key)
 
     def keys(self) -> Iterable[str]:

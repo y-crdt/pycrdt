@@ -141,6 +141,14 @@ impl Map {
         Python::with_gil(|py| PyString::new(py, s.as_str()).into())
     }
 
+    /// Returns true if the given key exists in the map.
+    fn has(&self, txn: &mut Transaction, key: &str) -> PyResult<bool> {
+        let mut t0 = txn.transaction();
+        let t1 = t0.as_mut().unwrap();
+        let t = t1.as_ref();
+        Ok(self.map.get(t, key).is_some())
+    }
+
     pub fn observe(&mut self, py: Python<'_>, f: PyObject) -> PyResult<Py<Subscription>> {
         let sub = self.map
             .observe(move |txn, e| {

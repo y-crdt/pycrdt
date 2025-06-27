@@ -213,6 +213,9 @@ class Map:
         """Unsubscribes previously subscribed event callback identified by given
         `subscription`."""
 
+    def has(self, txn: Transaction, key: str) -> bool:
+        """Returns true if the given key exists in the map."""
+
 class XmlFragment:
     def parent(self) -> XmlFragment | XmlElement | XmlText | None:
         """Returns the parent of the XML fragment, if any."""
