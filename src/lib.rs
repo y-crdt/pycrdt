@@ -8,6 +8,7 @@ mod text;
 mod array;
 mod map;
 mod transaction;
+mod sticky_index;
 mod subscription;
 mod type_conversions;
 mod undo;
@@ -20,6 +21,7 @@ use crate::text::{Text, TextEvent};
 use crate::array::{Array, ArrayEvent};
 use crate::map::{Map, MapEvent};
 use crate::transaction::Transaction;
+use crate::sticky_index::{StickyIndex, decode_sticky_index, get_sticky_index_from_json_string};
 use crate::subscription::Subscription;
 use crate::undo::{StackItem, UndoManager};
 use crate::update::{get_state, get_update, merge_updates};
@@ -37,6 +39,7 @@ fn _pycrdt(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<MapEvent>()?;
     m.add_class::<Transaction>()?;
     m.add_class::<StackItem>()?;
+    m.add_class::<StickyIndex>()?;
     m.add_class::<Subscription>()?;
     m.add_class::<UndoManager>()?;
     m.add_class::<XmlElement>()?;
@@ -46,5 +49,7 @@ fn _pycrdt(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_state, m)?)?;
     m.add_function(wrap_pyfunction!(get_update, m)?)?;
     m.add_function(wrap_pyfunction!(merge_updates, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_sticky_index, m)?)?;
+    m.add_function(wrap_pyfunction!(get_sticky_index_from_json_string, m)?)?;
     Ok(())
 }
