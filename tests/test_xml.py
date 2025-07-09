@@ -151,6 +151,18 @@ def test_text():
     doc["test2"] = XmlFragment([XmlText()])
 
 
+def test_element_with_any_attribute():
+    doc = Doc()
+
+    doc["test"] = frag = XmlFragment()
+    el = XmlElement("div")
+    frag.children.append(el)
+    el.attributes["class"] = {"a": True}
+    assert el.attributes["class"] == {"a": True}
+    assert list(el.attributes) == [("class", {"a": True})]
+    assert len(el.attributes) == 1
+
+
 def test_element():
     doc = Doc()
 

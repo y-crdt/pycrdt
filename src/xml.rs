@@ -79,24 +79,27 @@ macro_rules! impl_xml_methods {
             )?
 
             $(
-                fn attributes(&self, txn: &mut Transaction) -> Vec<(String, String)> {
+                fn attributes<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> Vec<(String, Bound<'py, PyAny>)> {
                     let mut t0 = txn.transaction();
                     let t1 = t0.as_mut().unwrap();
                     let t = t1.as_ref();
-                    self.$xinner.attributes(t).map(|(k,v)| (String::from(k), v.to_string(t))).collect()
+                    self.$xinner
+                        .attributes(t)
+                        .map(|(k, v)| (String::from(k), v.into_py(py)))
+                        .collect()
                 }
 
-                fn attribute(&self, txn: &mut Transaction, name: &str) -> Option<String> {
+                fn attribute<'py>(&self, py: Python<'py>, txn: &mut Transaction, name: &str) -> Option<Bound<'py, PyAny>> {
                     let mut t0 = txn.transaction();
                     let t1 = t0.as_mut().unwrap();
                     let t = t1.as_ref();
-                    Some(self.$xinner.get_attribute(t, name)?.to_string(t))
+                    Some(self.$xinner.get_attribute(t, name)?.into_py(py))
                 }
 
-                fn insert_attribute(&self, txn: &mut Transaction, name: &str, value: &str) {
+                fn insert_attribute(&self, txn: &mut Transaction, name: &str, value: Bound<'_, PyAny>) {
                     let mut _t = txn.transaction();
                     let mut t = _t.as_mut().unwrap().as_mut();
-                    self.$xinner.insert_attribute(&mut t, name, value);
+                    self.$xinner.insert_attribute(&mut t, name, py_to_any(&value));
                 }
 
                 fn remove_attribute(&self, txn: &mut Transaction, name: &str) {
