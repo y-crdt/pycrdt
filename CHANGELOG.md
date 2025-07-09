@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.25
+
+- Allow XML attributes to be of any type.
+
 ## 0.12.24
 
 - Upgrade `yrs` to v0.24.0.
