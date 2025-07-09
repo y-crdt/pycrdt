@@ -83,16 +83,16 @@ macro_rules! impl_xml_methods {
                     let mut t0 = txn.transaction();
                     let t1 = t0.as_mut().unwrap();
                     let t = t1.as_ref();
-                    self.$xinner.attributes(t).map(|(k,v)| (String::from(k), v)).collect()
+                    self.$xinner.attributes(t).map(|(k,v)| (String::from(k), v.to_string(t))).collect()
                 }
 
                 fn attribute(&self, txn: &mut Transaction, name: &str) -> Option<String> {
                     let mut t0 = txn.transaction();
                     let t1 = t0.as_mut().unwrap();
                     let t = t1.as_ref();
-                    self.$xinner.get_attribute(t, name)
+                    Some(self.$xinner.get_attribute(t, name)?.to_string(t))
                 }
-            
+
                 fn insert_attribute(&self, txn: &mut Transaction, name: &str, value: &str) {
                     let mut _t = txn.transaction();
                     let mut t = _t.as_mut().unwrap().as_mut();
