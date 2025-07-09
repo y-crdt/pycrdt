@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.24
+
+- Upgrade `yrs` to v0.24.0.
+
 ## 0.12.23
 
 - Support sticky index.
