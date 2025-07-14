@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.26
+
+- Bump `trio` to <0.31.
+
 ## 0.12.25
 
 - Allow XML attributes to be of any type.
