@@ -5,12 +5,30 @@ use pyo3::{pyclass, pymethods, Bound, PyAny, PyObject, PyResult, Python};
 use yrs::types::text::YChange;
 use yrs::types::xml::{XmlEvent as _XmlEvent, XmlTextEvent as _XmlTextEvent};
 use yrs::{
-    DeepObservable, GetString as _, Observable as _, Text as _, TransactionMut, Xml as _, XmlElementPrelim, XmlElementRef, XmlFragment as _, XmlFragmentRef, XmlOut, XmlTextPrelim, XmlTextRef
+    ArrayPrelim,
+    MapPrelim,
+    TextPrelim,
+    DeepObservable,
+    GetString as _,
+    Observable as _,
+    Text as _,
+    TransactionMut,
+    Xml as _,
+    XmlElementPrelim,
+    XmlElementRef,
+    XmlFragment as _,
+    XmlFragmentRef,
+    XmlOut,
+    XmlTextPrelim,
+    XmlTextRef
 };
 
 use crate::subscription::Subscription;
 use crate::type_conversions::{events_into_py, py_to_any, py_to_attrs, EntryChangeWrapper, ToPython};
 use crate::transaction::Transaction;
+use crate::array::Array;
+use crate::map::Map;
+use crate::text::Text;
 
 /// Implements methods common to `XmlFragment`, `XmlElement`, and `XmlText`.
 macro_rules! impl_xml_methods {
@@ -242,6 +260,51 @@ impl_xml_methods!(XmlText[text, xml: text] {
             self.text.insert_embed(&mut t, index, embed);
         }
         Ok(())
+    }
+
+    #[pyo3(signature = (txn, index, attrs=None))]
+    fn insert_array_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Array> {
+        let mut _t = txn.transaction();
+        let mut t = _t.as_mut().unwrap().as_mut();
+        let integrated;
+        if let Some(attrs) = attrs {
+            let attrs = py_to_attrs(attrs)?;
+            integrated = self.text.insert_embed_with_attributes(&mut t, index, ArrayPrelim::default(), attrs);
+        } else {
+            integrated = self.text.insert_embed(&mut t, index, ArrayPrelim::default());
+        }
+        let shared = Array::from(integrated);
+        Ok(shared)
+    }
+
+    #[pyo3(signature = (txn, index, attrs=None))]
+    fn insert_map_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Map> {
+        let mut _t = txn.transaction();
+        let mut t = _t.as_mut().unwrap().as_mut();
+        let integrated;
+        if let Some(attrs) = attrs {
+            let attrs = py_to_attrs(attrs)?;
+            integrated = self.text.insert_embed_with_attributes(&mut t, index, MapPrelim::default(), attrs);
+        } else {
+            integrated = self.text.insert_embed(&mut t, index, MapPrelim::default());
+        }
+        let shared = Map::from(integrated);
+        Ok(shared)
+    }
+
+    #[pyo3(signature = (txn, index, attrs=None))]
+    fn insert_text_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Text> {
+        let mut _t = txn.transaction();
+        let mut t = _t.as_mut().unwrap().as_mut();
+        let integrated;
+        if let Some(attrs) = attrs {
+            let attrs = py_to_attrs(attrs)?;
+            integrated = self.text.insert_embed_with_attributes(&mut t, index, TextPrelim::default(), attrs);
+        } else {
+            integrated = self.text.insert_embed(&mut t, index, TextPrelim::default());
+        }
+        let shared = Text::from(integrated);
+        Ok(shared)
     }
 
     fn remove_range(&self, txn: &mut Transaction, index: u32, len: u32) {
