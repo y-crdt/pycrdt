@@ -1,5 +1,10 @@
 # Version history
 
+## 0.12.27
+
+- Support XML `insert_embed` shared types.
+- Fix `UndoManager` with `XmlFragment`.
+
 ## 0.12.26
 
 - Bump `trio` to <0.31.
