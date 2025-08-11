@@ -262,9 +262,16 @@ class XmlText(_XmlTraitMixin):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
-            self.integrated.insert_embed(
-                txn._txn, index, value, iter(attrs.items()) if attrs is not None else None
-            )
+            _attrs = iter(attrs.items()) if attrs is not None else None
+            if isinstance(value, BaseType):
+                # shared type
+                assert txn._txn is not None
+                self._do_and_integrate("insert", value, txn._txn, index, _attrs)
+            else:
+                # primitive type
+                self.integrated.insert_embed(
+                    txn._txn, index, value, _attrs
+                )
 
     def format(self, start: int, stop: int, attrs: dict[str, Any]) -> None:
         """
