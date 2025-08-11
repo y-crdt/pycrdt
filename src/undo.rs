@@ -15,6 +15,7 @@ use crate::doc::Doc;
 use crate::text::Text;
 use crate::array::Array;
 use crate::map::Map;
+use crate::xml::XmlFragment;
 
 struct PythonClock {
     timestamp: PyObject,
@@ -58,6 +59,10 @@ impl UndoManager {
 
     pub fn expand_scope_map(&mut self, scope: &Map) {
         self.undo_manager.expand_scope(&scope.map);
+    }
+
+    pub fn expand_scope_xmlfragment(&mut self, scope: &XmlFragment) {
+        self.undo_manager.expand_scope(&scope.fragment);
     }
 
     pub fn include_origin(&mut self, origin: i128) {
