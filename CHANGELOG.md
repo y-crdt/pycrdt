@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.28
+
+- Upgrade `pyo3` to v0.26.0.
+
 ## 0.12.27
 
 - Support XML `insert_embed` shared types.
