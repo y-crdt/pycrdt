@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.29
+
+- Improve performance of `map.__contains__`.
+
 ## 0.12.28
 
 - Upgrade `pyo3` to v0.26.0.
