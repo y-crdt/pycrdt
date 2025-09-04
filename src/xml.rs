@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
 use pyo3::types::{PyBool, PyDict, PyIterator, PyList, PyString, PyTuple};
-use pyo3::{pyclass, pymethods, Bound, PyAny, PyObject, PyResult, Python};
+use pyo3::{pyclass, pymethods, Bound, PyAny, PyResult, Python};
 use yrs::types::text::YChange;
 use yrs::types::xml::{XmlEvent as _XmlEvent, XmlTextEvent as _XmlTextEvent};
 use yrs::{
@@ -159,9 +159,9 @@ impl From<XmlFragmentRef> for XmlFragment {
 }
 
 impl_xml_methods!(XmlFragment[fragment, fragment: fragment] {
-    fn observe(&self, f: PyObject) -> Subscription {
+    fn observe(&self, f: Py<PyAny>) -> Subscription {
         self.fragment.observe(move |txn, e| {
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 let e = unsafe { XmlEvent::from_xml_event(e, txn, py) };
                 if let Err(err) = f.call1(py, (e,)) {
                     err.restore(py)
@@ -170,9 +170,9 @@ impl_xml_methods!(XmlFragment[fragment, fragment: fragment] {
         }).into()
     }
 
-    fn observe_deep(&self, f: PyObject) -> Subscription {
+    fn observe_deep(&self, f: Py<PyAny>) -> Subscription {
         self.fragment.observe_deep(move |txn, events| {
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 let events = events_into_py(py, txn, events);
                 if let Err(err) = f.call1(py, (events,)) {
                     err.restore(py);
@@ -199,9 +199,9 @@ impl_xml_methods!(XmlElement[element, fragment: element, xml: element] {
         self.element.try_tag().map(|s| String::from(&**s))
     }
 
-    fn observe(&self, f: PyObject) -> Subscription {
+    fn observe(&self, f: Py<PyAny>) -> Subscription {
         self.element.observe(move |txn, e| {
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 let e = unsafe { XmlEvent::from_xml_event(e, txn, py) };
                 if let Err(err) = f.call1(py, (e,)) {
                     err.restore(py)
@@ -210,9 +210,9 @@ impl_xml_methods!(XmlElement[element, fragment: element, xml: element] {
         }).into()
     }
 
-    fn observe_deep(&self, f: PyObject) -> Subscription {
+    fn observe_deep(&self, f: Py<PyAny>) -> Subscription {
         self.element.observe_deep(move |txn, events| {
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 let events = events_into_py(py, txn, events);
                 if let Err(err) = f.call1(py, (events,)) {
                     err.restore(py);
@@ -352,9 +352,9 @@ impl_xml_methods!(XmlText[text, xml: text] {
         ).unwrap()
     }
 
-    fn observe(&self, f: PyObject) -> Subscription {
+    fn observe(&self, f: Py<PyAny>) -> Subscription {
         self.text.observe(move |txn, e| {
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 let e = unsafe { XmlEvent::from_xml_text_event(e, txn, py) };
                 if let Err(err) = f.call1(py, (e,)) {
                     err.restore(py)
@@ -363,7 +363,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
         }).into()
     }
 
-    fn observe_deep(&self, f: PyObject) -> Subscription {
+    fn observe_deep(&self, f: Py<PyAny>) -> Subscription {
         self.observe(f)
     }
 });
@@ -375,15 +375,15 @@ pub struct XmlEvent {
     txn: *const TransactionMut<'static>,
     transaction: Option<Py<Transaction>>,
     #[pyo3(get)]
-    children_changed: PyObject,
+    children_changed: Py<PyAny>,
     #[pyo3(get)]
-    target: PyObject,
+    target: Py<PyAny>,
     #[pyo3(get)]
-    path: PyObject,
+    path: Py<PyAny>,
     #[pyo3(get)]
-    delta: PyObject,
+    delta: Py<PyAny>,
     #[pyo3(get)]
-    keys: PyObject,
+    keys: Py<PyAny>,
 }
 
 impl XmlEvent {

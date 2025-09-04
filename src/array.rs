@@ -93,11 +93,11 @@ impl Array {
         Ok(shared)
     }
 
-    fn insert_xmlelement_prelim(&self, _txn: &mut Transaction, _index: u32) -> PyResult<PyObject> {
+    fn insert_xmlelement_prelim(&self, _txn: &mut Transaction, _index: u32) -> PyResult<Py<PyAny>> {
         Err(PyTypeError::new_err("Cannot insert an XmlElement into an array - insert it into an XmlFragment and insert that into the array"))
     }
 
-    fn insert_xmltext_prelim(&self, _txn: &mut Transaction, _index: u32) -> PyResult<PyObject> {
+    fn insert_xmltext_prelim(&self, _txn: &mut Transaction, _index: u32) -> PyResult<Py<PyAny>> {
         Err(PyTypeError::new_err("Cannot insert an XmlText into an array - insert it into an XmlFragment and insert that into the array"))
     }
 
@@ -159,10 +159,10 @@ impl Array {
         Ok(s)
     }
 
-    pub fn observe(&mut self, py: Python<'_>, f: PyObject) -> PyResult<Py<Subscription>> {
+    pub fn observe(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let sub = self.array
             .observe(move |txn, e| {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let event = ArrayEvent::new(e, txn);
                     if let Err(err) = f.call1(py, (event,)) {
                         err.restore(py)
@@ -173,10 +173,10 @@ impl Array {
         Ok(s)
     }
 
-    pub fn observe_deep(&mut self, py: Python<'_>, f: PyObject) -> PyResult<Py<Subscription>> {
+    pub fn observe_deep(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let sub = self.array
             .observe_deep(move |txn, events| {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let events = events_into_py(py, txn, events);
                     if let Err(err) = f.call1(py, (events,)) {
                         err.restore(py)
@@ -192,10 +192,10 @@ impl Array {
 pub struct ArrayEvent {
     event: *const _ArrayEvent,
     txn: *const TransactionMut<'static>,
-    target: Option<PyObject>,
-    delta: Option<PyObject>,
-    path: Option<PyObject>,
-    transaction: Option<PyObject>,
+    target: Option<Py<PyAny>>,
+    delta: Option<Py<PyAny>>,
+    path: Option<Py<PyAny>>,
+    transaction: Option<Py<PyAny>>,
 }
 
 impl ArrayEvent {
