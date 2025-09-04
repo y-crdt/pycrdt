@@ -18,12 +18,12 @@ use crate::map::Map;
 use crate::xml::XmlFragment;
 
 struct PythonClock {
-    timestamp: PyObject,
+    timestamp: Py<PyAny>,
 }
 
 impl Clock for PythonClock {
     fn now(&self) -> Timestamp {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             self.timestamp.call0(py).expect("Error getting timestamp").extract(py).expect("Could not convert timestamp to int")
         })
     }
@@ -37,7 +37,7 @@ pub struct UndoManager {
 #[pymethods]
 impl UndoManager {
     #[new]
-    fn new(doc: &Doc, capture_timeout_millis: u64, timestamp: PyObject) -> Self {
+    fn new(doc: &Doc, capture_timeout_millis: u64, timestamp: Py<PyAny>) -> Self {
         let mut options = Options {
             capture_timeout_millis: 500,
             tracked_origins: HashSet::new(),

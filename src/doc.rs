@@ -95,20 +95,20 @@ impl Doc {
         Err(PyRuntimeError::new_err("Already in a transaction"))
     }
 
-    fn get_state(&mut self) -> PyObject {
+    fn get_state(&mut self) -> Py<PyAny> {
         let txn = self.doc.transact_mut();
         let state = txn.state_vector().encode_v1();
         drop(txn);
-        Python::with_gil(|py| PyBytes::new(py, &state).into())
+        Python::attach(|py| PyBytes::new(py, &state).into())
     }
 
-    fn get_update(&mut self, state: &Bound<'_, PyBytes>) -> PyResult<PyObject> {
+    fn get_update(&mut self, state: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
         let txn = self.doc.transact_mut();
         let state: &[u8] = state.extract()?;
         let Ok(state_vector) = StateVector::decode_v1(&state) else { return Err(PyValueError::new_err("Cannot decode state")) };
         let update = txn.encode_diff_v1(&state_vector);
         drop(txn);
-        let bytes: PyObject = Python::with_gil(|py| PyBytes::new(py, &update).into());
+        let bytes: Py<PyAny> = Python::attach(|py| PyBytes::new(py, &update).into());
         Ok(bytes)
     }
 
@@ -120,7 +120,7 @@ impl Doc {
             .map_err(|e| PyRuntimeError::new_err(format!("Cannot apply update: {}", e)))
     }
 
-    fn roots(&self, py: Python<'_>, txn: &mut Transaction) -> PyObject {
+    fn roots(&self, py: Python<'_>, txn: &mut Transaction) -> Py<PyAny> {
         let mut t0 = txn.transaction();
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
@@ -131,11 +131,11 @@ impl Doc {
         result.into()
     }
 
-    pub fn observe(&mut self, py: Python<'_>, f: PyObject) -> PyResult<Py<Subscription>> {
+    pub fn observe(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let sub = self.doc
             .observe_transaction_cleanup(move |txn, event| {
                 if !event.delete_set.is_empty() || event.before_state != event.after_state {
-                    Python::with_gil(|py| {
+                    Python::attach(|py| {
                         let event = TransactionEvent::new(py, event, txn);
                         if let Err(err) = f.call1(py, (event,)) {
                             err.restore(py)
@@ -148,10 +148,10 @@ impl Doc {
         Ok(s)
     }
 
-    pub fn observe_subdocs(&mut self, py: Python<'_>, f: PyObject) -> PyResult<Py<Subscription>> {
+    pub fn observe_subdocs(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let sub = self.doc
             .observe_subdocs(move |_, event| {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let event = SubdocsEvent::new(py, event);
                     if let Err(err) = f.call1(py, (event,)) {
                         err.restore(py)
@@ -172,7 +172,7 @@ pub struct TransactionEvent {
     after_state: Option<Py<PyBytes>>,
     delete_set: Option<Py<PyBytes>>,
     update: Option<Py<PyBytes>>,
-    transaction: Option<PyObject>,
+    transaction: Option<Py<PyAny>>,
 }
 
 impl TransactionEvent {
@@ -264,9 +264,9 @@ impl TransactionEvent {
 
 #[pyclass(unsendable)]
 pub struct SubdocsEvent {
-    added: PyObject,
-    removed: PyObject,
-    loaded: PyObject,
+    added: Py<PyAny>,
+    removed: Py<PyAny>,
+    loaded: Py<PyAny>,
 }
 
 impl SubdocsEvent {
@@ -288,17 +288,17 @@ impl SubdocsEvent {
 #[pymethods]
 impl SubdocsEvent {
     #[getter]
-    pub fn added(&mut self, py: Python<'_>) -> PyObject {
+    pub fn added(&mut self, py: Python<'_>) -> Py<PyAny> {
         self.added.clone_ref(py)
     }
 
     #[getter]
-    pub fn removed(&mut self, py: Python<'_>) -> PyObject {
+    pub fn removed(&mut self, py: Python<'_>) -> Py<PyAny> {
         self.removed.clone_ref(py)
     }
 
     #[getter]
-    pub fn loaded(&mut self, py: Python<'_>) -> PyObject {
+    pub fn loaded(&mut self, py: Python<'_>) -> Py<PyAny> {
         self.loaded.clone_ref(py)
     }
 }

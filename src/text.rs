@@ -131,9 +131,9 @@ impl Text {
         Ok(s)
     }
 
-    fn observe(&mut self, py: Python<'_>, f: PyObject) -> PyResult<Py<Subscription>> {
+    fn observe(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let sub = self.text.observe(move |txn, e| {
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 let e = TextEvent::new(e, txn);
                 if let Err(err) = f.call1(py, (e,)) {
                     err.restore(py)
@@ -144,7 +144,7 @@ impl Text {
         Ok(s)
     }
 
-    pub fn observe_deep(&mut self, py: Python<'_>, f: PyObject) -> PyResult<Py<Subscription>> {
+    pub fn observe_deep(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         self.observe(py, f)
     }
 }
@@ -153,10 +153,10 @@ impl Text {
 pub struct TextEvent {
     event: *const _TextEvent,
     txn: *const TransactionMut<'static>,
-    target: Option<PyObject>,
-    delta: Option<PyObject>,
-    path: Option<PyObject>,
-    transaction: Option<PyObject>,
+    target: Option<Py<PyAny>>,
+    delta: Option<Py<PyAny>>,
+    path: Option<Py<PyAny>>,
+    transaction: Option<Py<PyAny>>,
 }
 
 impl TextEvent {

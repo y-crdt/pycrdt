@@ -44,14 +44,14 @@ impl StickyIndex {
         self.sticky_index.borrow_mut().as_mut().unwrap().get_offset(t).unwrap().index
     }
 
-    pub fn encode(&self) -> PyObject {
+    pub fn encode(&self) -> Py<PyAny> {
         let encoded = self.sticky_index.borrow_mut().as_mut().unwrap().encode_v1();
-        Python::with_gil(|py| PyBytes::new(py, &encoded).into())
+        Python::attach(|py| PyBytes::new(py, &encoded).into())
     }
 
-    pub fn to_json_string(&self) -> PyObject {
+    pub fn to_json_string(&self) -> Py<PyAny> {
         let encoded = serde_json::to_string(self.sticky_index.borrow_mut().as_mut().unwrap()).unwrap();
-        Python::with_gil(|py| PyString::new(py, &encoded).into())
+        Python::attach(|py| PyString::new(py, &encoded).into())
     }
 
     pub fn get_assoc(&self) -> i8 {
