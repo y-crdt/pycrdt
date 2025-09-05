@@ -30,6 +30,7 @@ class Doc(BaseDoc, Generic[T]):
         init: dict[str, T] = {},
         *,
         client_id: int | None = None,
+        skip_gc: bool | None = None,
         doc: _Doc | None = None,
         Model=None,
         allow_multithreading: bool = False,
@@ -43,7 +44,7 @@ class Doc(BaseDoc, Generic[T]):
             allow_multithreading: Whether to allow the document to be used in different threads.
         """
         super().__init__(
-            client_id=client_id, doc=doc, Model=Model, allow_multithreading=allow_multithreading
+            client_id=client_id, skip_gc=skip_gc, doc=doc, Model=Model, allow_multithreading=allow_multithreading
         )
         for k, v in init.items():
             self[k] = v
