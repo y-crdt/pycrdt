@@ -38,6 +38,8 @@ class Doc(BaseDoc, Generic[T]):
         Args:
             init: The initial root types of the document.
             client_id: An optional client ID for the document.
+            skip_gc: Whether to skip garbage collection on deleted collections
+                on transaction commit.
             allow_multithreading: Whether to allow the document to be used in different threads.
         """
         super().__init__(
