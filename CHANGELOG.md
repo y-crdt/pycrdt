@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.31
+
+- Expose `skip_gc` in `Doc`.
+
 ## 0.12.30
 
 - Allow turning garbage collection off.
