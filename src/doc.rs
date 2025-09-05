@@ -1,9 +1,9 @@
 use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
-use pyo3::types::{PyBytes, PyDict, PyInt, PyList};
+use pyo3::types::{PyBool, PyBytes, PyDict, PyInt, PyList};
 use yrs::{
-    Doc as _Doc, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
+    Doc as _Doc, Options, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
 };
 use yrs::updates::encoder::Encode;
 use yrs::updates::decoder::Decode;
@@ -31,13 +31,17 @@ impl Doc {
 #[pymethods]
 impl Doc {
     #[new]
-    fn new(client_id: &Bound<'_, PyAny>) -> Self {
-        if client_id.is_none() {
-            let doc = _Doc::new();
-            return Doc { doc };
+    fn new(client_id: &Bound<'_, PyAny>, skip_gc: &Bound<'_, PyAny>) -> Self {
+        let mut options = Options::default();
+        if !client_id.is_none() {
+            let _client_id: u64 = client_id.downcast::<PyInt>().unwrap().extract().unwrap();
+            options.client_id = _client_id;
         }
-        let id: u64 = client_id.downcast::<PyInt>().unwrap().extract().unwrap();
-        let doc = _Doc::with_client_id(id);
+        if !skip_gc.is_none() {
+            let _skip_gc: bool = client_id.downcast::<PyBool>().unwrap().extract().unwrap();
+            options.skip_gc = _skip_gc;
+        }
+        let doc = _Doc::with_options(options);
         Doc { doc }
     }
 

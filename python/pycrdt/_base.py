@@ -54,6 +54,7 @@ class BaseDoc:
         self,
         *,
         client_id: int | None = None,
+        skip_gc: bool | None = None,
         doc: _Doc | None = None,
         Model=None,
         allow_multithreading: bool = False,
@@ -61,7 +62,7 @@ class BaseDoc:
     ) -> None:
         super().__init__(**data)
         if doc is None:
-            doc = _Doc(client_id)
+            doc = _Doc(client_id, skip_gc)
         self._doc = doc
         self._txn = None
         self._txn_lock = threading.Lock()
