@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.32
+
+- Fix `skip_gc` in `Doc`.
+
 ## 0.12.31
 
 - Expose `skip_gc` in `Doc`.
