@@ -38,7 +38,7 @@ impl Doc {
             options.client_id = _client_id;
         }
         if !skip_gc.is_none() {
-            let _skip_gc: bool = client_id.downcast::<PyBool>().unwrap().extract().unwrap();
+            let _skip_gc: bool = skip_gc.downcast::<PyBool>().unwrap().extract().unwrap();
             options.skip_gc = _skip_gc;
         }
         let doc = _Doc::with_options(options);
