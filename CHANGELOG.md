@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.30
+
+- Allow turning garbage collection off.
+
 ## 0.12.29
 
 - Improve performance of `map.__contains__`.
