@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-
+from typing import TYPE_CHECKING
 
 from ._pycrdt import Snapshot as _Snapshot
+
+if TYPE_CHECKING:
+    from ._doc import Doc
 
 
 @dataclass
@@ -17,7 +19,7 @@ class Snapshot:
     _snapshot: _Snapshot
 
     @classmethod
-    def from_doc(cls, doc) -> "Snapshot":
+    def from_doc(cls, doc: 'Doc') -> "Snapshot":
         """
         Create a snapshot from a document.
 
@@ -26,8 +28,6 @@ class Snapshot:
         Returns:
             The snapshot of the document's current state.
         """
-        # Local import to avoid circular import
-        # from pycrdt import Doc
         snap = _Snapshot.from_doc(doc._doc)
         return cls(snap)
 
