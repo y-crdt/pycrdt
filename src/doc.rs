@@ -49,15 +49,16 @@ impl Doc {
             txn.apply_update(update).unwrap();
         }
         // Ensure root types are present in the restored doc (recreate them if needed)
-        // Copy root type names from the original doc
+        // Copy root type names and types from the original doc
         let txn_orig = original.doc.transact();
-        let root_names: Vec<&str> = txn_orig.root_refs().into_iter().map(|(k, _)| k).collect();
-        for name in root_names {
-            // Try to access each root type in the new doc, which will create it if missing
-            let _ = new_doc.get_or_insert_text(name);
-            let _ = new_doc.get_or_insert_array(name);
-            let _ = new_doc.get_or_insert_map(name);
-            let _ = new_doc.get_or_insert_xml_fragment(name);
+        for (name, root) in txn_orig.root_refs() {
+            match root {
+                yrs::Out::YText(_) => { let _ = new_doc.get_or_insert_text(name); },
+                yrs::Out::YArray(_) => { let _ = new_doc.get_or_insert_array(name); },
+                yrs::Out::YMap(_) => { let _ = new_doc.get_or_insert_map(name); },
+                yrs::Out::YXmlFragment(_) => { let _ = new_doc.get_or_insert_xml_fragment(name); },
+                _ => {}, // ignore unknown types
+            }
         }
         drop(txn_orig);
         Doc { doc: new_doc }
