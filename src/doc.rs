@@ -84,7 +84,7 @@ impl Doc {
 
     #[staticmethod]
     #[pyo3(name = "from_snapshot")]
-    pub fn from_snapshot(py: Python<'_>, doc: PyRef<'_, Doc>, snapshot: PyRef<'_, crate::snapshot::Snapshot>) -> PyResult<Py<Doc>> {
+    pub fn from_snapshot(py: Python<'_>, snapshot: PyRef<'_, crate::snapshot::Snapshot>, doc: PyRef<'_, Doc>) -> PyResult<Py<Doc>> {
         let restored = Doc::_from_snapshot_impl(&doc, &snapshot);
         Py::new(py, restored)
     }

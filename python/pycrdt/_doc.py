@@ -187,7 +187,7 @@ class Doc(BaseDoc, Generic[T]):
         Returns:
             A new Doc instance restored to the snapshot state.
         """
-        new_doc = _Doc.from_snapshot(doc._doc, snapshot._snapshot)
+        new_doc = _Doc.from_snapshot(snapshot._snapshot, doc._doc)
         return Doc(doc=new_doc)
 
     def __setitem__(self, key: str, value: T) -> None:
