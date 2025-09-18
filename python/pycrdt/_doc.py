@@ -10,6 +10,7 @@ from ._base import BaseDoc, BaseType, Typed, base_types, forbid_read_transaction
 from ._pycrdt import Doc as _Doc
 from ._pycrdt import SubdocsEvent, Subscription, TransactionEvent
 from ._pycrdt import Transaction as _Transaction
+from ._snapshot import Snapshot
 from ._transaction import NewTransaction, ReadTransaction, Transaction
 
 T = TypeVar("T", bound=BaseType)
@@ -175,6 +176,19 @@ class Doc(BaseDoc, Generic[T]):
             forbid_read_transaction(txn)
             assert txn._txn is not None
             self._doc.apply_update(txn._txn, update)
+
+    @staticmethod
+    def from_snapshot(snapshot: "Snapshot", doc: "Doc") -> "Doc":
+        """
+        Create a new Doc from a Snapshot and an original Doc.
+        Args:
+            snapshot: The Snapshot to restore to.
+            doc: The original Doc to use for options/state.
+        Returns:
+            A new Doc instance restored to the snapshot state.
+        """
+        new_doc = _Doc.from_snapshot(doc._doc, snapshot._snapshot)
+        return Doc(doc=new_doc)
 
     def __setitem__(self, key: str, value: T) -> None:
         """

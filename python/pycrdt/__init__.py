@@ -41,3 +41,4 @@ from ._xml import XmlElement as XmlElement
 from ._xml import XmlEvent as XmlEvent
 from ._xml import XmlFragment as XmlFragment
 from ._xml import XmlText as XmlText
+from ._snapshot import Snapshot as Snapshot
