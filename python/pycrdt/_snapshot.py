@@ -19,7 +19,7 @@ class Snapshot:
     _snapshot: _Snapshot
 
     @classmethod
-    def from_doc(cls, doc: 'Doc') -> "Snapshot":
+    def from_doc(cls, doc: "Doc") -> "Snapshot":
         """
         Create a snapshot from a document.
 
