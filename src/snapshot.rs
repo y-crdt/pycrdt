@@ -43,5 +43,4 @@ impl Snapshot {
             Err(e) => Err(pyo3::exceptions::PyValueError::new_err(format!("Failed to decode snapshot: {}", e)))
         }
     }
-
 }

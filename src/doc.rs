@@ -62,7 +62,7 @@ impl Doc {
         }
         drop(txn_orig);
         Doc { doc: new_doc }
-        }
+    }
 }
 
 #[pymethods]
