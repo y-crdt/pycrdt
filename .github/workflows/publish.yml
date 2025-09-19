@@ -47,21 +47,23 @@ jobs:
       matrix:
         platform:
           - target: x64
-            interpreter: 3.9 3.10 3.11 3.12 3.13
+            interpreter: ["3.9", "3.10", "3.11", "3.12", "3.13"]
           - target: x86
-            interpreter: 3.9 3.10 3.11 3.12 3.13
+            interpreter: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: |
+            ${{ join(matrix.platform.interpreter, '
+            ') }}
           architecture: ${{ matrix.platform.target }}
       - uses: dtolnay/rust-toolchain@stable
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i ${{ matrix.platform.interpreter }}
+          args: --release --out dist -i ${{ join(matrix.platform.interpreter, ' ') }}
       - name: Test built wheel
         run: |
           pip install pytest pytest-mypy-testing "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.31" "exceptiongroup; python_version<'3.11'"
