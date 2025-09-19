@@ -5,7 +5,7 @@ use pyo3::types::{PyBool, PyBytes, PyDict, PyInt, PyList};
 use yrs::{
     Doc as _Doc, Options, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
 };
-use yrs::updates::encoder::Encode;
+use yrs::updates::encoder::{Encode, Encoder};
 use yrs::updates::decoder::Decode;
 use crate::text::Text;
 use crate::array::Array;
@@ -26,6 +26,43 @@ impl Doc {
     pub fn from(doc: _Doc) -> Self {
         Doc { doc }
     }
+    /// Internal: create a new Doc from a Snapshot and an original Doc
+    pub fn _from_snapshot_impl(original: &Self, snapshot: &crate::snapshot::Snapshot) -> Self {
+        // Create a new Doc with the same options as the original
+        let mut options = yrs::Options::default();
+        options.client_id = original.doc.client_id();
+        options.skip_gc = original.doc.skip_gc();
+        if let Some(collection_id) = original.doc.collection_id() {
+            options.collection_id = Some(collection_id);
+        }
+        options.guid = original.doc.guid();
+        let new_doc = yrs::Doc::with_options(options);
+        // Encode the update from the snapshot
+        let mut encoder = yrs::updates::encoder::EncoderV1::new();
+        {
+            let txn = original.doc.transact();
+            txn.encode_state_from_snapshot(&snapshot.snapshot, &mut encoder).unwrap();
+        }
+        let update = yrs::Update::decode_v1(&encoder.to_vec()).unwrap();
+        {
+            let mut txn = new_doc.transact_mut();
+            txn.apply_update(update).unwrap();
+        }
+        // Ensure root types are present in the restored doc (recreate them if needed)
+        // Copy root type names and types from the original doc
+        let txn_orig = original.doc.transact();
+        for (name, root) in txn_orig.root_refs() {
+            match root {
+                yrs::Out::YText(_) => { let _ = new_doc.get_or_insert_text(name); },
+                yrs::Out::YArray(_) => { let _ = new_doc.get_or_insert_array(name); },
+                yrs::Out::YMap(_) => { let _ = new_doc.get_or_insert_map(name); },
+                yrs::Out::YXmlFragment(_) => { let _ = new_doc.get_or_insert_xml_fragment(name); },
+                _ => {}, // ignore unknown types
+            }
+        }
+        drop(txn_orig);
+        Doc { doc: new_doc }
+    }
 }
 
 #[pymethods]
@@ -43,6 +80,13 @@ impl Doc {
         }
         let doc = _Doc::with_options(options);
         Doc { doc }
+    }
+
+    #[staticmethod]
+    #[pyo3(name = "from_snapshot")]
+    pub fn from_snapshot(py: Python<'_>, snapshot: PyRef<'_, crate::snapshot::Snapshot>, doc: PyRef<'_, Doc>) -> PyResult<Py<Doc>> {
+        let restored = Doc::_from_snapshot_impl(&doc, &snapshot);
+        Py::new(py, restored)
     }
 
     fn guid(&mut self) -> String {

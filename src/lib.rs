@@ -14,6 +14,7 @@ mod type_conversions;
 mod undo;
 mod update;
 mod xml;
+mod snapshot;
 use crate::doc::Doc;
 use crate::doc::TransactionEvent;
 use crate::doc::SubdocsEvent;
@@ -25,6 +26,7 @@ use crate::sticky_index::{StickyIndex, decode_sticky_index, get_sticky_index_fro
 use crate::subscription::Subscription;
 use crate::undo::{StackItem, UndoManager};
 use crate::update::{get_state, get_update, merge_updates};
+use crate::snapshot::Snapshot;
 
 #[pymodule]
 fn _pycrdt(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -46,6 +48,7 @@ fn _pycrdt(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<XmlFragment>()?;
     m.add_class::<XmlText>()?;
     m.add_class::<XmlEvent>()?;
+    m.add_class::<Snapshot>()?;
     m.add_function(wrap_pyfunction!(get_state, m)?)?;
     m.add_function(wrap_pyfunction!(get_update, m)?)?;
     m.add_function(wrap_pyfunction!(merge_updates, m)?)?;

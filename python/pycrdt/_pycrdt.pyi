@@ -1,11 +1,29 @@
 from typing import Any, Callable, Iterator
 
+class Snapshot:
+    """A snapshot of a document's state at a given point in time."""
+
+    @staticmethod
+    def from_doc(doc: "Doc") -> "Snapshot":
+        """Create a snapshot from a document."""
+
+    @staticmethod
+    def decode(data: bytes) -> "Snapshot":
+        """Decode a snapshot from its binary representation."""
+
+    def encode(self) -> bytes:
+        """Encode the snapshot to its binary representation."""
+
 class Doc:
     """Shared document."""
 
     def __init__(self, client_id: int | None, skip_gc: bool | None) -> None:
         """Create a new document with an optional global client ID.
         If no client ID is passed, a random one will be generated."""
+
+    @staticmethod
+    def from_snapshot(snapshot: "Snapshot", doc: Doc) -> "Doc":
+        """Create a new Doc from a Snapshot and an original Doc."""
 
     def client_id(self) -> int:
         """Returns the document unique client identifier."""
