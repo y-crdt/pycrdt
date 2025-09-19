@@ -207,7 +207,7 @@ impl MapEvent {
         unsafe { self.event.as_ref().unwrap() }
     }
 
-    fn txn(&self) -> &TransactionMut {
+    fn txn(&self) -> &TransactionMut<'_> {
         unsafe { self.txn.as_ref().unwrap() }
     }
 }
