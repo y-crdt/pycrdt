@@ -1,8 +1,9 @@
 # Version history
 
-## 0.12.33
+## 0.12.34
 
 - Add snapshot support.
+- Install multiple Pythons to not rely on Windows hosted Python cache.
 
 ## 0.12.32
 
