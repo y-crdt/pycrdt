@@ -17,7 +17,7 @@ use crate::type_conversions::{py_to_any, py_to_attrs, ToPython};
 use crate::sticky_index::StickyIndex;
 
 
-#[pyclass(name = "Text", module = "pycrdt._pycrdt")]
+#[pyclass]
 pub struct Text {
     pub text: TextRef,
 }

@@ -54,6 +54,3 @@ class Snapshot:
             The bytes representing the snapshot.
         """
         return self._snapshot.encode()
-
-
-__all__ = ["Snapshot"]
