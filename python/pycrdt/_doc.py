@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import Any, Callable, Generic, Iterable, Literal, Type, TypeVar, Union, cast, overload
+from inspect import iscoroutinefunction
+from typing import Any, Awaitable, Callable, Generic, Iterable, Literal, Type, TypeVar, Union, cast, overload
 
 from anyio import BrokenResourceError, create_memory_object_stream
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
@@ -288,19 +289,37 @@ class Doc(BaseDoc, Generic[T]):
                 for key, val in self._doc.roots(txn._txn).items()
             }
 
-    def observe(self, callback: Callable[[TransactionEvent], None]) -> Subscription:
+    def observe(
+        self,
+        callback: Callable[[TransactionEvent], None] | Callable[[TransactionEvent], Awaitable[None]],
+    ) -> Subscription:
         """
         Subscribes a callback to be called with the document change event.
 
         Args:
             callback: The callback to call with the [TransactionEvent][pycrdt.TransactionEvent].
+                The callback can be async.
 
         Returns:
             The subscription that can be used to [unobserve()][pycrdt.Doc.unobserve].
         """
-        subscription = self._doc.observe(callback)
+        if iscoroutinefunction(callback):
+            cb = self._async_callback_to_sync(callback)
+        else:
+            cb = cast(Callable[[TransactionEvent], None], callback)
+        subscription = self._doc.observe(cb)
         self._subscriptions.append(subscription)
         return subscription
+
+    def _async_callback_to_sync(
+        self,
+        async_callback: Callable[[TransactionEvent], Awaitable[None]],
+    ) -> Callable[[TransactionEvent], None]:
+        def callback(event: TransactionEvent) -> None:
+            assert self._task_group is not None
+            self._task_group.start_soon(async_callback, event)
+
+        return callback
 
     def observe_subdocs(self, callback: Callable[[SubdocsEvent], None]) -> Subscription:
         """
