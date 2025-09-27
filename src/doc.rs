@@ -143,19 +143,19 @@ impl Doc {
         Err(PyRuntimeError::new_err("Already in a transaction"))
     }
 
-    fn get_state(&mut self) -> Py<PyAny> {
-        let txn = self.doc.transact_mut();
-        let state = txn.state_vector().encode_v1();
-        drop(txn);
+    fn get_state(&self, txn: &Transaction) -> Py<PyAny> {
+        let mut _t = txn.transaction();
+        let t = _t.as_mut().unwrap().as_mut();
+        let state = t.state_vector().encode_v1();
         Python::attach(|py| PyBytes::new(py, &state).into())
     }
 
-    fn get_update(&mut self, state: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
-        let txn = self.doc.transact_mut();
+    fn get_update(&self, txn: &Transaction, state: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
+        let mut _t = txn.transaction();
+        let t = _t.as_mut().unwrap().as_mut();
         let state: &[u8] = state.extract()?;
         let Ok(state_vector) = StateVector::decode_v1(&state) else { return Err(PyValueError::new_err("Cannot decode state")) };
-        let update = txn.encode_diff_v1(&state_vector);
-        drop(txn);
+        let update = t.encode_diff_v1(&state_vector);
         let bytes: Py<PyAny> = Python::attach(|py| PyBytes::new(py, &update).into());
         Ok(bytes)
     }

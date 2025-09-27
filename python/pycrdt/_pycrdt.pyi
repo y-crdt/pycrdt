@@ -49,10 +49,10 @@ class Doc:
     def get_or_insert_xml_fragment(self, txn: Transaction, name: str) -> XmlFragment:
         """Create an XML fragment root type on this document, or get an existing one."""
 
-    def get_state(self) -> bytes:
+    def get_state(self, txn: Transaction) -> bytes:
         """Get the current document state."""
 
-    def get_update(self, state: bytes) -> bytes:
+    def get_update(self, txn: Transaction, state: bytes) -> bytes:
         """Get the update from the given state to the current state."""
 
     def apply_update(self, txn: Transaction, update: bytes) -> None:
