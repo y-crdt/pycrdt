@@ -1,5 +1,10 @@
 # Version history
 
+## 0.12.36
+
+- Support document change async callbacks.
+- Allow `get_state` and `get_update` to use an existing transaction.
+
 ## 0.12.35
 
 - Bump `trio` to <0.32.
