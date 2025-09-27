@@ -144,7 +144,9 @@ class Doc(BaseDoc, Generic[T]):
         Returns:
             The current document state.
         """
-        return self._doc.get_state()
+        with self.transaction() as txn:
+            assert txn._txn is not None
+            return self._doc.get_state(txn._txn)
 
     def get_update(self, state: bytes | None = None) -> bytes:
         """
@@ -156,7 +158,9 @@ class Doc(BaseDoc, Generic[T]):
         """
         if state is None:
             state = b"\x00"
-        return self._doc.get_update(state)
+        with self.transaction() as txn:
+            assert txn._txn is not None
+            return self._doc.get_update(txn._txn, state)
 
     def apply_update(self, update: bytes) -> None:
         """
