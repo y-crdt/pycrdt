@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.35
+
+- Bump `trio` to <0.32.
+
 ## 0.12.34
 
 - Add snapshot support.
