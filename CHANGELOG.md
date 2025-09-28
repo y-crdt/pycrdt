@@ -1,5 +1,12 @@
 # Version history
 
+## 0.12.37
+
+- Drop Python 3.9 support.
+- Drop dependency on `importlib_metadata`.
+- Support async callbacks in `observe_subdocs`.
+- Allow iterating over a document events by registering async callbacks when async transactions are used.
+
 ## 0.12.36
 
 - Support document change async callbacks.
