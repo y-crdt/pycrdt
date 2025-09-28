@@ -1,7 +1,7 @@
 from functools import partial
 
 import pytest
-from anyio import TASK_STATUS_IGNORED, Event, create_task_group
+from anyio import TASK_STATUS_IGNORED, Event, create_task_group, sleep
 from anyio.abc import TaskStatus
 from pycrdt import Array, Doc, Map, Text
 
@@ -10,6 +10,11 @@ pytestmark = pytest.mark.anyio
 
 def callback(events, event):
     events.append(event)
+
+
+async def async_callback(events, event):
+    events.append(event)
+    await sleep(0)
 
 
 def encode_client_id(client_id_bytes):
@@ -53,7 +58,7 @@ def test_api():
     }
 
 
-def test_subdoc():
+async def test_subdoc():
     doc0 = Doc()
     map0 = Map()
     doc0["map0"] = map0
@@ -73,8 +78,11 @@ def test_subdoc():
 
     remote_doc = Doc()
     events = []
+    aevents = []
     sub = remote_doc.observe_subdocs(partial(callback, events))  # noqa: F841
-    remote_doc.apply_update(update0)
+    asub = remote_doc.observe_subdocs(partial(async_callback, aevents))  # noqa: F841
+    async with remote_doc.transaction():
+        remote_doc.apply_update(update0)
     remote_array0 = Array()
     remote_map0 = Map()
     remote_doc["array0"] = remote_array0
@@ -103,13 +111,20 @@ def test_subdoc():
     assert str(array2) == str(remote_array2)
 
     assert len(events) == 1
+    assert len(aevents) == 1
     event = events[0]
+    aevent = aevents[0]
     assert len(event.added) == 2
+    assert len(aevent.added) == 2
     assert event.added[0] in (doc1.guid, doc2.guid)
+    assert aevent.added[0] in (doc1.guid, doc2.guid)
     assert event.added[1] in (doc1.guid, doc2.guid)
+    assert aevent.added[1] in (doc1.guid, doc2.guid)
     assert doc1.guid != doc2.guid
     assert event.removed == []
+    assert aevent.removed == []
     assert event.loaded == []
+    assert aevent.loaded == []
 
 
 def test_doc_in_event():
@@ -239,6 +254,39 @@ async def test_iterate_events():
         text += ", World!"
         await done_event.wait()
         text += " Goodbye."
+
+    assert len(updates) == 2
+    assert updates[0].endswith(b"Hello\x00")
+    assert updates[1].endswith(b", World!\x00")
+
+
+async def test_iterate_events_with_async_transactions():
+    doc = Doc()
+    updates = []
+
+    async def iterate_events(done_event, *, task_status: TaskStatus[None] = TASK_STATUS_IGNORED):
+        async with doc.events(async_transactions=True) as events:
+            task_status.started()
+            idx = 0
+            async for event in events:
+                updates.append(event.update)
+                if idx == 1:
+                    done_event.set()
+                    return
+                idx += 1
+
+    async with create_task_group() as tg:
+        done_event = Event()
+        await tg.start(iterate_events, done_event)
+        async with doc.transaction():
+            text = doc.get("text", type=Text)
+        async with doc.transaction():
+            text += "Hello"
+        async with doc.transaction():
+            text += ", World!"
+        await done_event.wait()
+        async with doc.transaction():
+            text += " Goodbye."
 
     assert len(updates) == 2
     assert updates[0].endswith(b"Hello\x00")
