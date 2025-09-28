@@ -1,4 +1,5 @@
 import gc
+import platform
 import sys
 import time
 from functools import partial
@@ -314,6 +315,23 @@ async def test_async_callback_in_new_transaction():
     doc1.apply_update(update)
     text1 = doc1.get("text", type=Text)
     assert str(text1) == "hello"
+
+
+async def test_async_callback_in_sync_transaction():
+    doc = Doc()
+
+    async def async_callback(event):
+        pass  # pragma: nocover
+
+    doc.observe(async_callback)
+    text = doc.get("text", type=Text)
+
+    with pytest.raises(SystemError) as excinfo:
+        with doc.transaction():
+            text += "hello"
+    if platform.python_implementation() != "PyPy":  # pragma: nocover
+        assert isinstance(excinfo.value.__context__, RuntimeError)
+        assert str(excinfo.value.__context__) == "Async callback in non-async transaction"
 
 
 async def test_async_transaction_in_existing_async_transaction():
