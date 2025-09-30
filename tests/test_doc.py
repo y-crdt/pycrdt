@@ -231,6 +231,25 @@ def test_get_update_exception():
     assert str(excinfo.value) == "Cannot decode state"
 
 
+def test_apply_update_exception():
+    doc = Doc()
+    with pytest.raises(ValueError) as excinfo:
+        doc.apply_update(b"\xFF\xFF\xFF\xFF")
+    assert "Cannot decode update" in str(excinfo.value)
+
+
+def test_invalid_client_id():
+    with pytest.raises(ValueError) as excinfo:
+        Doc(client_id="not_an_int")
+    assert "client_id must be" in str(excinfo.value)
+
+
+def test_invalid_skip_gc():
+    with pytest.raises(ValueError) as excinfo:
+        Doc(skip_gc="not_a_bool")
+    assert "skip_gc must be" in str(excinfo.value)
+
+
 async def test_iterate_events():
     doc = Doc()
     updates = []
