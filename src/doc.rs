@@ -68,18 +68,24 @@ impl Doc {
 #[pymethods]
 impl Doc {
     #[new]
-    fn new(client_id: &Bound<'_, PyAny>, skip_gc: &Bound<'_, PyAny>) -> Self {
+    fn new(client_id: &Bound<'_, PyAny>, skip_gc: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut options = Options::default();
         if !client_id.is_none() {
-            let _client_id: u64 = client_id.downcast::<PyInt>().unwrap().extract().unwrap();
+            let _client_id: u64 = client_id.downcast::<PyInt>()
+                .map_err(|_| PyValueError::new_err("client_id must be an integer"))?
+                .extract()
+                .map_err(|_| PyValueError::new_err("client_id must be a valid u64"))?;
             options.client_id = _client_id;
         }
         if !skip_gc.is_none() {
-            let _skip_gc: bool = skip_gc.downcast::<PyBool>().unwrap().extract().unwrap();
+            let _skip_gc: bool = skip_gc.downcast::<PyBool>()
+                .map_err(|_| PyValueError::new_err("skip_gc must be a boolean"))?
+                .extract()
+                .map_err(|_| PyValueError::new_err("skip_gc must be a valid bool"))?;
             options.skip_gc = _skip_gc;
         }
         let doc = _Doc::with_options(options);
-        Doc { doc }
+        Ok(Doc { doc })
     }
 
     #[staticmethod]
@@ -161,7 +167,8 @@ impl Doc {
     }
 
     fn apply_update(&mut self, txn: &mut Transaction, update: &Bound<'_, PyBytes>) -> PyResult<()> {
-        let u = Update::decode_v1(update.as_bytes()).unwrap();
+        let u = Update::decode_v1(update.as_bytes())
+            .map_err(|e| PyValueError::new_err(format!("Cannot decode update: {}", e)))?;
         let mut _t = txn.transaction();
         let t = _t.as_mut().unwrap().as_mut();
         t.apply_update(u)
@@ -251,13 +258,13 @@ impl TransactionEvent {
 #[pymethods]
 impl TransactionEvent {
     #[getter]
-    pub fn transaction<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyAny> {
+    pub fn transaction<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         if let Some(transaction) = &self.transaction {
-            transaction.clone_ref(py).into_bound(py)
+            Ok(transaction.clone_ref(py).into_bound(py))
         } else {
-            let transaction = Transaction::from(self.txn()).into_bound_py_any(py).unwrap();
+            let transaction = Transaction::from(self.txn()).into_bound_py_any(py)?;
             self.transaction = Some(transaction.clone().unbind());
-            transaction
+            Ok(transaction)
         }
     }
 

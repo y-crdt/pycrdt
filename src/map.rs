@@ -94,7 +94,8 @@ impl Map {
     fn insert_doc(&self, txn: &mut Transaction, key: &str, doc: &Bound<'_, PyAny>) -> PyResult<()> {
         let mut _t = txn.transaction();
         let mut t = _t.as_mut().unwrap().as_mut();
-        let d1: Doc = doc.extract().unwrap();
+        let d1: Doc = doc.extract()
+            .map_err(|_| PyTypeError::new_err("Expected Doc object"))?;
         let d2: _Doc = d1.doc;
         let doc_ref = self.map.insert(&mut t, key, d2);
         doc_ref.load(t);
@@ -215,24 +216,24 @@ impl MapEvent {
 #[pymethods]
 impl MapEvent {
     #[getter]
-    pub fn transaction<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyAny> {
+    pub fn transaction<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         if let Some(transaction) = &self.transaction {
-            transaction.clone_ref(py).into_bound(py)
+            Ok(transaction.clone_ref(py).into_bound(py))
         } else {
-            let transaction = Transaction::from(self.txn()).into_bound_py_any(py).unwrap();
+            let transaction = Transaction::from(self.txn()).into_bound_py_any(py)?;
             self.transaction = Some(transaction.clone().unbind());
-            transaction
+            Ok(transaction)
         }
     }
 
     #[getter]
-    pub fn target<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyAny> {
+    pub fn target<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         if let Some(target) = &self.target {
-            target.clone_ref(py).into_bound(py)
+            Ok(target.clone_ref(py).into_bound(py))
         } else {
-            let target = Map::from(self.event().target().clone()).into_bound_py_any(py).unwrap();
+            let target = Map::from(self.event().target().clone()).into_bound_py_any(py)?;
             self.target = Some(target.clone().unbind());
-            target
+            Ok(target)
         }
     }
 
@@ -248,9 +249,9 @@ impl MapEvent {
     }
 
     #[getter]
-    pub fn keys<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyAny> {
+    pub fn keys<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         if let Some(keys) = &self.keys {
-            keys.clone_ref(py).into_bound(py)
+            Ok(keys.clone_ref(py).into_bound(py))
         } else {
             let keys = {
                 let keys = self.event().keys(self.txn());
@@ -258,20 +259,20 @@ impl MapEvent {
                 for (key, value) in keys.iter() {
                     let key = &**key;
                     let value = EntryChangeWrapper(value);
-                    result.set_item(key, value.into_pyobject(py).unwrap()).unwrap();
+                    result.set_item(key, value.into_pyobject(py)?)?;
                 }
                 result
             };
-            let keys = keys.into_bound_py_any(py).unwrap();
+            let keys = keys.into_bound_py_any(py)?;
             self.keys = Some(keys.clone().unbind());
-            keys
+            Ok(keys)
         }
     }
 
-    fn __repr__(&mut self, py: Python<'_>) -> String {
-        let target = self.target(py);
-        let keys = self.keys(py);
+    fn __repr__(&mut self, py: Python<'_>) -> PyResult<String> {
+        let target = self.target(py)?;
+        let keys = self.keys(py)?;
         let path = self.path(py);
-        format!("MapEvent(target={target}, keys={keys}, path={path})")
+        Ok(format!("MapEvent(target={target}, keys={keys}, path={path})"))
     }
 }
