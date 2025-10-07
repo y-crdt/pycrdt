@@ -234,7 +234,7 @@ def test_get_update_exception():
 def test_apply_update_exception():
     doc = Doc()
     with pytest.raises(ValueError) as excinfo:
-        doc.apply_update(b"\xFF\xFF\xFF\xFF")
+        doc.apply_update(b"\xff\xff\xff\xff")
     assert "Cannot decode update" in str(excinfo.value)
 
 

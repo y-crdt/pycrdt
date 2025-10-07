@@ -269,9 +269,7 @@ class XmlText(_XmlTraitMixin):
                 self._do_and_integrate("insert", value, txn._txn, index, _attrs)
             else:
                 # primitive type
-                self.integrated.insert_embed(
-                    txn._txn, index, value, _attrs
-                )
+                self.integrated.insert_embed(txn._txn, index, value, _attrs)
 
     def format(self, start: int, stop: int, attrs: dict[str, Any]) -> None:
         """

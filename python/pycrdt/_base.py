@@ -47,7 +47,6 @@ class BaseDoc:
     _txn_lock: threading.Lock
     _txn_async_lock: anyio.Lock
     _allow_multithreading: bool
-    _Model: Any
     _subscriptions: list[Subscription]
     _origins: dict[int, Any]
     _task_group: TaskGroup | None
