@@ -326,12 +326,10 @@ async def test_async_callback_in_sync_transaction():
     doc.observe(async_callback)
     text = doc.get("text", type=Text)
 
-    with pytest.raises(SystemError) as excinfo:
+    with pytest.raises(RuntimeError) as excinfo:
         with doc.transaction():
             text += "hello"
-    if platform.python_implementation() != "PyPy":  # pragma: nocover
-        assert isinstance(excinfo.value.__context__, RuntimeError)
-        assert str(excinfo.value.__context__) == "Async callback in non-async transaction"
+    assert str(excinfo.value) == "Async callback in non-async transaction"
 
 
 async def test_async_transaction_in_existing_async_transaction():
