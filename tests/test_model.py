@@ -59,3 +59,16 @@ def test_model():
         10,
         30,
     )
+
+
+def test_model_no_model_defined():
+    local_doc = Doc(
+        {
+            "timestamp": Text(),
+            "dimensions": Array(),
+        },
+    )
+    with pytest.raises(RuntimeError) as exc_info:
+        local_doc.get_model_state()
+
+    assert str(exc_info.value).startswith("no Model defined for doc")
