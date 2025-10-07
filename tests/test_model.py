@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Tuple
 
 import pytest
@@ -54,7 +54,7 @@ def test_model():
     assert list(local_doc["dimensions"]) == ["10", "30"]
 
     decoded = local_doc.get_model_state()
-    assert decoded.timestamp == datetime(2020, 2, 2, 3, 4, 5, tzinfo=UTC)
+    assert decoded.timestamp == datetime(2020, 2, 2, 3, 4, 5, tzinfo=timezone.utc)
     assert decoded.dimensions == (
         10,
         30,
