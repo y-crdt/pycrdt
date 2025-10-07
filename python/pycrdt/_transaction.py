@@ -73,16 +73,18 @@ class Transaction:
         # since nested transactions reuse the root transaction
         if self._leases == 0:
             assert self._txn is not None
-            if not isinstance(self, ReadTransaction):
-                self._txn.commit()
-                origin_hash = self._txn.origin()
-                if origin_hash is not None:
-                    del self._doc._origins[origin_hash]
-                if self._doc._allow_multithreading:
-                    self._doc._txn_lock.release()
-            self._txn.drop()
-            self._txn = None
-            self._doc._txn = None
+            try:
+                if not isinstance(self, ReadTransaction):
+                    self._txn.commit()
+                    origin_hash = self._txn.origin()
+                    if origin_hash is not None:
+                        del self._doc._origins[origin_hash]
+                    if self._doc._allow_multithreading:
+                        self._doc._txn_lock.release()
+            finally:
+                self._txn.drop()
+                self._txn = None
+                self._doc._txn = None
 
     async def __aenter__(self, _acquire_transaction: bool = True) -> Transaction:
         if self._leases > 0 and self._doc._task_group is None:
