@@ -1,5 +1,10 @@
 # Version history
 
+## 0.12.38
+
+- Improve error propagation with `PyResult`.
+- Cleanup transaction when commit fails.
+
 ## 0.12.37
 
 - Drop Python 3.9 support.
