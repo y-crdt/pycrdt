@@ -12,6 +12,8 @@ from typing import (
     Type,
     Union,
     cast,
+    get_args,
+    get_origin,
     get_type_hints,
     overload,
 )
@@ -388,10 +390,12 @@ class Typed:
             if key not in annotations:
                 raise AttributeError(f'"{type(self).mro()[0]}" has no attribute "{key}"')
             expected_type = annotations[key]
-            if hasattr(expected_type, "__origin__"):
-                expected_type = expected_type.__origin__
-            if hasattr(expected_type, "__args__"):
-                expected_types = expected_type.__args__
+            origin = get_origin(expected_type)
+            if origin == Union:
+                expected_types = get_args(expected_type)
+            elif origin is not None:
+                expected_type = origin
+                expected_types = (expected_type,)
             else:
                 expected_types = (expected_type,)
             if type(value) not in expected_types:
