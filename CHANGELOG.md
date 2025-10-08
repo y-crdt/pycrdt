@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.39
+
+- Support Python v3.14.
+
 ## 0.12.38
 
 - Improve error propagation with `PyResult`.

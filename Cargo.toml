@@ -1,6 +1,6 @@
 [package]
 name = "pycrdt"
-version = "0.12.38"
+version = "0.12.39"
 edition = "2021"
 
 [lib]
