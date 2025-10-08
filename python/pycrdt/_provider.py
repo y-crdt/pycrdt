@@ -141,10 +141,8 @@ class Provider:
         return self
 
     async def __aexit__(self, exc_type, exc_value, exc_tb):
-        try:
-            await self.stop()
-        finally:
-            return await self._exit_stack.__aexit__(exc_type, exc_value, exc_tb)
+        await self.stop()
+        return await self._exit_stack.__aexit__(exc_type, exc_value, exc_tb)
 
     @asynccontextmanager
     async def _get_or_create_task_group(self) -> AsyncIterator[TaskGroup]:
