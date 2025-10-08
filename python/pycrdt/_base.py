@@ -4,6 +4,7 @@ import threading
 from abc import ABC, abstractmethod
 from functools import lru_cache, partial
 from inspect import signature
+from types import UnionType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -391,7 +392,7 @@ class Typed:
                 raise AttributeError(f'"{type(self).mro()[0]}" has no attribute "{key}"')
             expected_type = annotations[key]
             origin = get_origin(expected_type)
-            if origin == Union:
+            if origin in (Union, UnionType):
                 expected_types = get_args(expected_type)
             elif origin is not None:
                 expected_type = origin
