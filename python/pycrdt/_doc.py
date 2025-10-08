@@ -170,8 +170,10 @@ class Doc(BaseDoc, Generic[T]):
             raise RuntimeError(
                 "no Model defined for doc. Instantiate Doc with Doc(Model=PydanticModel)"
             )
-        d = {k: self[k].to_py() for k in self._Model.model_fields}
-        return self._Model.model_validate(d)
+        with self.transaction() as txn:
+            assert txn._txn is not None
+            all_roots = self._doc.to_py(txn._txn)
+        return self._Model.model_validate(all_roots)
 
     def get_update(self, state: bytes | None = None) -> bytes:
         """

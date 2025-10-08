@@ -61,6 +61,9 @@ class Doc:
     def roots(self, txn: Transaction) -> dict[str, Text | Array | Map]:
         """Get top-level (root) shared types available in current document."""
 
+    def to_py(self, txn: Transaction) -> dict[str, Any]:
+        """Get top-level (root) shared types as native Python objects."""
+
     def observe(self, callback: Callable[[TransactionEvent], None]) -> Subscription:
         """Subscribes a callback to be called with the shared document change event.
         Returns a subscription that can be used to unsubscribe."""
