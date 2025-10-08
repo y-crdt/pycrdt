@@ -28,7 +28,7 @@ jobs:
       - name: Build wheels - universal2
         uses: PyO3/maturin-action@v1
         with:
-          args: --release --target universal2-apple-darwin --out dist -i 3.10 3.11 3.12 3.13 pypy3.10
+          args: --release --target universal2-apple-darwin --out dist -i 3.10 3.11 3.12 3.13 3.14 pypy3.10 pypy3.11
       - name: Test built wheel - universal2
         run: |
           pip install pytest pytest-mypy-testing "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32" "exceptiongroup; python_version<'3.11'"
@@ -47,9 +47,9 @@ jobs:
       matrix:
         platform:
           - target: x64
-            interpreter: ["3.10", "3.11", "3.12", "3.13"]
+            interpreter: ["3.10", "3.11", "3.12", "3.13", "3.14"]
           - target: x86
-            interpreter: ["3.10", "3.11", "3.12", "3.13"]
+            interpreter: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -98,7 +98,7 @@ jobs:
           rust-toolchain: stable
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --out dist -i 3.10 3.11 3.12 3.13 pypy3.10
+          args: --release --out dist -i 3.10 3.11 3.12 3.13 3.14 pypy3.10 pypy3.11
       - name: Test built wheel
         if: matrix.target == 'x86_64'
         run: |
@@ -127,7 +127,7 @@ jobs:
           rust-toolchain: stable
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --out dist -i 3.10 3.11 3.12 3.13 pypy3.10
+          args: --release --out dist -i 3.10 3.11 3.12 3.13 3.14 pypy3.10 pypy3.11
 
       - uses: uraimo/run-on-arch-action@v2.8.1
         name: Test built wheel

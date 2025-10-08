@@ -1,6 +1,6 @@
 # Version history
 
-## 0.12.39
+## 0.12.40
 
 - Support Python v3.14.
 
