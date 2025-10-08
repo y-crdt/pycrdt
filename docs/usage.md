@@ -88,13 +88,23 @@ CRDTs ensure that documents don't diverge, their shared documents will eventuall
 
 Every change to a shared data happens in a document transaction, and there can only be one transaction at a time. Pycrdt offers two methods for creating transactions:
 
-- `doc.transaction()`: used with a context manager, this will create a new transaction if there is no current one, or use the current transaction. This method will never block, and should be used most of the time.
+- `doc.transaction()`: used with a context manager or an async context manager, this will create a new transaction if there is no current one, or use the current transaction. This method will never block, and should be used most of the time.
 - `doc.new_transaction()`: used with a context manager or an async context manager, this will always try to create a new transaction. This method can block, waiting for a transaction to be released.
 
 ### Non-blocking transactions
 
-When no current transaction exists, an implicit transaction is created.
+#### Synchronous context manager
+
+When no current transaction exists, an implicit transaction is created:
+
+```py
+doc = Doc()
+text = doc.get("text", type=Text)
+text += "This change creates an implicit transaction"
+```
+
 Grouping multiple changes in a single transaction makes them atomic: they will appear as done simultaneously rather than sequentially.
+For performances, it is always better to try and group multiple changes in a single transaction.
 
 ```py
 with doc.transaction():
@@ -114,6 +124,26 @@ with doc.transaction() as t0:
         with doc.transaction() as t2:
             map0["key1"] = "value1"
 ```
+
+#### Asynchronous context manager
+
+Transactions created with an async context manager allow to register async callbacks when [observing document changes](#document-events). This makes
+it possible to apply back-pressure on document changes. With just synchronous callbacks, lots of document changes could be done
+without giving a chance to the event loop to send them over the wire, for instance. In the following example, the async context manager
+will not exit until the async callback is done:
+
+```py
+async def async_callback(event):
+    await send(event.update)
+
+doc.observe(async_callback)
+
+async with doc.transaction():
+    ...
+```
+
+Note that registering an async callback and creating a transaction with a synchronous context manager will result in an error.
+Also, it is not possible to have a nested async transaction while the root transaction is synchronous.
 
 ### Blocking transactions
 

@@ -19,6 +19,7 @@
       - NewTransaction
       - Provider
       - ReadTransaction
+      - Snapshot
       - StackItem
       - StickyIndex
       - Subscription

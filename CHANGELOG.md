@@ -1,5 +1,31 @@
 # Version history
 
+## 0.12.38
+
+- Improve error propagation with `PyResult`.
+- Cleanup transaction when commit fails.
+
+## 0.12.37
+
+- Drop Python 3.9 support.
+- Drop dependency on `importlib_metadata`.
+- Support async callbacks in `observe_subdocs`.
+- Allow iterating over a document events by registering async callbacks when async transactions are used.
+
+## 0.12.36
+
+- Support document change async callbacks.
+- Allow `get_state` and `get_update` to use an existing transaction.
+
+## 0.12.35
+
+- Bump `trio` to <0.32.
+
+## 0.12.34
+
+- Add snapshot support.
+- Install multiple Pythons to not rely on Windows hosted Python cache.
+
 ## 0.12.32
 
 - Fix `skip_gc` in `Doc`.

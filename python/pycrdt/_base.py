@@ -18,6 +18,7 @@ from typing import (
 
 import anyio
 from anyio import BrokenResourceError, create_memory_object_stream
+from anyio.abc import TaskGroup
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 
 from ._pycrdt import Doc as _Doc
@@ -49,6 +50,7 @@ class BaseDoc:
     _Model: Any
     _subscriptions: list[Subscription]
     _origins: dict[int, Any]
+    _task_group: TaskGroup | None
 
     def __init__(
         self,
@@ -71,6 +73,7 @@ class BaseDoc:
         self._subscriptions = []
         self._origins = {}
         self._allow_multithreading = allow_multithreading
+        self._task_group = None
 
 
 class BaseType(ABC):

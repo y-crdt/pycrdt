@@ -1,4 +1,5 @@
 import gc
+import platform
 import sys
 import time
 from functools import partial
@@ -294,3 +295,68 @@ def test_get_root_type_in_transaction():
     assert array.to_py() == ["bar"]
     assert map0.to_py() == {"key0": "val0"}
     assert str(frag) == "baz"
+
+
+async def test_async_callback_in_new_transaction():
+    doc0 = Doc()
+    update = None
+
+    async def async_callback(event):
+        nonlocal update
+        update = event.update
+
+    doc0.observe(async_callback)
+    text0 = doc0.get("text", type=Text)
+
+    async with doc0.new_transaction():
+        text0 += "hello"
+
+    doc1 = Doc()
+    doc1.apply_update(update)
+    text1 = doc1.get("text", type=Text)
+    assert str(text1) == "hello"
+
+
+async def test_async_callback_in_sync_transaction():
+    doc = Doc()
+
+    async def async_callback(event):
+        pass  # pragma: nocover
+
+    doc.observe(async_callback)
+    text = doc.get("text", type=Text)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        with doc.transaction():
+            text += "hello"
+    assert str(excinfo.value) == "Async callback in non-async transaction"
+
+
+async def test_async_transaction_in_existing_async_transaction():
+    doc0 = Doc()
+    update = None
+
+    async def async_callback(event):
+        nonlocal update
+        update = event.update
+
+    doc0.observe(async_callback)
+    text0 = doc0.get("text", type=Text)
+
+    async with doc0.transaction():
+        async with doc0.transaction():
+            text0 += "hello"
+
+    doc1 = Doc()
+    doc1.apply_update(update)
+    text1 = doc1.get("text", type=Text)
+    assert str(text1) == "hello"
+
+
+async def test_async_transaction_in_existing_sync_transaction():
+    doc = Doc()
+    with doc.transaction():
+        with pytest.raises(RuntimeError) as excinfo:
+            async with doc.transaction():
+                pass  # pragma: nocover
+        assert str(excinfo.value) == "Already in a non-async transaction"

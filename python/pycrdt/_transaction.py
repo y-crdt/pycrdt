@@ -4,7 +4,7 @@ from functools import partial
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
-from anyio import to_thread
+from anyio import create_task_group, to_thread
 
 from ._pycrdt import Transaction as _Transaction
 
@@ -73,16 +73,38 @@ class Transaction:
         # since nested transactions reuse the root transaction
         if self._leases == 0:
             assert self._txn is not None
-            if not isinstance(self, ReadTransaction):
-                self._txn.commit()
-                origin_hash = self._txn.origin()
-                if origin_hash is not None:
-                    del self._doc._origins[origin_hash]
-                if self._doc._allow_multithreading:
-                    self._doc._txn_lock.release()
-            self._txn.drop()
-            self._txn = None
-            self._doc._txn = None
+            try:
+                if not isinstance(self, ReadTransaction):
+                    self._txn.commit()
+                    origin_hash = self._txn.origin()
+                    if origin_hash is not None:
+                        del self._doc._origins[origin_hash]
+                    if self._doc._allow_multithreading:
+                        self._doc._txn_lock.release()
+            finally:
+                self._txn.drop()
+                self._txn = None
+                self._doc._txn = None
+
+    async def __aenter__(self, _acquire_transaction: bool = True) -> Transaction:
+        if self._leases > 0 and self._doc._task_group is None:
+            raise RuntimeError("Already in a non-async transaction")
+        self._doc._task_group = await create_task_group().__aenter__()
+        return self.__enter__(_acquire_transaction)
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
+        self.__exit__(exc_type, exc_val, exc_tb)
+        if self._leases == 0:
+            assert self._doc._task_group is not None
+            res = await self._doc._task_group.__aexit__(exc_type, exc_val, exc_tb)
+            self._doc._task_group = None
+            return res
+        return None
 
     @property
     def origin(self) -> Any:
@@ -116,7 +138,7 @@ class NewTransaction(Transaction):
     ```
     """
 
-    async def __aenter__(self) -> Transaction:
+    async def __aenter__(self) -> Transaction:  # type: ignore[override]
         if self._doc._allow_multithreading:
             if not await to_thread.run_sync(
                 partial(self._doc._txn_lock.acquire, timeout=self._timeout), abandon_on_cancel=True
@@ -124,17 +146,18 @@ class NewTransaction(Transaction):
                 raise TimeoutError("Could not acquire transaction")
         else:
             await self._doc._txn_async_lock.acquire()
-        return super().__enter__(_acquire_transaction=False)  # type: ignore[call-arg]
+        return await super().__aenter__(_acquire_transaction=False)
 
     async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> None:
-        super().__exit__(exc_type, exc_val, exc_tb)
+    ) -> bool | None:
+        res = await super().__aexit__(exc_type, exc_val, exc_tb)
         if not self._doc._allow_multithreading:
             self._doc._txn_async_lock.release()
+        return res
 
 
 class ReadTransaction(Transaction):

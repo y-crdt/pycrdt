@@ -5,7 +5,7 @@ use pyo3::types::{PyBool, PyBytes, PyDict, PyInt, PyList};
 use yrs::{
     Doc as _Doc, Options, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
 };
-use yrs::updates::encoder::Encode;
+use yrs::updates::encoder::{Encode, Encoder};
 use yrs::updates::decoder::Decode;
 use crate::text::Text;
 use crate::array::Array;
@@ -26,23 +26,73 @@ impl Doc {
     pub fn from(doc: _Doc) -> Self {
         Doc { doc }
     }
+    /// Internal: create a new Doc from a Snapshot and an original Doc
+    pub fn _from_snapshot_impl(original: &Self, snapshot: &crate::snapshot::Snapshot) -> Self {
+        // Create a new Doc with the same options as the original
+        let mut options = yrs::Options::default();
+        options.client_id = original.doc.client_id();
+        options.skip_gc = original.doc.skip_gc();
+        if let Some(collection_id) = original.doc.collection_id() {
+            options.collection_id = Some(collection_id);
+        }
+        options.guid = original.doc.guid();
+        let new_doc = yrs::Doc::with_options(options);
+        // Encode the update from the snapshot
+        let mut encoder = yrs::updates::encoder::EncoderV1::new();
+        {
+            let txn = original.doc.transact();
+            txn.encode_state_from_snapshot(&snapshot.snapshot, &mut encoder).unwrap();
+        }
+        let update = yrs::Update::decode_v1(&encoder.to_vec()).unwrap();
+        {
+            let mut txn = new_doc.transact_mut();
+            txn.apply_update(update).unwrap();
+        }
+        // Ensure root types are present in the restored doc (recreate them if needed)
+        // Copy root type names and types from the original doc
+        let txn_orig = original.doc.transact();
+        for (name, root) in txn_orig.root_refs() {
+            match root {
+                yrs::Out::YText(_) => { let _ = new_doc.get_or_insert_text(name); },
+                yrs::Out::YArray(_) => { let _ = new_doc.get_or_insert_array(name); },
+                yrs::Out::YMap(_) => { let _ = new_doc.get_or_insert_map(name); },
+                yrs::Out::YXmlFragment(_) => { let _ = new_doc.get_or_insert_xml_fragment(name); },
+                _ => {}, // ignore unknown types
+            }
+        }
+        drop(txn_orig);
+        Doc { doc: new_doc }
+    }
 }
 
 #[pymethods]
 impl Doc {
     #[new]
-    fn new(client_id: &Bound<'_, PyAny>, skip_gc: &Bound<'_, PyAny>) -> Self {
+    fn new(client_id: &Bound<'_, PyAny>, skip_gc: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut options = Options::default();
         if !client_id.is_none() {
-            let _client_id: u64 = client_id.downcast::<PyInt>().unwrap().extract().unwrap();
+            let _client_id: u64 = client_id.downcast::<PyInt>()
+                .map_err(|_| PyValueError::new_err("client_id must be an integer"))?
+                .extract()
+                .map_err(|_| PyValueError::new_err("client_id must be a valid u64"))?;
             options.client_id = _client_id;
         }
         if !skip_gc.is_none() {
-            let _skip_gc: bool = skip_gc.downcast::<PyBool>().unwrap().extract().unwrap();
+            let _skip_gc: bool = skip_gc.downcast::<PyBool>()
+                .map_err(|_| PyValueError::new_err("skip_gc must be a boolean"))?
+                .extract()
+                .map_err(|_| PyValueError::new_err("skip_gc must be a valid bool"))?;
             options.skip_gc = _skip_gc;
         }
         let doc = _Doc::with_options(options);
-        Doc { doc }
+        Ok(Doc { doc })
+    }
+
+    #[staticmethod]
+    #[pyo3(name = "from_snapshot")]
+    pub fn from_snapshot(py: Python<'_>, snapshot: PyRef<'_, crate::snapshot::Snapshot>, doc: PyRef<'_, Doc>) -> PyResult<Py<Doc>> {
+        let restored = Doc::_from_snapshot_impl(&doc, &snapshot);
+        Py::new(py, restored)
     }
 
     fn guid(&mut self) -> String {
@@ -99,25 +149,26 @@ impl Doc {
         Err(PyRuntimeError::new_err("Already in a transaction"))
     }
 
-    fn get_state(&mut self) -> Py<PyAny> {
-        let txn = self.doc.transact_mut();
-        let state = txn.state_vector().encode_v1();
-        drop(txn);
+    fn get_state(&self, txn: &Transaction) -> Py<PyAny> {
+        let mut _t = txn.transaction();
+        let t = _t.as_mut().unwrap().as_mut();
+        let state = t.state_vector().encode_v1();
         Python::attach(|py| PyBytes::new(py, &state).into())
     }
 
-    fn get_update(&mut self, state: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
-        let txn = self.doc.transact_mut();
+    fn get_update(&self, txn: &Transaction, state: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
+        let mut _t = txn.transaction();
+        let t = _t.as_mut().unwrap().as_mut();
         let state: &[u8] = state.extract()?;
         let Ok(state_vector) = StateVector::decode_v1(&state) else { return Err(PyValueError::new_err("Cannot decode state")) };
-        let update = txn.encode_diff_v1(&state_vector);
-        drop(txn);
+        let update = t.encode_diff_v1(&state_vector);
         let bytes: Py<PyAny> = Python::attach(|py| PyBytes::new(py, &update).into());
         Ok(bytes)
     }
 
     fn apply_update(&mut self, txn: &mut Transaction, update: &Bound<'_, PyBytes>) -> PyResult<()> {
-        let u = Update::decode_v1(update.as_bytes()).unwrap();
+        let u = Update::decode_v1(update.as_bytes())
+            .map_err(|e| PyValueError::new_err(format!("Cannot decode update: {}", e)))?;
         let mut _t = txn.transaction();
         let t = _t.as_mut().unwrap().as_mut();
         t.apply_update(u)
@@ -199,7 +250,7 @@ impl TransactionEvent {
     fn event(&self) -> &TransactionCleanupEvent {
         unsafe { self.event.as_ref().unwrap() }
     }
-    fn txn(&self) -> &TransactionMut {
+    fn txn(&self) -> &TransactionMut<'_> {
         unsafe { self.txn.as_ref().unwrap() }
     }
 }
@@ -207,13 +258,13 @@ impl TransactionEvent {
 #[pymethods]
 impl TransactionEvent {
     #[getter]
-    pub fn transaction<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyAny> {
+    pub fn transaction<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         if let Some(transaction) = &self.transaction {
-            transaction.clone_ref(py).into_bound(py)
+            Ok(transaction.clone_ref(py).into_bound(py))
         } else {
-            let transaction = Transaction::from(self.txn()).into_bound_py_any(py).unwrap();
+            let transaction = Transaction::from(self.txn()).into_bound_py_any(py)?;
             self.transaction = Some(transaction.clone().unbind());
-            transaction
+            Ok(transaction)
         }
     }
 
