@@ -61,11 +61,11 @@ jobs:
       run: mypy python
 
     - name: Run tests
-      if: ${{ !((matrix.python-version == '3.13') && (matrix.os == 'ubuntu')) }}
+      if: ${{ !((matrix.python-version == '3.14') && (matrix.os == 'ubuntu')) }}
       run: pytest --color=yes -v tests
 
     - name: Run code coverage
-      if: ${{ (matrix.python-version == '3.13') && (matrix.os == 'ubuntu') }}
+      if: ${{ (matrix.python-version == '3.14') && (matrix.os == 'ubuntu') }}
       run: |
         coverage run -m pytest tests
         coverage report --show-missing --fail-under=100
