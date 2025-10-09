@@ -380,7 +380,10 @@ class Typed:
                 raise AttributeError(f'"{type(self).mro()[0]}" has no attribute "{key}"')
             expected_type = annotations[key]
             if hasattr(expected_type, "mro") and Typed in expected_type.mro():
-                return expected_type(self._[key])
+                try:
+                    return expected_type(self._[key])
+                except KeyError:
+                    raise AttributeError(f'"{type(self).mro()[0]}" has no attribute "{key}"')
             return self._[key]
 
         def __setattr__(self, key: str, value: Any) -> None:
