@@ -1,20 +1,21 @@
-use pyo3::prelude::*;
-use pyo3::IntoPyObjectExt;
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
-use pyo3::types::{PyBool, PyBytes, PyDict, PyInt, PyList};
-use yrs::{
-    Doc as _Doc, Options, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
-};
-use yrs::updates::encoder::{Encode, Encoder};
-use yrs::updates::decoder::Decode;
-use crate::text::Text;
 use crate::array::Array;
 use crate::map::Map;
-use crate::transaction::Transaction;
 use crate::subscription::Subscription;
+use crate::text::Text;
+use crate::transaction::Transaction;
 use crate::type_conversions::ToPython;
 use crate::xml::XmlFragment;
-
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::prelude::*;
+use pyo3::types::{PyBool, PyBytes, PyDict, PyInt, PyList};
+use pyo3::IntoPyObjectExt;
+use yrs::updates::decoder::Decode;
+use yrs::updates::encoder::{Encode, Encoder};
+use yrs::{
+    Array as YArray, Doc as _Doc, GetString, Map as YMap, Options, ReadTxn, StateVector,
+    SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update,
+    WriteTxn,
+};
 
 #[pyclass]
 #[derive(Clone)]
@@ -41,7 +42,8 @@ impl Doc {
         let mut encoder = yrs::updates::encoder::EncoderV1::new();
         {
             let txn = original.doc.transact();
-            txn.encode_state_from_snapshot(&snapshot.snapshot, &mut encoder).unwrap();
+            txn.encode_state_from_snapshot(&snapshot.snapshot, &mut encoder)
+                .unwrap();
         }
         let update = yrs::Update::decode_v1(&encoder.to_vec()).unwrap();
         {
@@ -53,11 +55,19 @@ impl Doc {
         let txn_orig = original.doc.transact();
         for (name, root) in txn_orig.root_refs() {
             match root {
-                yrs::Out::YText(_) => { let _ = new_doc.get_or_insert_text(name); },
-                yrs::Out::YArray(_) => { let _ = new_doc.get_or_insert_array(name); },
-                yrs::Out::YMap(_) => { let _ = new_doc.get_or_insert_map(name); },
-                yrs::Out::YXmlFragment(_) => { let _ = new_doc.get_or_insert_xml_fragment(name); },
-                _ => {}, // ignore unknown types
+                yrs::Out::YText(_) => {
+                    let _ = new_doc.get_or_insert_text(name);
+                }
+                yrs::Out::YArray(_) => {
+                    let _ = new_doc.get_or_insert_array(name);
+                }
+                yrs::Out::YMap(_) => {
+                    let _ = new_doc.get_or_insert_map(name);
+                }
+                yrs::Out::YXmlFragment(_) => {
+                    let _ = new_doc.get_or_insert_xml_fragment(name);
+                }
+                _ => {} // ignore unknown types
             }
         }
         drop(txn_orig);
@@ -71,14 +81,16 @@ impl Doc {
     fn new(client_id: &Bound<'_, PyAny>, skip_gc: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut options = Options::default();
         if !client_id.is_none() {
-            let _client_id: u64 = client_id.downcast::<PyInt>()
+            let _client_id: u64 = client_id
+                .downcast::<PyInt>()
                 .map_err(|_| PyValueError::new_err("client_id must be an integer"))?
                 .extract()
                 .map_err(|_| PyValueError::new_err("client_id must be a valid u64"))?;
             options.client_id = _client_id;
         }
         if !skip_gc.is_none() {
-            let _skip_gc: bool = skip_gc.downcast::<PyBool>()
+            let _skip_gc: bool = skip_gc
+                .downcast::<PyBool>()
                 .map_err(|_| PyValueError::new_err("skip_gc must be a boolean"))?
                 .extract()
                 .map_err(|_| PyValueError::new_err("skip_gc must be a valid bool"))?;
@@ -90,7 +102,11 @@ impl Doc {
 
     #[staticmethod]
     #[pyo3(name = "from_snapshot")]
-    pub fn from_snapshot(py: Python<'_>, snapshot: PyRef<'_, crate::snapshot::Snapshot>, doc: PyRef<'_, Doc>) -> PyResult<Py<Doc>> {
+    pub fn from_snapshot(
+        py: Python<'_>,
+        snapshot: PyRef<'_, crate::snapshot::Snapshot>,
+        doc: PyRef<'_, Doc>,
+    ) -> PyResult<Py<Doc>> {
         let restored = Doc::_from_snapshot_impl(&doc, &snapshot);
         Py::new(py, restored)
     }
@@ -103,7 +119,12 @@ impl Doc {
         self.doc.client_id()
     }
 
-    fn get_or_insert_text(&mut self, py: Python<'_>, txn: &mut Transaction, name: &str) -> PyResult<Py<Text>> {
+    fn get_or_insert_text(
+        &mut self,
+        py: Python<'_>,
+        txn: &mut Transaction,
+        name: &str,
+    ) -> PyResult<Py<Text>> {
         let mut _t = txn.transaction();
         let t = _t.as_mut().unwrap().as_mut();
         let text = t.get_or_insert_text(name);
@@ -111,15 +132,25 @@ impl Doc {
         Ok(pytext)
     }
 
-    fn get_or_insert_array(&mut self, py: Python<'_>, txn: &mut Transaction, name: &str) -> PyResult<Py<Array>> {
+    fn get_or_insert_array(
+        &mut self,
+        py: Python<'_>,
+        txn: &mut Transaction,
+        name: &str,
+    ) -> PyResult<Py<Array>> {
         let mut _t = txn.transaction();
         let t = _t.as_mut().unwrap().as_mut();
         let shared = t.get_or_insert_array(name);
-        let pyshared: Py<Array > = Py::new(py, Array::from(shared))?;
+        let pyshared: Py<Array> = Py::new(py, Array::from(shared))?;
         Ok(pyshared)
     }
 
-    fn get_or_insert_map(&mut self, py: Python<'_>, txn: &mut Transaction, name: &str) -> PyResult<Py<Map>> {
+    fn get_or_insert_map(
+        &mut self,
+        py: Python<'_>,
+        txn: &mut Transaction,
+        name: &str,
+    ) -> PyResult<Py<Map>> {
         let mut _t = txn.transaction();
         let t = _t.as_mut().unwrap().as_mut();
         let shared = t.get_or_insert_map(name);
@@ -141,7 +172,11 @@ impl Doc {
         Err(PyRuntimeError::new_err("Already in a transaction"))
     }
 
-    fn create_transaction_with_origin(&self, py: Python<'_>, origin: i128) -> PyResult<Py<Transaction>> {
+    fn create_transaction_with_origin(
+        &self,
+        py: Python<'_>,
+        origin: i128,
+    ) -> PyResult<Py<Transaction>> {
         if let Ok(txn) = self.doc.try_transact_mut_with(origin) {
             let t: Py<Transaction> = Py::new(py, Transaction::from(txn))?;
             return Ok(t);
@@ -160,7 +195,9 @@ impl Doc {
         let mut _t = txn.transaction();
         let t = _t.as_mut().unwrap().as_mut();
         let state: &[u8] = state.extract()?;
-        let Ok(state_vector) = StateVector::decode_v1(&state) else { return Err(PyValueError::new_err("Cannot decode state")) };
+        let Ok(state_vector) = StateVector::decode_v1(&state) else {
+            return Err(PyValueError::new_err("Cannot decode state"));
+        };
         let update = t.encode_diff_v1(&state_vector);
         let bytes: Py<PyAny> = Python::attach(|py| PyBytes::new(py, &update).into());
         Ok(bytes)
@@ -186,8 +223,53 @@ impl Doc {
         result.into()
     }
 
+    fn to_py(&self, py: Python<'_>, txn: &mut Transaction) -> PyResult<Py<PyAny>> {
+        let mut _t = txn.transaction();
+        let t = _t.as_mut().unwrap().as_mut();
+        let result = PyDict::new(py);
+
+        let roots_info: Vec<_> = t
+            .root_refs()
+            .map(|(name, root)| (name.to_string(), root))
+            .collect();
+
+        for (name, root) in roots_info {
+            match root {
+                yrs::Out::YText(_) => {
+                    let text = t.get_or_insert_text(name.as_str());
+                    let value = text.get_string(t);
+                    result.set_item(name, value)?;
+                }
+                yrs::Out::YArray(_) => {
+                    let array = t.get_or_insert_array(name.as_str());
+                    let list = PyList::empty(py);
+                    for item in array.iter(t) {
+                        list.append(item.into_py(py))?;
+                    }
+                    result.set_item(name, list)?;
+                }
+                yrs::Out::YMap(_) => {
+                    let map = t.get_or_insert_map(name.as_str());
+                    let dict = PyDict::new(py);
+                    for (key, value) in map.iter(t) {
+                        dict.set_item(key, value.into_py(py))?;
+                    }
+                    result.set_item(name, dict)?;
+                }
+                yrs::Out::YXmlFragment(_) => {
+                    let xml = t.get_or_insert_xml_fragment(name.as_str());
+                    let xml_py = Py::new(py, XmlFragment::from(xml))?;
+                    result.set_item(name, xml_py)?;
+                }
+                _ => {} // ignore other types
+            }
+        }
+        Ok(result.into())
+    }
+
     pub fn observe(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
-        let sub = self.doc
+        let sub = self
+            .doc
             .observe_transaction_cleanup(move |txn, event| {
                 if !event.delete_set.is_empty() || event.before_state != event.after_state {
                     Python::attach(|py| {
@@ -204,7 +286,8 @@ impl Doc {
     }
 
     pub fn observe_subdocs(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
-        let sub = self.doc
+        let sub = self
+            .doc
             .observe_subdocs(move |_, event| {
                 Python::attach(|py| {
                     let event = SubdocsEvent::new(py, event);
@@ -326,11 +409,20 @@ pub struct SubdocsEvent {
 
 impl SubdocsEvent {
     fn new<'py>(py: Python<'py>, event: &_SubdocsEvent) -> Self {
-        let added: Vec<String> = event.added().map(|d| d.guid().clone().to_string()).collect();
+        let added: Vec<String> = event
+            .added()
+            .map(|d| d.guid().clone().to_string())
+            .collect();
         let added = PyList::new(py, added).unwrap().into_py_any(py).unwrap();
-        let removed: Vec<String> = event.removed().map(|d| d.guid().clone().to_string()).collect();
+        let removed: Vec<String> = event
+            .removed()
+            .map(|d| d.guid().clone().to_string())
+            .collect();
         let removed = PyList::new(py, removed).unwrap().into_py_any(py).unwrap();
-        let loaded: Vec<String> = event.loaded().map(|d| d.guid().clone().to_string()).collect();
+        let loaded: Vec<String> = event
+            .loaded()
+            .map(|d| d.guid().clone().to_string())
+            .collect();
         let loaded = PyList::new(py, loaded).unwrap().into_py_any(py).unwrap();
         SubdocsEvent {
             added,

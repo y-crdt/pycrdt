@@ -2,7 +2,19 @@ from __future__ import annotations
 
 from functools import partial
 from inspect import iscoroutinefunction
-from typing import Any, Awaitable, Callable, Generic, Iterable, Literal, Type, TypeVar, Union, cast, overload
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Generic,
+    Iterable,
+    Literal,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 from anyio import BrokenResourceError, create_memory_object_stream
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
@@ -15,7 +27,9 @@ from ._snapshot import Snapshot
 from ._transaction import NewTransaction, ReadTransaction, Transaction
 
 T = TypeVar("T", bound=BaseType)
-TransactionOrSubdocsEvent = TypeVar("TransactionOrSubdocsEvent", bound=TransactionEvent | SubdocsEvent)
+TransactionOrSubdocsEvent = TypeVar(
+    "TransactionOrSubdocsEvent", bound=TransactionEvent | SubdocsEvent
+)
 
 
 class Doc(BaseDoc, Generic[T]):
@@ -35,7 +49,7 @@ class Doc(BaseDoc, Generic[T]):
         client_id: int | None = None,
         skip_gc: bool | None = None,
         doc: _Doc | None = None,
-        Model=None,
+        Model: Any | None = None,
         allow_multithreading: bool = False,
     ) -> None:
         """
@@ -47,8 +61,9 @@ class Doc(BaseDoc, Generic[T]):
             allow_multithreading: Whether to allow the document to be used in different threads.
         """
         super().__init__(
-            client_id=client_id, skip_gc=skip_gc, doc=doc, Model=Model, allow_multithreading=allow_multithreading
+            client_id=client_id, skip_gc=skip_gc, doc=doc, allow_multithreading=allow_multithreading
         )
+        self._Model = Model
         for k, v in init.items():
             self[k] = v
         if Model is not None:
@@ -150,6 +165,16 @@ class Doc(BaseDoc, Generic[T]):
             assert txn._txn is not None
             return self._doc.get_state(txn._txn)
 
+    def get_model_state(self) -> Any:
+        if self._Model is None:
+            raise RuntimeError(
+                "no Model defined for doc. Instantiate Doc with Doc(Model=PydanticModel)"
+            )
+        with self.transaction() as txn:
+            assert txn._txn is not None
+            all_roots = self._doc.to_py(txn._txn)
+        return self._Model.model_validate(all_roots)
+
     def get_update(self, state: bytes | None = None) -> bytes:
         """
         Args:
@@ -174,7 +199,7 @@ class Doc(BaseDoc, Generic[T]):
             twin_doc.apply_update(update)
             d = {k: twin_doc[k].to_py() for k in self._Model.model_fields}
             try:
-                self._Model(**d)
+                self._Model.model_validate(d)
             except Exception as e:
                 self._twin_doc = Doc(dict(self))
                 raise e
@@ -292,7 +317,8 @@ class Doc(BaseDoc, Generic[T]):
 
     def observe(
         self,
-        callback: Callable[[TransactionEvent], None] | Callable[[TransactionEvent], Awaitable[None]],
+        callback: Callable[[TransactionEvent], None]
+        | Callable[[TransactionEvent], Awaitable[None]],
     ) -> Subscription:
         """
         Subscribes a callback to be called with the document change event.
@@ -405,7 +431,9 @@ class Doc(BaseDoc, Generic[T]):
         observe = self.observe_subdocs if subdocs else self.observe
         if not self._send_streams[subdocs]:
             if async_transactions:
-                self._event_subscription[subdocs] = observe(partial(self._async_send_event, subdocs))
+                self._event_subscription[subdocs] = observe(
+                    partial(self._async_send_event, subdocs)
+                )
             else:
                 self._event_subscription[subdocs] = observe(partial(self._send_event, subdocs))
         send_stream, receive_stream = create_memory_object_stream[

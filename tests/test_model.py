@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Tuple
 
 import pytest
@@ -52,3 +52,23 @@ def test_model():
 
     assert str(local_doc["timestamp"]) == "2020-02-02T03:04:05Z"
     assert list(local_doc["dimensions"]) == ["10", "30"]
+
+    decoded = local_doc.get_model_state()
+    assert decoded.timestamp == datetime(2020, 2, 2, 3, 4, 5, tzinfo=timezone.utc)
+    assert decoded.dimensions == (
+        10,
+        30,
+    )
+
+
+def test_model_no_model_defined():
+    local_doc = Doc(
+        {
+            "timestamp": Text(),
+            "dimensions": Array(),
+        },
+    )
+    with pytest.raises(RuntimeError) as exc_info:
+        local_doc.get_model_state()
+
+    assert str(exc_info.value).startswith("no Model defined for doc")
