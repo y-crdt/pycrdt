@@ -1,5 +1,10 @@
 # Version history
 
+## 0.12.41
+
+- Bump `pyo3` to v0.27.0.
+- Drop PyPy 3.10 support.
+
 ## 0.12.40
 
 - Support Python v3.14.
