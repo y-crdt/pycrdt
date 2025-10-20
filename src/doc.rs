@@ -71,14 +71,14 @@ impl Doc {
     fn new(client_id: &Bound<'_, PyAny>, skip_gc: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut options = Options::default();
         if !client_id.is_none() {
-            let _client_id: u64 = client_id.downcast::<PyInt>()
+            let _client_id: u64 = client_id.cast::<PyInt>()
                 .map_err(|_| PyValueError::new_err("client_id must be an integer"))?
                 .extract()
                 .map_err(|_| PyValueError::new_err("client_id must be a valid u64"))?;
             options.client_id = _client_id;
         }
         if !skip_gc.is_none() {
-            let _skip_gc: bool = skip_gc.downcast::<PyBool>()
+            let _skip_gc: bool = skip_gc.cast::<PyBool>()
                 .map_err(|_| PyValueError::new_err("skip_gc must be a boolean"))?
                 .extract()
                 .map_err(|_| PyValueError::new_err("skip_gc must be a valid bool"))?;
