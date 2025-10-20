@@ -236,17 +236,17 @@ pub fn py_to_any<'py>(value: &Bound<'py, PyAny>) -> Any {
     } else if value.is_instance_of::<PyFloat>() {
         let v: f64 = value.extract().unwrap();
         Any::Number(v)
-    } else if let Ok(v) = value.downcast::<PyList>() {
+    } else if let Ok(v) = value.cast::<PyList>() {
         let mut items = Vec::new();
         for i in v.iter() {
             let a = py_to_any(&i);
             items.push(a);
         }
         Any::Array(items.into())
-    } else if let Ok(val) = value.downcast::<PyDict>() {
+    } else if let Ok(val) = value.cast::<PyDict>() {
         let mut items: HashMap<String, Any> = HashMap::new();
         for (k, v) in val.iter() {
-            let k = k.downcast::<PyString>().unwrap().to_str().unwrap().to_string();
+            let k = k.cast::<PyString>().unwrap().to_str().unwrap().to_string();
             let v = py_to_any(&v);
             items.insert(k, v);
         }
