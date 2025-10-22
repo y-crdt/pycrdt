@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.42
+
+- Bump `pyo3` to v0.27.1.
+
 ## 0.12.41
 
 - Bump `pyo3` to v0.27.0.
