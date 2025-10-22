@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import sys
-
 import pytest
 from pycrdt import Array, Doc, Map, TypedArray, TypedDoc, TypedMap
 
