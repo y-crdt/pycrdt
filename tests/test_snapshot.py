@@ -65,3 +65,11 @@ def test_doc_from_snapshot():
     with doc.transaction():
         text = doc["test"]
     assert str(text) == "new old"
+
+
+def test_empty_snapshot():
+    doc = Doc()
+    data = Snapshot.from_doc(doc).encode()
+    assert data == bytes([0, 0])
+    snapshot = Snapshot.decode(data)
+    Doc.from_snapshot(snapshot, doc)
