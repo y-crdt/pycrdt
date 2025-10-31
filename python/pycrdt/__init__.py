@@ -1,3 +1,7 @@
+from pkgutil import extend_path
+
+__path__ = extend_path(__path__, __name__)
+
 from ._array import Array as Array
 from ._array import ArrayEvent as ArrayEvent
 from ._array import TypedArray as TypedArray
