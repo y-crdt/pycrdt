@@ -239,19 +239,33 @@ def test_stack_item_deletions_insertions():
     assert len(undo_stack) == 1
     item = undo_stack[0]
     
-    # Access deletions and insertions
-    deletions = item.deletions()
-    insertions = item.insertions()
-    
+    # Access deletions and insertions (now properties)
+    deletions = item.deletions
+    insertions = item.insertions
+
     # They should be DeleteSet objects
     assert deletions is not None
     assert insertions is not None
-    
+
     # They should be encodable
     deletions_bytes = deletions.encode()
     insertions_bytes = insertions.encode()
     assert isinstance(deletions_bytes, bytes)
     assert isinstance(insertions_bytes, bytes)
+
+def test_deleteset_to_json_string():
+    """Test that DeleteSet.to_json_string produces valid JSON"""
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+    text += "Hello"
+    text += ", World!"
+    item = undo_manager.undo_stack[0]
+    deletions = item.deletions
+    json_str = deletions.to_json_string()
+    import json
+    parsed = json.loads(json_str)
+    assert isinstance(parsed, dict)
 
 
 def test_stack_item_multiple_changes():

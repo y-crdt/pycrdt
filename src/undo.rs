@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyBytes};
+use pyo3::types::{PyList, PyBytes, PyString};
 use pyo3::exceptions::PyRuntimeError;
 use yrs::{
     UndoManager as _UndoManager,
@@ -40,6 +40,21 @@ impl DeleteSet {
     pub fn encode(&self) -> Py<PyAny> {
         let encoded = self.delete_set.encode_v1();
         Python::attach(|py: Python<'_>| PyBytes::new(py, &encoded).into())
+    }
+
+    /// Serialize the DeleteSet to a JSON string
+    pub fn to_json_string(&self) -> Py<PyAny> {
+        use std::collections::HashMap;
+        let mut mapping: HashMap<u64, Vec<(u32, u32)>> = HashMap::new();
+        for (client, ranges) in self.delete_set.iter() {
+            let mut vec_ranges = Vec::new();
+            for range in ranges.iter() {
+                vec_ranges.push((range.start, range.end));
+            }
+            mapping.insert(*client, vec_ranges);
+        }
+        let encoded = serde_json::to_string(&mapping).unwrap();
+        Python::attach(|py| PyString::new(py, &encoded).into())
     }
 
     /// Decode a DeleteSet from bytes
@@ -184,12 +199,14 @@ impl StackItem {
 
 #[pymethods]
 impl StackItem {
-    /// Get the deletions DeleteSet
+    /// Get the deletions DeleteSet as a Python property
+    #[getter]
     pub fn deletions(&self) -> DeleteSet {
         DeleteSet::from(self.stack_item.deletions().clone())
     }
 
-    /// Get the insertions DeleteSet
+    /// Get the insertions DeleteSet as a Python property
+    #[getter]
     pub fn insertions(&self) -> DeleteSet {
         DeleteSet::from(self.stack_item.insertions().clone())
     }
