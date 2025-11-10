@@ -24,7 +24,7 @@ use crate::map::{Map, MapEvent};
 use crate::transaction::Transaction;
 use crate::sticky_index::{StickyIndex, decode_sticky_index, get_sticky_index_from_json_string};
 use crate::subscription::Subscription;
-use crate::undo::{StackItem, UndoManager};
+use crate::undo::{StackItem, UndoManager, DeleteSet};
 use crate::update::{get_state, get_update, merge_updates};
 use crate::snapshot::Snapshot;
 
@@ -41,6 +41,7 @@ fn _pycrdt(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<MapEvent>()?;
     m.add_class::<Transaction>()?;
     m.add_class::<StackItem>()?;
+    m.add_class::<DeleteSet>()?;
     m.add_class::<StickyIndex>()?;
     m.add_class::<Subscription>()?;
     m.add_class::<UndoManager>()?;
