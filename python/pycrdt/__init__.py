@@ -46,3 +46,7 @@ from ._xml import XmlElement as XmlElement
 from ._xml import XmlEvent as XmlEvent
 from ._xml import XmlFragment as XmlFragment
 from ._xml import XmlText as XmlText
+
+
+def import_pycrdt():
+    import pycrdt
