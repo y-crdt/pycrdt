@@ -1,5 +1,5 @@
 import pytest
-from pycrdt import Array, Doc, Map, Text, UndoManager, StackItem
+from pycrdt import Array, Doc, Map, StackItem, Text, UndoManager
 
 
 def undo_redo(data, undo_manager, val0, val1, val3):
@@ -198,29 +198,29 @@ def test_stack_item_serialization():
     doc = Doc()
     doc["text"] = text = Text()
     undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
-    
+
     # Make some changes
     text += "Hello"
     text += ", World!"
-    
+
     # Get a stack item
     undo_stack = undo_manager.undo_stack
     assert len(undo_stack) == 2
     original_item = undo_stack[0]
-    
+
     # Serialize it
     deletions_bytes, insertions_bytes = original_item.encode()
     assert isinstance(deletions_bytes, bytes)
     assert isinstance(insertions_bytes, bytes)
-    
+
     # Deserialize it
     restored_item = StackItem.decode(deletions_bytes, insertions_bytes)
     assert restored_item is not None
-    
+
     # Verify the deletions and insertions are preserved
     original_deletions_bytes, original_insertions_bytes = original_item.encode()
     restored_deletions_bytes, restored_insertions_bytes = restored_item.encode()
-    
+
     assert original_deletions_bytes == restored_deletions_bytes
     assert original_insertions_bytes == restored_insertions_bytes
 
@@ -230,15 +230,15 @@ def test_stack_item_deletions_insertions():
     doc = Doc()
     doc["text"] = text = Text()
     undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
-    
+
     # Make a change
     text += "Hello"
-    
+
     # Get the stack item
     undo_stack = undo_manager.undo_stack
     assert len(undo_stack) == 1
     item = undo_stack[0]
-    
+
     # Access deletions and insertions (now properties)
     deletions = item.deletions
     insertions = item.insertions
@@ -253,6 +253,7 @@ def test_stack_item_deletions_insertions():
     assert isinstance(deletions_bytes, bytes)
     assert isinstance(insertions_bytes, bytes)
 
+
 def test_deleteset_to_json_string():
     """Test that DeleteSet.to_json_string produces valid JSON"""
     doc = Doc()
@@ -264,6 +265,7 @@ def test_deleteset_to_json_string():
     deletions = item.deletions
     json_str = deletions.to_json_string()
     import json
+
     parsed = json.loads(json_str)
     assert isinstance(parsed, dict)
 
@@ -274,22 +276,22 @@ def test_stack_item_multiple_changes():
     doc["text"] = text = Text()
     doc["array"] = array = Array()
     undo_manager = UndoManager(scopes=[text, array], capture_timeout_millis=0)
-    
+
     # Make various changes
     text += "Hello"
     array.append(1)
     array.append(2)
     text += " World"
-    
+
     # Get all stack items
     undo_stack = undo_manager.undo_stack
     assert len(undo_stack) == 4
-    
+
     # Serialize and deserialize all items
     for original_item in undo_stack:
         deletions_bytes, insertions_bytes = original_item.encode()
         restored_item = StackItem.decode(deletions_bytes, insertions_bytes)
-        
+
         # Verify they match
         orig_del, orig_ins = original_item.encode()
         rest_del, rest_ins = restored_item.encode()
