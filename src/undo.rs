@@ -1,21 +1,85 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 use pyo3::prelude::*;
-use pyo3::types::PyList;
+use pyo3::types::{PyList, PyBytes, PyString};
 use pyo3::exceptions::PyRuntimeError;
 use yrs::{
     UndoManager as _UndoManager,
+    DeleteSet as _DeleteSet,
 };
 use yrs::undo::{
     Options,
     StackItem as _StackItem,
 };
 use yrs::sync::{Clock, Timestamp};
+use yrs::updates::encoder::Encode;
+use yrs::updates::decoder::Decode;
 use crate::doc::Doc;
 use crate::text::Text;
 use crate::array::Array;
 use crate::map::Map;
 use crate::xml::XmlFragment;
+
+#[pyclass]
+#[derive(Clone)]
+pub struct DeleteSet {
+    delete_set: _DeleteSet,
+}
+
+#[pymethods]
+impl DeleteSet {
+    /// Create a new empty DeleteSet
+    #[new]
+    pub fn new() -> Self {
+        DeleteSet {
+            delete_set: _DeleteSet::new(),
+        }
+    }
+
+    /// Encode the DeleteSet to bytes
+    pub fn encode(&self) -> Py<PyAny> {
+        let encoded = self.delete_set.encode_v1();
+        Python::attach(|py: Python<'_>| PyBytes::new(py, &encoded).into())
+    }
+
+    /// Serialize the DeleteSet to a JSON string
+    pub fn to_json_string(&self) -> Py<PyAny> {
+        use std::collections::HashMap;
+        let mut mapping: HashMap<u64, Vec<(u32, u32)>> = HashMap::new();
+        for (client, ranges) in self.delete_set.iter() {
+            let mut vec_ranges = Vec::new();
+            for range in ranges.iter() {
+                vec_ranges.push((range.start, range.end));
+            }
+            mapping.insert(*client, vec_ranges);
+        }
+        let encoded = serde_json::to_string(&mapping).unwrap();
+        Python::attach(|py| PyString::new(py, &encoded).into())
+    }
+
+    /// Decode a DeleteSet from bytes
+    #[staticmethod]
+    pub fn decode(data: &Bound<'_, PyBytes>) -> PyResult<Self> {
+        let bytes: &[u8] = data.as_bytes();
+        match _DeleteSet::decode_v1(bytes) {
+            Ok(delete_set) => Ok(DeleteSet { delete_set }),
+            Err(e) => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Failed to decode DeleteSet: {}",
+                e
+            ))),
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{:?}", self.delete_set)
+    }
+}
+
+impl DeleteSet {
+    pub fn from(delete_set: _DeleteSet) -> Self {
+        DeleteSet { delete_set }
+    }
+}
 
 struct PythonClock {
     timestamp: Py<PyAny>,
@@ -135,6 +199,98 @@ impl StackItem {
 
 #[pymethods]
 impl StackItem {
+    /// Get the deletions DeleteSet as a Python property
+    #[getter]
+    pub fn deletions(&self) -> DeleteSet {
+        DeleteSet::from(self.stack_item.deletions().clone())
+    }
+
+    /// Get the insertions DeleteSet as a Python property
+    #[getter]
+    pub fn insertions(&self) -> DeleteSet {
+        DeleteSet::from(self.stack_item.insertions().clone())
+    }
+
+    /// Encode the StackItem to bytes
+    /// Returns a tuple of (deletions_bytes, insertions_bytes)
+    pub fn encode<'py>(&self, py: Python<'py>) -> Bound<'py, pyo3::types::PyTuple> {
+        let deletions_encoded = self.stack_item.deletions().encode_v1();
+        let insertions_encoded = self.stack_item.insertions().encode_v1();
+        pyo3::types::PyTuple::new(
+            py,
+            vec![
+                PyBytes::new(py, &deletions_encoded).into_any(),
+                PyBytes::new(py, &insertions_encoded).into_any(),
+            ]
+        ).unwrap()
+    }
+
+    /// Serialize the StackItem to a JSON string
+    pub fn to_json_string(&self) -> Py<PyAny> {
+        use std::collections::HashMap;
+        use serde_json::json;
+
+        let mut deletions_mapping: HashMap<u64, Vec<(u32, u32)>> = HashMap::new();
+        for (client, ranges) in self.stack_item.deletions().iter() {
+            let mut vec_ranges = Vec::new();
+            for range in ranges.iter() {
+                vec_ranges.push((range.start, range.end));
+            }
+            deletions_mapping.insert(*client, vec_ranges);
+        }
+
+        let mut insertions_mapping: HashMap<u64, Vec<(u32, u32)>> = HashMap::new();
+        for (client, ranges) in self.stack_item.insertions().iter() {
+            let mut vec_ranges = Vec::new();
+            for range in ranges.iter() {
+                vec_ranges.push((range.start, range.end));
+            }
+            insertions_mapping.insert(*client, vec_ranges);
+        }
+
+        let result = json!({
+            "deletions": deletions_mapping,
+            "insertions": insertions_mapping
+        });
+
+        let encoded = serde_json::to_string(&result).unwrap();
+        Python::attach(|py| PyString::new(py, &encoded).into())
+    }
+
+    /// Decode a StackItem from bytes
+    /// Takes a tuple of (deletions_bytes, insertions_bytes)
+    #[staticmethod]
+    pub fn decode(deletions_data: &Bound<'_, PyBytes>, insertions_data: &Bound<'_, PyBytes>) -> PyResult<Self> {
+        let deletions_bytes: &[u8] = deletions_data.as_bytes();
+        let insertions_bytes: &[u8] = insertions_data.as_bytes();
+        
+        let deletions = match _DeleteSet::decode_v1(deletions_bytes) {
+            Ok(ds) => ds,
+            Err(e) => return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Failed to decode deletions: {}",
+                e
+            ))),
+        };
+        
+        let insertions = match _DeleteSet::decode_v1(insertions_bytes) {
+            Ok(ds) => ds,
+            Err(e) => return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Failed to decode insertions: {}",
+                e
+            ))),
+        };
+
+        // Since StackItem::new is private, we need to construct it using unsafe code
+        // The StackItem struct has three fields: deletions, insertions, and meta
+        // For meta type (), this is a zero-sized type
+        let stack_item = unsafe {
+            // This works because StackItem<()> has a simple memory layout
+            std::mem::transmute::<(_DeleteSet, _DeleteSet, ()), _StackItem<()>>((deletions, insertions, ()))
+        };
+        
+        Ok(StackItem { stack_item })
+    }
+
     fn __repr__(&self) -> String {
         format!("{0}", self.stack_item)
     }
