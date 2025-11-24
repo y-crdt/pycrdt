@@ -366,3 +366,39 @@ def test_push_multiple_stack_items():
     assert str(text) == "First"
     undo_manager.undo()
     assert str(text) == ""
+
+
+def test_push_undo_stack_deletion():
+    """Push a deletion StackItem and undo to restore deleted content."""
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+
+    # Insert initial content -> first stack item
+    text += "Hello world"
+    assert str(text) == "Hello world"
+    assert len(undo_manager.undo_stack) == 1
+
+    # Perform deletion of suffix -> second stack item represents deletion
+    del text[6:]
+    assert str(text) == "Hello "
+    assert len(undo_manager.undo_stack) == 2
+    deletion_item = undo_manager.undo_stack[-1]
+
+    # Serialize the deletion stack item
+    deletions_bytes, insertions_bytes = deletion_item.encode()
+    # Clear manager state (drops both items but leaves document as-is)
+    undo_manager.clear()
+    assert len(undo_manager.undo_stack) == 0
+    assert str(text) == "Hello "
+
+    # Recreate StackItem from bytes and push back
+    restored = StackItem.decode(deletions_bytes, insertions_bytes)
+    undo_manager.push_undo_stack(restored)
+    assert len(undo_manager.undo_stack) == 1
+    assert undo_manager.can_undo()
+
+    # Undo should revert the deletion restoring original content
+    undo_manager.undo()
+    assert str(text) == "Hello world"
+    assert not undo_manager.can_undo()
