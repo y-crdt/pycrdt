@@ -402,3 +402,28 @@ def test_push_undo_stack_deletion():
     undo_manager.undo()
     assert str(text) == "Hello world"
     assert not undo_manager.can_undo()
+
+
+def test_stack_item_merge():
+    """Merging two stack items should allow undoing both changes at once."""
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+
+    text += "Hello"
+    text += " world"
+    assert len(undo_manager.undo_stack) == 2
+    item1, item2 = undo_manager.undo_stack
+
+    merged = StackItem.merge(item1, item2)
+    # Clear existing items and push merged
+    undo_manager.clear()
+    undo_manager.push_undo_stack(merged)
+    assert len(undo_manager.undo_stack) == 1
+    assert str(text) == "Hello world"
+
+    # Undo should remove both insertions
+    assert undo_manager.can_undo()
+    undo_manager.undo()
+    assert str(text) == ""
+    assert not undo_manager.can_undo()

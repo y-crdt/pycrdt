@@ -363,6 +363,20 @@ impl StackItem {
         Ok(StackItem { stack_item })
     }
 
+    /// Merge two StackItems into one containing union of deletions and insertions
+    #[staticmethod]
+    pub fn merge(a: &StackItem, b: &StackItem) -> StackItem {
+        let mut deletions = a.stack_item.deletions().clone();
+        let mut insertions = a.stack_item.insertions().clone();
+        // Merge in b's sets (assuming yrs DeleteSet supports merge)
+    deletions.merge(b.stack_item.deletions().clone());
+    insertions.merge(b.stack_item.insertions().clone());
+        let merged = unsafe {
+            std::mem::transmute::<(_DeleteSet, _DeleteSet, ()), _StackItem<()>>((deletions, insertions, ()))
+        };
+        StackItem { stack_item: merged }
+    }
+
     fn __repr__(&self) -> String {
         format!("{0}", self.stack_item)
     }

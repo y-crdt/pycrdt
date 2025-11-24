@@ -450,6 +450,13 @@ class StackItem:
     def to_json_string(self) -> str:
         """Serialize the StackItem to a JSON string."""
 
+    @staticmethod
+    def merge(a: "StackItem", b: "StackItem") -> "StackItem":
+        """Merge two StackItems into one containing the union of their deletions and insertions.
+
+        The merged item represents both operations as a single undo unit.
+        """
+
 class StickyIndex:
     def get_offset(self, txn: Transaction) -> int: ...
     def encode(self) -> bytes: ...
