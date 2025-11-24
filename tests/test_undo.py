@@ -297,3 +297,72 @@ def test_stack_item_multiple_changes():
         rest_del, rest_ins = restored_item.encode()
         assert orig_del == rest_del
         assert orig_ins == rest_ins
+
+
+def test_push_undo_stack():
+    """Test pushing a StackItem back onto the undo stack"""
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+
+    # Make some changes
+    text += "Hello"
+    text += ", World!"
+
+    # Get and save the first stack item
+    assert len(undo_manager.undo_stack) == 2
+    saved_item = undo_manager.undo_stack[0]
+
+    # Serialize it
+    deletions_bytes, insertions_bytes = saved_item.encode()
+
+    # Clear the undo manager
+    undo_manager.clear()
+    assert len(undo_manager.undo_stack) == 0
+    assert str(text) == "Hello, World!"
+
+    # Restore the item from bytes
+    restored_item = StackItem.decode(deletions_bytes, insertions_bytes)
+
+    # Push it back onto the stack
+    undo_manager.push_undo_stack(restored_item)
+    assert len(undo_manager.undo_stack) == 1
+
+    # Verify we can undo with the restored item
+    assert undo_manager.can_undo()
+    undo_manager.undo()
+    assert str(text) == ", World!"
+
+
+def test_push_multiple_stack_items():
+    """Test pushing multiple StackItems onto the undo stack"""
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+
+    # Make changes
+    text += "First"
+    text += " Second"
+    text += " Third"
+
+    # Save all items
+    assert len(undo_manager.undo_stack) == 3
+    saved_items = [item for item in undo_manager.undo_stack]
+
+    # Clear and restore
+    undo_manager.clear()
+    assert len(undo_manager.undo_stack) == 0
+
+    # Push items back in order
+    for item in saved_items:
+        undo_manager.push_undo_stack(item)
+
+    assert len(undo_manager.undo_stack) == 3
+
+    # Undo all changes
+    undo_manager.undo()
+    assert str(text) == "First Second"
+    undo_manager.undo()
+    assert str(text) == "First"
+    undo_manager.undo()
+    assert str(text) == ""

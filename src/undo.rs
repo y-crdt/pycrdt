@@ -182,6 +182,78 @@ impl UndoManager {
         let res = PyList::new(py, elements);
         res.unwrap()
     }
+
+    /// Push a StackItem onto the undo stack
+    /// This requires unsafe code because yrs doesn't expose the undo stack as mutable
+    pub fn push_undo_stack(&mut self, item: &StackItem) -> PyResult<()> {
+        // This is unsafe and relies on internal implementation details.
+        // The yrs UndoManager doesn't expose a public API to push items to the stack
+        // We work around this by:
+        // 1. Getting a reference to the undo stack (which returns &[StackItem])
+        // 2. Finding the Vec that owns this slice data in memory
+        // 3. Creating a mutable reference to that Vec
+        // This works because:
+        // - We have &mut self, so we have exclusive access to the UndoManager
+        // - UndoStack is repr(transparent) over Vec, so the slice points to Vec's data
+        // - The Vec is at a fixed offset within the Inner struct
+
+        unsafe {
+            // Get the undo_manager reference as a raw pointer
+            let undo_manager_ptr = &self.undo_manager as *const _UndoManager as *mut _UndoManager;
+
+            // The UndoManager structure is: { state: Arc<Inner>, doc: Doc }
+            // We need to access the Vec inside Arc<Inner>
+
+            // First, get a reference to the stack to find where it is
+            let stack_slice = (*undo_manager_ptr).undo_stack();
+
+            // The slice points to the Vec's data buffer
+            // We need to find the Vec itself, which is stored in Inner
+            // The Vec is 24 bytes (ptr, len, cap) on 64-bit systems
+
+            // We'll search backwards from the slice data pointer to find the Vec
+            // The Vec's ptr field should point to our slice's data
+            let slice_ptr = stack_slice.as_ptr();
+
+            // The UndoManager has state as the first field (Arc)
+            // We can extract the Arc and get raw pointer to Inner
+            #[repr(C)]
+            struct UndoManagerLayout {
+                state: *const std::ffi::c_void,
+            }
+            let layout = undo_manager_ptr as *const UndoManagerLayout;
+            let state_arc_ptr = (*layout).state;
+
+            // Arc stores the data inline after the reference count
+            // For Arc<T>, the layout is: [strong_count, weak_count, T]
+            // On 64-bit: 8 bytes + 8 bytes + sizeof(T)
+            let inner_ptr = (state_arc_ptr as *const u8).add(16);
+
+            // Inner<()> layout: scope, options, undo_stack, redo_stack, ...
+            // We need to find undo_stack (which is UndoStack<()> == Vec<StackItem<()>>)
+            // Skip HashSet (usually 48 bytes) and Options (varies)
+
+            // Alternative simpler approach: scan memory for the Vec that owns our slice
+            // Vec layout: [ptr, len, cap]
+            // We're looking for a location where ptr == slice_ptr
+
+            // Try offsets in the reasonable range (100-200 bytes into Inner)
+            for offset in (0..500).step_by(8) {
+                let potential_vec_ptr = (inner_ptr as *const u8).add(offset) as *const Vec<_StackItem<()>>;
+                let vec_ref: &_ = &*potential_vec_ptr;
+
+                if vec_ref.as_ptr() == slice_ptr && vec_ref.len() == stack_slice.len() {
+                    // Found it! Now create a mutable reference
+                    let vec_mut = potential_vec_ptr as *mut Vec<_StackItem<()>>;
+                    (*vec_mut).push(item.stack_item.clone());
+                    return Ok(());
+                }
+            }
+
+            // If we reach here, we couldn't find the Vec
+            return Err(PyRuntimeError::new_err("Failed to locate undo stack in memory"));
+        }
+    }
 }
 
 

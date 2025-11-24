@@ -134,3 +134,18 @@ class UndoManager:
     def redo_stack(self) -> list[StackItem]:
         """The list of redoable actions."""
         return self._undo_manager.redo_stack()
+
+    def push_undo_stack(self, item: StackItem) -> None:
+        """
+        Push a [StackItem][pycrdt.StackItem] onto the undo stack.
+
+        This allows restoring previously saved undo/redo state or manually
+        constructing undo operations.
+
+        Args:
+            item: The StackItem to push onto the undo stack.
+
+        Raises:
+            RuntimeError: If the item cannot be added to the stack.
+        """
+        self._undo_manager.push_undo_stack(item)
