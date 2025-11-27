@@ -396,10 +396,66 @@ class UndoManager:
     def redo_stack(self) -> list[StackItem]:
         """Returns the undo manager's redo stack."""
 
+    def push_undo_stack(self, item: StackItem) -> None:
+        """Push a StackItem onto the undo stack."""
+
+class DeleteSet:
+    """A set of deletions in a CRDT document."""
+
+    def __init__(self) -> None:
+        """Create a new empty DeleteSet."""
+
+    def encode(self) -> bytes:
+        """Encode the DeleteSet to bytes."""
+
+    def to_json_string(self) -> str:
+        """Serialize the DeleteSet to a JSON string."""
+
+    @staticmethod
+    def decode(data: bytes) -> DeleteSet:
+        """Decode a DeleteSet from bytes."""
+
 class StackItem:
     """A unit of work for the [UndoManager][pycrdt.UndoManager], consisting of
     compressed information about all updates and deletions tracked by it.
     """
+
+    @property
+    def deletions(self) -> DeleteSet:
+        """Get the deletions DeleteSet."""
+
+    @property
+    def insertions(self) -> DeleteSet:
+        """Get the insertions DeleteSet."""
+
+    def encode(self) -> tuple[bytes, bytes]:
+        """Encode the StackItem to bytes.
+
+        Returns:
+            A tuple of (deletions_bytes, insertions_bytes).
+        """
+
+    @staticmethod
+    def decode(deletions: bytes, insertions: bytes) -> StackItem:
+        """Decode a StackItem from bytes.
+
+        Args:
+            deletions: The encoded deletions DeleteSet.
+            insertions: The encoded insertions DeleteSet.
+
+        Returns:
+            A decoded StackItem.
+        """
+
+    def to_json_string(self) -> str:
+        """Serialize the StackItem to a JSON string."""
+
+    @staticmethod
+    def merge(a: "StackItem", b: "StackItem") -> "StackItem":
+        """Merge two StackItems into one containing the union of their deletions and insertions.
+
+        The merged item represents both operations as a single undo unit.
+        """
 
 class StickyIndex:
     def get_offset(self, txn: Transaction) -> int: ...
