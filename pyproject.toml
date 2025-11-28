@@ -40,7 +40,7 @@ test = [
     "pytest >=8.3.5,<9",
     "pytest-mypy-testing",
     "anyio",
-    "trio >=0.25.1,<0.32",
+    "trio >=0.25.1,<0.33",
     "pydantic >=2.5.2,<3",
     "mypy",
     "coverage[toml] >=7",
