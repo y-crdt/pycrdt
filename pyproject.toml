@@ -42,7 +42,7 @@ test = [
     "anyio",
     "trio >=0.25.1,<0.33",
     "pydantic >=2.5.2,<3",
-    "mypy",
+    "mypy >=1.18.0,<1.19.0",
     "coverage[toml] >=7",
     "exceptiongroup; python_version<'3.11'",
 ]
