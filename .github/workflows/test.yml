@@ -51,7 +51,7 @@ jobs:
         override: true
 
     - name: Cache rust
-      uses: Swatinem/rust-cache@v1
+      uses: Swatinem/rust-cache@v2
 
     - name: Build and install pycrdt
       run: pip install --group test -e .
