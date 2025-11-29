@@ -9,7 +9,7 @@ pip install pycrdt
 ## With `micromamba`
 
 We recommend using `micromamba` to manage `conda-forge` environments (see `micromamba`'s
-[installation instructions](https://mamba.readthedocs.io/en/latest/installation.html#micromamba)).
+[installation instructions](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html#micromamba-installation)).
 First create an environment, here called `my_env`, and activate it:
 ```bash
 micromamba create -n my_env
@@ -18,7 +18,7 @@ micromamba activate my_env
 Then install `pycrdt`.
 
 ```bash
-micromamba install -c conda-forge pycrdt
+micromamba install pycrdt
 ```
 
 ## Development install
@@ -33,11 +33,11 @@ We recommend working in a conda environment. In order to build `pycrdt`, you wil
 ```bash
 micromamba create -n pycrdt-dev
 micromamba activate pycrdt-dev
-micromamba install -c conda-forge pip rust
+micromamba install pip rust
 ```
 Then install `pycrdt` in editable mode:
 ```bash
-pip install -e .
+pip install -e . --group test --group types
 ```
 This will build the Rust extension using [maturin](https://www.maturin.rs). If you make changes
 to the Python code only, you don't need to recompile anything, changes will be reflected the next
@@ -48,4 +48,9 @@ but you don't need to reinstall `pycrdt`, you can just re-build the Rust extensi
 pip install maturin
 # build the Rust extension each time the Rust code changes:
 maturin develop
+```
+
+Tests can be run with:
+```bash
+pytest -v
 ```
