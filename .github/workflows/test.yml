@@ -54,14 +54,24 @@ jobs:
       uses: Swatinem/rust-cache@v2
 
     - name: Build and install pycrdt
-      run: pip install --group test -e .
+      run: pip install -e .
 
     - name: Check types
-      run: mypy python
+      if: ${{ !(matrix.python-version == 'pypy3.11') }}
+      run: |
+        pip install --group types -e .
+        mypy python
+
+    - name: Install test dependencies
+      run: pip install --group test -e .
 
     - name: Run tests
-      if: ${{ !((matrix.python-version == '3.14') && (matrix.os == 'ubuntu')) }}
+      if: ${{ !(((matrix.python-version == '3.14') && (matrix.os == 'ubuntu')) || (matrix.python-version == 'pypy3.11')) }}
       run: pytest --color=yes -v tests
+
+    - name: Run tests on PyPy
+      if: ${{ (matrix.python-version == 'pypy3.11') }}
+      run: pytest --color=yes --ignore tests/test_types.py -v tests
 
     - name: Run code coverage
       if: ${{ (matrix.python-version == '3.14') && (matrix.os == 'ubuntu') }}

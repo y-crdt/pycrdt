@@ -31,9 +31,9 @@ jobs:
           args: --release --target universal2-apple-darwin --out dist -i 3.10 3.11 3.12 3.13 3.14 pypy3.11
       - name: Test built wheel - universal2
         run: |
-          pip install pytest pytest-mypy-testing "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32" "exceptiongroup; python_version<'3.11'"
+          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32" "exceptiongroup; python_version<'3.11'"
           pip install pycrdt --no-deps --no-index --find-links dist --force-reinstall
-          pytest
+          pytest --ignore tests/test_types.py
       - name: Upload wheels
         uses: actions/upload-artifact@v5
         with:
@@ -66,9 +66,9 @@ jobs:
           args: --release --out dist -i ${{ join(matrix.platform.interpreter, ' ') }}
       - name: Test built wheel
         run: |
-          pip install pytest pytest-mypy-testing "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32" "exceptiongroup; python_version<'3.11'"
+          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32" "exceptiongroup; python_version<'3.11'"
           pip install pycrdt --no-deps --no-index --find-links dist --force-reinstall
-          pytest
+          pytest --ignore tests/test_types.py
       - name: Upload wheels
         uses: actions/upload-artifact@v5
         with:
@@ -102,9 +102,9 @@ jobs:
       - name: Test built wheel
         if: matrix.target == 'x86_64'
         run: |
-          pip install pytest pytest-mypy-testing "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32" "exceptiongroup; python_version<'3.11'"
+          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32" "exceptiongroup; python_version<'3.11'"
           pip install pycrdt --no-deps --no-index --find-links dist --force-reinstall
-          pytest
+          pytest --ignore tests/test_types.py
       - name: Upload wheels
         uses: actions/upload-artifact@v5
         with:
@@ -138,10 +138,10 @@ jobs:
           install: |
             apt-get update
             apt-get install -y --no-install-recommends python3 python3-pip
-            pip3 install -U pip pytest pytest-mypy-testing "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32" "exceptiongroup; python_version<'3.11'"
+            pip3 install -U pip pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32" "exceptiongroup; python_version<'3.11'"
           run: |
             pip3 install pycrdt --no-deps --no-index --find-links dist/ --force-reinstall
-            pytest
+            pytest --ignore tests/test_types.py
 
       - name: Upload wheels
         uses: actions/upload-artifact@v5
