@@ -38,13 +38,15 @@ dependencies = [
 [dependency-groups]
 test = [
     "pytest >=8.3.5,<10",
-    "pytest-mypy-testing",
     "anyio",
     "trio >=0.25.1,<0.33",
     "pydantic >=2.5.2,<3",
-    "mypy >=1.18.0,<1.19.0",
     "coverage[toml] >=7",
     "exceptiongroup; python_version<'3.11'",
+]
+types = [
+  "mypy >=1.19.0",
+  "pytest-mypy-testing",
 ]
 docs = [
     "mkdocs",
