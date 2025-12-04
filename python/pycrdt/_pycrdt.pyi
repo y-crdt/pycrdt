@@ -363,7 +363,14 @@ class XmlText:
 class UndoManager:
     """Undo manager."""
 
-    def __init__(self, doc: Doc, capture_timeout_millis, timestamp: Callable[[], int]) -> None:
+    def __init__(
+        self,
+        doc: Doc,
+        capture_timeout_millis,
+        timestamp: Callable[[], int],
+        undo_stack: list[StackItem] | None = None,
+        redo_stack: list[StackItem] | None = None,
+    ) -> None:
         """Creates an undo manager."""
 
     def expand_scope(self, scope: Text | Array | Map) -> None:
@@ -396,9 +403,6 @@ class UndoManager:
     def redo_stack(self) -> list[StackItem]:
         """Returns the undo manager's redo stack."""
 
-    def push_undo_stack(self, item: StackItem) -> None:
-        """Push a StackItem onto the undo stack."""
-
 class DeleteSet:
     """A set of deletions in a CRDT document."""
 
@@ -407,9 +411,6 @@ class DeleteSet:
 
     def encode(self) -> bytes:
         """Encode the DeleteSet to bytes."""
-
-    def to_json_string(self) -> str:
-        """Serialize the DeleteSet to a JSON string."""
 
     @staticmethod
     def decode(data: bytes) -> DeleteSet:
@@ -446,9 +447,6 @@ class StackItem:
         Returns:
             A decoded StackItem.
         """
-
-    def to_json_string(self) -> str:
-        """Serialize the StackItem to a JSON string."""
 
     @staticmethod
     def merge(a: "StackItem", b: "StackItem") -> "StackItem":

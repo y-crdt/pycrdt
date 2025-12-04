@@ -42,21 +42,6 @@ impl DeleteSet {
         Python::attach(|py: Python<'_>| PyBytes::new(py, &encoded).into())
     }
 
-    /// Serialize the DeleteSet to a JSON string
-    pub fn to_json_string(&self) -> Py<PyAny> {
-        use std::collections::HashMap;
-        let mut mapping: HashMap<u64, Vec<(u32, u32)>> = HashMap::new();
-        for (client, ranges) in self.delete_set.iter() {
-            let mut vec_ranges = Vec::new();
-            for range in ranges.iter() {
-                vec_ranges.push((range.start, range.end));
-            }
-            mapping.insert(*client, vec_ranges);
-        }
-        let encoded = serde_json::to_string(&mapping).unwrap();
-        Python::attach(|py| PyString::new(py, &encoded).into())
-    }
-
     /// Decode a DeleteSet from bytes
     #[staticmethod]
     pub fn decode(data: &Bound<'_, PyBytes>) -> PyResult<Self> {
@@ -230,38 +215,6 @@ impl StackItem {
                 PyBytes::new(py, &insertions_encoded).into_any(),
             ]
         ).unwrap()
-    }
-
-    /// Serialize the StackItem to a JSON string
-    pub fn to_json_string(&self) -> Py<PyAny> {
-        use std::collections::HashMap;
-        use serde_json::json;
-
-        let mut deletions_mapping: HashMap<u64, Vec<(u32, u32)>> = HashMap::new();
-        for (client, ranges) in self.stack_item.deletions().iter() {
-            let mut vec_ranges = Vec::new();
-            for range in ranges.iter() {
-                vec_ranges.push((range.start, range.end));
-            }
-            deletions_mapping.insert(*client, vec_ranges);
-        }
-
-        let mut insertions_mapping: HashMap<u64, Vec<(u32, u32)>> = HashMap::new();
-        for (client, ranges) in self.stack_item.insertions().iter() {
-            let mut vec_ranges = Vec::new();
-            for range in ranges.iter() {
-                vec_ranges.push((range.start, range.end));
-            }
-            insertions_mapping.insert(*client, vec_ranges);
-        }
-
-        let result = json!({
-            "deletions": deletions_mapping,
-            "insertions": insertions_mapping
-        });
-
-        let encoded = serde_json::to_string(&result).unwrap();
-        Python::attach(|py| PyString::new(py, &encoded).into())
     }
 
     /// Decode a StackItem from bytes

@@ -254,22 +254,6 @@ def test_stack_item_deletions_insertions():
     assert isinstance(insertions_bytes, bytes)
 
 
-def test_deleteset_to_json_string():
-    """Test that DeleteSet.to_json_string produces valid JSON"""
-    doc = Doc()
-    doc["text"] = text = Text()
-    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
-    text += "Hello"
-    text += ", World!"
-    item = undo_manager.undo_stack[0]
-    deletions = item.deletions
-    json_str = deletions.to_json_string()
-    import json
-
-    parsed = json.loads(json_str)
-    assert isinstance(parsed, dict)
-
-
 def test_stack_item_multiple_changes():
     """Test serialization with multiple types of changes"""
     doc = Doc()
