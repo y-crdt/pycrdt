@@ -431,3 +431,100 @@ def test_stack_item_merge_and_undo():
     undo_manager.undo()
     assert str(text) == ""
     assert not undo_manager.can_undo()
+
+
+def test_stack_item_merge_with_meta_handler():
+    """Test merging two stack items with conflicting metadata using dicts (yjs-like)."""
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+
+    text += "Hello"
+    text += " world"
+    assert len(undo_manager.undo_stack) == 2
+    item1, item2 = undo_manager.undo_stack
+
+    # Create new stack items with conflicting metadata (using dicts like yjs)
+    meta1 = {"cursor": 5, "user": "alice"}
+    meta2 = {"cursor": 11, "user": "bob"}
+    item_with_meta1 = StackItem[dict](item1.deletions, item1.insertions, meta1)
+    item_with_meta2 = StackItem[dict](item2.deletions, item2.insertions, meta2)
+
+    # Verify the items have different metadata
+    assert item_with_meta1.meta == meta1
+    assert item_with_meta2.meta == meta2
+
+    # Create a handler that resolves conflicts by merging dicts
+    def meta_conflict_handler(meta_a: dict, meta_b: dict) -> dict:
+        # Merge two metadata dicts, preferring values from meta_b
+        result = {}
+        if meta_a:
+            result.update(meta_a)
+        if meta_b:
+            result.update(meta_b)
+        return result
+
+    # Merge with handler
+    merged = StackItem.merge(item_with_meta1, item_with_meta2, meta_conflict_handler)
+
+    # Verify the metadata was merged according to the handler
+    assert merged.meta == {"cursor": 11, "user": "bob"}
+
+    # Verify merged item works correctly in undo operations
+    undo_manager.clear()
+    undo_manager = UndoManager(
+        scopes=[text],
+        undo_stack=[merged],
+        redo_stack=[],
+        capture_timeout_millis=0,
+    )
+    assert len(undo_manager.undo_stack) == 1
+    assert str(text) == "Hello world"
+
+    # Undo should still work correctly
+    assert undo_manager.can_undo()
+    undo_manager.undo()
+    assert str(text) == ""
+
+
+def test_stack_item_constructor_with_metadata():
+    """Test creating StackItems with custom metadata using the constructor."""
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+
+    # Make a change to create a stack item
+    text += "Hello"
+    assert len(undo_manager.undo_stack) == 1
+    original_item = undo_manager.undo_stack[0]
+
+    # Create a new StackItem with custom metadata
+    item_with_metadata = StackItem[str](
+        original_item.deletions, original_item.insertions, "cursor_position:5"
+    )
+
+    # Verify metadata is set correctly
+    assert item_with_metadata.meta == "cursor_position:5"
+
+    # Create another with different metadata
+    item_with_metadata2 = StackItem(original_item.deletions, original_item.insertions, "user:alice")
+    assert item_with_metadata2.meta == "user:alice"
+
+    # Verify items without explicit metadata get None
+    item_without_meta = StackItem(original_item.deletions, original_item.insertions)
+    assert item_without_meta.meta is None
+
+    # Verify it can be used in an UndoManager
+    undo_manager.clear()
+    undo_manager = UndoManager(
+        scopes=[text],
+        undo_stack=[item_with_metadata],
+        redo_stack=[],
+        capture_timeout_millis=0,
+    )
+
+    # Verify undo works with item with metadata
+    assert str(text) == "Hello"
+    assert undo_manager.can_undo()
+    undo_manager.undo()
+    assert str(text) == ""

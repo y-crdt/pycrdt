@@ -1,4 +1,4 @@
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Generic, Iterator, TypeVar
 
 class Snapshot:
     """A snapshot of a document's state at a given point in time."""
@@ -416,10 +416,23 @@ class DeleteSet:
     def decode(data: bytes) -> DeleteSet:
         """Decode a DeleteSet from bytes."""
 
-class StackItem:
+MetaT = TypeVar("MetaT")
+
+class StackItem(Generic[MetaT]):
     """A unit of work for the [UndoManager][pycrdt.UndoManager], consisting of
     compressed information about all updates and deletions tracked by it.
     """
+
+    def __init__(
+        self, deletions: DeleteSet, insertions: DeleteSet, meta: MetaT | None = None
+    ) -> None:
+        """Create a new StackItem.
+
+        Args:
+            deletions: The DeleteSet of deletions.
+            insertions: The DeleteSet of insertions.
+            meta: Optional metadata (can be any Python object).
+        """
 
     @property
     def deletions(self) -> DeleteSet:
@@ -429,6 +442,10 @@ class StackItem:
     def insertions(self) -> DeleteSet:
         """Get the insertions DeleteSet."""
 
+    @property
+    def meta(self) -> MetaT | None:
+        """Custom metadata. Can be any Python object."""
+
     def encode(self) -> tuple[bytes, bytes]:
         """Encode the StackItem to bytes.
 
@@ -437,7 +454,7 @@ class StackItem:
         """
 
     @staticmethod
-    def decode(deletions: bytes, insertions: bytes) -> StackItem:
+    def decode(deletions: bytes, insertions: bytes) -> "StackItem[None]":
         """Decode a StackItem from bytes.
 
         Args:
@@ -445,14 +462,23 @@ class StackItem:
             insertions: The encoded insertions DeleteSet.
 
         Returns:
-            A decoded StackItem.
+            A decoded StackItem with no metadata.
         """
 
     @staticmethod
-    def merge(a: "StackItem", b: "StackItem") -> "StackItem":
+    def merge(
+        a: "StackItem[MetaT]",
+        b: "StackItem[MetaT]",
+        merge_meta: Callable[[MetaT | None, MetaT | None], Any] | None = None,
+    ) -> "StackItem[Any]":
         """Merge two StackItems into one containing the union of their deletions and insertions.
 
-        The merged item represents both operations as a single undo unit.
+        Args:
+            a: First StackItem to merge.
+            b: Second StackItem to merge.
+            merge_meta: Optional function to handle metadata conflicts.
+                Takes (meta_a, meta_b) and returns the merged metadata.
+                If None, keeps the first item's metadata.
         """
 
 class StickyIndex:

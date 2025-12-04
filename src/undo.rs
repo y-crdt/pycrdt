@@ -1,15 +1,13 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyBytes, PyString};
+use pyo3::types::{PyList, PyBytes};
 use pyo3::exceptions::PyRuntimeError;
-use yrs::{
-    UndoManager as _UndoManager,
-    DeleteSet as _DeleteSet,
-};
+use yrs::DeleteSet as _DeleteSet;
 use yrs::undo::{
     Options,
     StackItem as _StackItem,
+    UndoManager as _UndoManager,
 };
 use yrs::sync::{Clock, Timestamp};
 use yrs::updates::encoder::Encode;
@@ -80,7 +78,7 @@ impl Clock for PythonClock {
 
 #[pyclass(unsendable)]
 pub struct UndoManager {
-    undo_manager: _UndoManager,
+    undo_manager: _UndoManager<PyMeta>,
 }
 
 #[pymethods]
@@ -93,7 +91,7 @@ impl UndoManager {
         undo_stack: Vec<StackItem>,
         redo_stack: Vec<StackItem>,
     ) -> Self {
-        let options = Options {
+        let options = Options::<PyMeta> {
             capture_timeout_millis,
             tracked_origins: HashSet::new(),
             capture_transaction: None,
@@ -180,17 +178,30 @@ impl UndoManager {
 #[pyclass]
 #[derive(Clone)]
 pub struct StackItem {
-    stack_item: _StackItem<()>
+    stack_item: _StackItem<PyMeta>
 }
 
 impl StackItem {
-    pub fn from(stack_item: _StackItem<()>) -> Self {
+    pub(crate) fn from(stack_item: _StackItem<PyMeta>) -> Self {
         StackItem { stack_item }
     }
 }
 
 #[pymethods]
 impl StackItem {
+    /// Create a new StackItem with deletions, insertions, and optional metadata
+    /// Metadata can be any Python object (dict, string, int, etc.)
+    #[new]
+    #[pyo3(signature = (deletions, insertions, meta=None))]
+    pub fn new(deletions: &DeleteSet, insertions: &DeleteSet, meta: Option<Py<PyAny>>) -> Self {
+        let stack_item = _StackItem::with_meta(
+            deletions.delete_set.clone(),
+            insertions.delete_set.clone(),
+            PyMeta(meta),
+        );
+        StackItem { stack_item }
+    }
+
     /// Get the deletions DeleteSet as a Python property
     #[getter]
     pub fn deletions(&self) -> DeleteSet {
@@ -201,6 +212,14 @@ impl StackItem {
     #[getter]
     pub fn insertions(&self) -> DeleteSet {
         DeleteSet::from(self.stack_item.insertions().clone())
+    }
+
+    /// Get the metadata as a Python property
+    #[getter]
+    pub fn meta(&self) -> Option<Py<PyAny>> {
+        self.stack_item.meta().0.as_ref().map(|py_obj| {
+            Python::attach(|py| py_obj.clone_ref(py))
+        })
     }
 
     /// Encode the StackItem to bytes
@@ -240,20 +259,60 @@ impl StackItem {
             ))),
         };
 
-        let stack_item = _StackItem::with_meta(deletions, insertions, ());
+        let stack_item = _StackItem::with_meta(deletions, insertions, PyMeta::default());
         
         Ok(StackItem { stack_item })
     }
 
     /// Merge two StackItems into one containing union of deletions and insertions
+    /// merge_meta is a function that takes (meta_a, meta_b) and returns the merged metadata
     #[staticmethod]
-    pub fn merge(a: &StackItem, b: &StackItem) -> StackItem {
+    #[pyo3(signature = (a, b, merge_meta=None))]
+    pub fn merge(a: &StackItem, b: &StackItem, merge_meta: Option<Py<PyAny>>) -> PyResult<StackItem> {
         let mut stack_item = a.stack_item.clone();
-        stack_item.merge(b.stack_item.clone(), |_a, _b| {});
-        StackItem { stack_item }
+
+        stack_item.merge(b.stack_item.clone(), |meta_a, meta_b| {
+            if let Some(ref handler) = merge_meta {
+                Python::attach(|py| {
+                    let args = (
+                        meta_a.0.as_ref().map(|m| m.clone_ref(py)),
+                        meta_b.0.as_ref().map(|m| m.clone_ref(py))
+                    );
+                    if let Ok(result) = handler.call1(py, args) {
+                        meta_a.0 = Some(result);
+                    }
+                })
+            }
+            // If no handler, keep first metadata (do nothing)
+        });
+
+        Ok(StackItem { stack_item })
+    }
+
+    /// Support for generic type hints like StackItem[dict]
+    #[classmethod]
+    fn __class_getitem__(cls: &Bound<'_, pyo3::types::PyType>, _item: &Bound<'_, PyAny>) -> Py<pyo3::types::PyType> {
+        // Return the class itself - this is just for type hinting support
+        cls.clone().unbind()
     }
 
     fn __repr__(&self) -> String {
         format!("{0}", self.stack_item)
+    }
+}
+
+
+/// Wrapper for Python objects to use as yrs StackItem metadata.
+#[derive(Default)]
+pub(crate) struct PyMeta(Option<Py<PyAny>>);
+
+unsafe impl Send for PyMeta {}
+unsafe impl Sync for PyMeta {}
+
+impl Clone for PyMeta {
+    fn clone(&self) -> Self {
+        PyMeta(self.0.as_ref().map(|py_obj| {
+            Python::attach(|py| py_obj.clone_ref(py))
+        }))
     }
 }
