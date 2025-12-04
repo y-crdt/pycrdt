@@ -1,5 +1,5 @@
 import pytest
-from pycrdt import Array, Doc, Map, StackItem, Text, UndoManager
+from pycrdt import Array, DeleteSet, Doc, Map, StackItem, Text, UndoManager
 
 
 def undo_redo(data, undo_manager, val0, val1, val3):
@@ -208,21 +208,21 @@ def test_stack_item_serialization():
     assert len(undo_stack) == 2
     original_item = undo_stack[0]
 
-    # Serialize it
-    deletions_bytes, insertions_bytes = original_item.encode()
+    # Serialize DeleteSets
+    deletions_bytes = original_item.deletions.encode()
+    insertions_bytes = original_item.insertions.encode()
     assert isinstance(deletions_bytes, bytes)
     assert isinstance(insertions_bytes, bytes)
 
-    # Deserialize it
-    restored_item = StackItem.decode(deletions_bytes, insertions_bytes)
+    # Deserialize and reconstruct StackItem
+    deletions = DeleteSet.decode(deletions_bytes)
+    insertions = DeleteSet.decode(insertions_bytes)
+    restored_item = StackItem(deletions=deletions, insertions=insertions)
     assert restored_item is not None
 
     # Verify the deletions and insertions are preserved
-    original_deletions_bytes, original_insertions_bytes = original_item.encode()
-    restored_deletions_bytes, restored_insertions_bytes = restored_item.encode()
-
-    assert original_deletions_bytes == restored_deletions_bytes
-    assert original_insertions_bytes == restored_insertions_bytes
+    assert original_item.deletions.encode() == restored_item.deletions.encode()
+    assert original_item.insertions.encode() == restored_item.insertions.encode()
 
 
 def test_stack_item_deletions_insertions():
@@ -273,14 +273,15 @@ def test_stack_item_multiple_changes():
 
     # Serialize and deserialize all items
     for original_item in undo_stack:
-        deletions_bytes, insertions_bytes = original_item.encode()
-        restored_item = StackItem.decode(deletions_bytes, insertions_bytes)
+        deletions_bytes = original_item.deletions.encode()
+        insertions_bytes = original_item.insertions.encode()
+        deletions = DeleteSet.decode(deletions_bytes)
+        insertions = DeleteSet.decode(insertions_bytes)
+        restored_item = StackItem(deletions=deletions, insertions=insertions)
 
         # Verify they match
-        orig_del, orig_ins = original_item.encode()
-        rest_del, rest_ins = restored_item.encode()
-        assert orig_del == rest_del
-        assert orig_ins == rest_ins
+        assert original_item.deletions.encode() == restored_item.deletions.encode()
+        assert original_item.insertions.encode() == restored_item.insertions.encode()
 
 
 def test_undo_from_restored_stack():
@@ -297,8 +298,9 @@ def test_undo_from_restored_stack():
     assert len(undo_manager.undo_stack) == 2
     saved_item = undo_manager.undo_stack[0]
 
-    # Serialize it
-    deletions_bytes, insertions_bytes = saved_item.encode()
+    # Serialize DeleteSets
+    deletions_bytes = saved_item.deletions.encode()
+    insertions_bytes = saved_item.insertions.encode()
 
     # Clear the undo manager
     undo_manager.clear()
@@ -306,7 +308,9 @@ def test_undo_from_restored_stack():
     assert str(text) == "Hello, World!"
 
     # Restore the item from bytes
-    restored_item = StackItem.decode(deletions_bytes, insertions_bytes)
+    deletions = DeleteSet.decode(deletions_bytes)
+    insertions = DeleteSet.decode(insertions_bytes)
+    restored_item = StackItem(deletions, insertions)
 
     # Create new undo manager with the restored stack
     undo_manager = UndoManager(
@@ -379,14 +383,17 @@ def test_undo_from_restored_stack_deletion():
     deletion_item = undo_manager.undo_stack[-1]
 
     # Serialize the deletion stack item
-    deletions_bytes, insertions_bytes = deletion_item.encode()
+    deletions_bytes = deletion_item.deletions.encode()
+    insertions_bytes = deletion_item.insertions.encode()
     # Clear manager state (drops both items but leaves document as-is)
     undo_manager.clear()
     assert len(undo_manager.undo_stack) == 0
     assert str(text) == "Hello "
 
     # Recreate StackItem from bytes and create new manager
-    restored = StackItem.decode(deletions_bytes, insertions_bytes)
+    deletions = DeleteSet.decode(deletions_bytes)
+    insertions = DeleteSet.decode(insertions_bytes)
+    restored = StackItem(deletions, insertions)
     undo_manager = UndoManager(
         scopes=[text],
         undo_stack=[restored],

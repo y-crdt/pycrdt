@@ -222,48 +222,6 @@ impl StackItem {
         })
     }
 
-    /// Encode the StackItem to bytes
-    /// Returns a tuple of (deletions_bytes, insertions_bytes)
-    pub fn encode<'py>(&self, py: Python<'py>) -> Bound<'py, pyo3::types::PyTuple> {
-        let deletions_encoded = self.stack_item.deletions().encode_v1();
-        let insertions_encoded = self.stack_item.insertions().encode_v1();
-        pyo3::types::PyTuple::new(
-            py,
-            vec![
-                PyBytes::new(py, &deletions_encoded).into_any(),
-                PyBytes::new(py, &insertions_encoded).into_any(),
-            ]
-        ).unwrap()
-    }
-
-    /// Decode a StackItem from bytes
-    /// Takes a tuple of (deletions_bytes, insertions_bytes)
-    #[staticmethod]
-    pub fn decode(deletions_data: &Bound<'_, PyBytes>, insertions_data: &Bound<'_, PyBytes>) -> PyResult<Self> {
-        let deletions_bytes: &[u8] = deletions_data.as_bytes();
-        let insertions_bytes: &[u8] = insertions_data.as_bytes();
-        
-        let deletions = match _DeleteSet::decode_v1(deletions_bytes) {
-            Ok(ds) => ds,
-            Err(e) => return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "Failed to decode deletions: {}",
-                e
-            ))),
-        };
-        
-        let insertions = match _DeleteSet::decode_v1(insertions_bytes) {
-            Ok(ds) => ds,
-            Err(e) => return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "Failed to decode insertions: {}",
-                e
-            ))),
-        };
-
-        let stack_item = _StackItem::with_meta(deletions, insertions, PyMeta::default());
-        
-        Ok(StackItem { stack_item })
-    }
-
     /// Merge two StackItems into one containing union of deletions and insertions
     /// merge_meta is a function that takes (meta_a, meta_b) and returns the merged metadata
     #[staticmethod]

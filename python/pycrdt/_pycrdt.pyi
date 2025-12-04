@@ -446,25 +446,6 @@ class StackItem(Generic[MetaT]):
     def meta(self) -> MetaT | None:
         """Custom metadata. Can be any Python object."""
 
-    def encode(self) -> tuple[bytes, bytes]:
-        """Encode the StackItem to bytes.
-
-        Returns:
-            A tuple of (deletions_bytes, insertions_bytes).
-        """
-
-    @staticmethod
-    def decode(deletions: bytes, insertions: bytes) -> "StackItem[None]":
-        """Decode a StackItem from bytes.
-
-        Args:
-            deletions: The encoded deletions DeleteSet.
-            insertions: The encoded insertions DeleteSet.
-
-        Returns:
-            A decoded StackItem with no metadata.
-        """
-
     @staticmethod
     def merge(
         a: "StackItem[MetaT]",
