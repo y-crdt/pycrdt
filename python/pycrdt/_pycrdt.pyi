@@ -366,7 +366,7 @@ class UndoManager:
     def __init__(
         self,
         doc: Doc,
-        capture_timeout_millis,
+        capture_timeout_millis: int,
         timestamp: Callable[[], int],
         undo_stack: list[StackItem] | None = None,
         redo_stack: list[StackItem] | None = None,
