@@ -1,5 +1,10 @@
 # Version history
 
+## 0.12.44
+
+- Expose `UndoManager` stack items.
+- Bump `yrs` to v0.25.0.
+
 ## 0.12.43
 
 - Make `pycrdt` a namespace package.
