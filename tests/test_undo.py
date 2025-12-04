@@ -494,6 +494,34 @@ def test_stack_item_merge_with_meta_handler():
     assert str(text) == ""
 
 
+def test_stack_item_merge_without_meta_handler():
+    """Test merging two stack items with conflicting metadata - default resolution."""
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+
+    text += "Hello"
+    text += " world"
+    assert len(undo_manager.undo_stack) == 2
+    item1, item2 = undo_manager.undo_stack
+
+    # Create new stack items with conflicting metadata (using dicts like yjs)
+    meta1 = {"cursor": 5, "user": "alice"}
+    meta2 = {"cursor": 11, "user": "bob"}
+    item_with_meta1 = StackItem[dict](item1.deletions, item1.insertions, meta1)
+    item_with_meta2 = StackItem[dict](item2.deletions, item2.insertions, meta2)
+
+    # Verify the items have different metadata
+    assert item_with_meta1.meta == meta1
+    assert item_with_meta2.meta == meta2
+
+    # Merge with handler
+    merged = StackItem.merge(item_with_meta1, item_with_meta2)
+
+    # Verify the metadata was merged using the default (first item's metadata wins)
+    assert merged.meta == {"cursor": 5, "user": "alice"}
+
+
 def test_stack_item_merge_handler_error():
     """Test that errors in merge handler are propagated."""
     doc = Doc()
