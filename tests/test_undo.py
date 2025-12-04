@@ -299,8 +299,8 @@ def test_stack_item_multiple_changes():
         assert orig_ins == rest_ins
 
 
-def test_push_undo_stack():
-    """Test pushing a StackItem back onto the undo stack"""
+def test_undo_from_restored_stack():
+    """Test restoring a StackItem and using it in a new UndoManager"""
     doc = Doc()
     doc["text"] = text = Text()
     undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
@@ -324,8 +324,13 @@ def test_push_undo_stack():
     # Restore the item from bytes
     restored_item = StackItem.decode(deletions_bytes, insertions_bytes)
 
-    # Push it back onto the stack
-    undo_manager.push_undo_stack(restored_item)
+    # Create new undo manager with the restored stack
+    undo_manager = UndoManager(
+        scopes=[text],
+        undo_stack=[restored_item],
+        redo_stack=[],
+        capture_timeout_millis=0,
+    )
     assert len(undo_manager.undo_stack) == 1
 
     # Verify we can undo with the restored item
@@ -334,8 +339,8 @@ def test_push_undo_stack():
     assert str(text) == ", World!"
 
 
-def test_push_multiple_stack_items():
-    """Test pushing multiple StackItems onto the undo stack"""
+def test_undo_multiple_from_restored():
+    """Test restoring multiple StackItems"""
     doc = Doc()
     doc["text"] = text = Text()
     undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
@@ -353,9 +358,13 @@ def test_push_multiple_stack_items():
     undo_manager.clear()
     assert len(undo_manager.undo_stack) == 0
 
-    # Push items back in order
-    for item in saved_items:
-        undo_manager.push_undo_stack(item)
+    # Create new undo manager with all saved items
+    undo_manager = UndoManager(
+        scopes=[text],
+        undo_stack=saved_items,
+        redo_stack=[],
+        capture_timeout_millis=0,
+    )
 
     assert len(undo_manager.undo_stack) == 3
 
@@ -368,8 +377,8 @@ def test_push_multiple_stack_items():
     assert str(text) == ""
 
 
-def test_push_undo_stack_deletion():
-    """Push a deletion StackItem and undo to restore deleted content."""
+def test_undo_from_restored_stack_deletion():
+    """Restore a deletion StackItem and undo to restore deleted content."""
     doc = Doc()
     doc["text"] = text = Text()
     undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
@@ -392,9 +401,14 @@ def test_push_undo_stack_deletion():
     assert len(undo_manager.undo_stack) == 0
     assert str(text) == "Hello "
 
-    # Recreate StackItem from bytes and push back
+    # Recreate StackItem from bytes and create new manager
     restored = StackItem.decode(deletions_bytes, insertions_bytes)
-    undo_manager.push_undo_stack(restored)
+    undo_manager = UndoManager(
+        scopes=[text],
+        undo_stack=[restored],
+        redo_stack=[],
+        capture_timeout_millis=0,
+    )
     assert len(undo_manager.undo_stack) == 1
     assert undo_manager.can_undo()
 
@@ -404,7 +418,7 @@ def test_push_undo_stack_deletion():
     assert not undo_manager.can_undo()
 
 
-def test_stack_item_merge():
+def test_stack_item_merge_and_undo():
     """Merging two stack items should allow undoing both changes at once."""
     doc = Doc()
     doc["text"] = text = Text()
@@ -416,9 +430,15 @@ def test_stack_item_merge():
     item1, item2 = undo_manager.undo_stack
 
     merged = StackItem.merge(item1, item2)
-    # Clear existing items and push merged
+
+    # Clear existing items and create new manager with merged item
     undo_manager.clear()
-    undo_manager.push_undo_stack(merged)
+    undo_manager = UndoManager(
+        scopes=[text],
+        undo_stack=[merged],
+        redo_stack=[],
+        capture_timeout_millis=0,
+    )
     assert len(undo_manager.undo_stack) == 1
     assert str(text) == "Hello world"
 
