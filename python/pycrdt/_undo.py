@@ -37,6 +37,8 @@ class UndoManager:
         scopes: list[BaseType] = [],
         capture_timeout_millis: int = 500,
         timestamp: Callable[[], int] = timestamp,
+        undo_stack: list[StackItem] | None = None,
+        redo_stack: list[StackItem] | None = None,
     ) -> None:
         """
         Args:
@@ -44,6 +46,8 @@ class UndoManager:
             scopes: A list of shared types the undo manager will work with.
             capture_timeout_millis: A time interval for grouping changes that will be undone/redone.
             timestamp: A function that returns a timestamp as an integer number of milli-seconds.
+            undo_stack: Pre-filled undo stack items.
+            redo_stack: Pre-filled redo stack items.
 
         Raises:
             RuntimeError: UndoManager must be created with doc or scopes.
@@ -54,7 +58,13 @@ class UndoManager:
             doc = scopes[0].doc
         elif scopes:
             raise RuntimeError("UndoManager must be created with doc or scopes")
-        self._undo_manager = _UndoManager(doc._doc, capture_timeout_millis, timestamp)
+        self._undo_manager = _UndoManager(
+            doc._doc,
+            capture_timeout_millis,
+            timestamp,
+            undo_stack or [],
+            redo_stack or [],
+        )
         for scope in scopes:
             self.expand_scope(scope)
 

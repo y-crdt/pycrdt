@@ -14,6 +14,7 @@ from ._map import MapEvent as MapEvent
 from ._map import TypedMap as TypedMap
 from ._provider import Channel as Channel
 from ._provider import Provider as Provider
+from ._pycrdt import DeleteSet as DeleteSet
 from ._pycrdt import StackItem as StackItem
 from ._pycrdt import SubdocsEvent as SubdocsEvent
 from ._pycrdt import Subscription as Subscription

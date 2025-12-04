@@ -1,4 +1,4 @@
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Generic, Iterator, TypeVar
 
 class Snapshot:
     """A snapshot of a document's state at a given point in time."""
@@ -363,7 +363,14 @@ class XmlText:
 class UndoManager:
     """Undo manager."""
 
-    def __init__(self, doc: Doc, capture_timeout_millis, timestamp: Callable[[], int]) -> None:
+    def __init__(
+        self,
+        doc: Doc,
+        capture_timeout_millis: int,
+        timestamp: Callable[[], int],
+        undo_stack: list[StackItem] | None = None,
+        redo_stack: list[StackItem] | None = None,
+    ) -> None:
         """Creates an undo manager."""
 
     def expand_scope(self, scope: Text | Array | Map) -> None:
@@ -396,10 +403,64 @@ class UndoManager:
     def redo_stack(self) -> list[StackItem]:
         """Returns the undo manager's redo stack."""
 
-class StackItem:
+class DeleteSet:
+    """A set of deletions in a CRDT document."""
+
+    def __init__(self) -> None:
+        """Create a new empty DeleteSet."""
+
+    def encode(self) -> bytes:
+        """Encode the DeleteSet to bytes."""
+
+    @staticmethod
+    def decode(data: bytes) -> DeleteSet:
+        """Decode a DeleteSet from bytes."""
+
+MetaT = TypeVar("MetaT")
+
+class StackItem(Generic[MetaT]):
     """A unit of work for the [UndoManager][pycrdt.UndoManager], consisting of
     compressed information about all updates and deletions tracked by it.
     """
+
+    def __init__(
+        self, deletions: DeleteSet, insertions: DeleteSet, meta: MetaT | None = None
+    ) -> None:
+        """Create a new StackItem.
+
+        Args:
+            deletions: The DeleteSet of deletions.
+            insertions: The DeleteSet of insertions.
+            meta: Optional metadata (can be any Python object).
+        """
+
+    @property
+    def deletions(self) -> DeleteSet:
+        """Get the deletions DeleteSet."""
+
+    @property
+    def insertions(self) -> DeleteSet:
+        """Get the insertions DeleteSet."""
+
+    @property
+    def meta(self) -> MetaT | None:
+        """Custom metadata. Can be any Python object."""
+
+    @staticmethod
+    def merge(
+        a: "StackItem[MetaT]",
+        b: "StackItem[MetaT]",
+        merge_meta: Callable[[MetaT | None, MetaT | None], Any] | None = None,
+    ) -> "StackItem[Any]":
+        """Merge two StackItems into one containing the union of their deletions and insertions.
+
+        Args:
+            a: First StackItem to merge.
+            b: Second StackItem to merge.
+            merge_meta: Optional function to handle metadata conflicts.
+                Takes (meta_a, meta_b) and returns the merged metadata.
+                If None, keeps the first item's metadata.
+        """
 
 class StickyIndex:
     def get_offset(self, txn: Transaction) -> int: ...
