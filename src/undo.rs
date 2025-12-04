@@ -270,6 +270,7 @@ impl StackItem {
     #[pyo3(signature = (a, b, merge_meta=None))]
     pub fn merge(a: &StackItem, b: &StackItem, merge_meta: Option<Py<PyAny>>) -> PyResult<StackItem> {
         let mut stack_item = a.stack_item.clone();
+        let mut error: Option<PyErr> = None;
 
         stack_item.merge(b.stack_item.clone(), |meta_a, meta_b| {
             if let Some(ref handler) = merge_meta {
@@ -278,13 +279,23 @@ impl StackItem {
                         meta_a.0.as_ref().map(|m| m.clone_ref(py)),
                         meta_b.0.as_ref().map(|m| m.clone_ref(py))
                     );
-                    if let Ok(result) = handler.call1(py, args) {
-                        meta_a.0 = Some(result);
+                    match handler.call1(py, args) {
+                        Ok(result) => {
+                            meta_a.0 = Some(result);
+                        }
+                        Err(e) => {
+                            error = Some(e);
+                        }
                     }
                 })
             }
             // If no handler, keep first metadata (do nothing)
         });
+
+        // Check if an error occurred during the merge callback
+        if let Some(err) = error {
+            return Err(err);
+        }
 
         Ok(StackItem { stack_item })
     }

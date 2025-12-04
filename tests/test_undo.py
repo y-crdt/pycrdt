@@ -487,6 +487,32 @@ def test_stack_item_merge_with_meta_handler():
     assert str(text) == ""
 
 
+def test_stack_item_merge_handler_error():
+    """Test that errors in merge handler are propagated."""
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+
+    text += "Hello"
+    text += " world"
+    assert len(undo_manager.undo_stack) == 2
+    item1, item2 = undo_manager.undo_stack
+
+    # Create items with metadata
+    item_with_meta1 = StackItem(item1.deletions, item1.insertions, {"value": 1})
+    item_with_meta2 = StackItem(item2.deletions, item2.insertions, {"value": 2})
+
+    # Handler that raises an exception
+    def failing_handler(meta_a, meta_b):
+        raise ValueError("Handler failed intentionally")
+
+    # Merge should propagate the error
+    import pytest
+
+    with pytest.raises(ValueError, match="Handler failed intentionally"):
+        StackItem.merge(item_with_meta1, item_with_meta2, failing_handler)
+
+
 def test_stack_item_constructor_with_metadata():
     """Test creating StackItems with custom metadata using the constructor."""
     doc = Doc()
