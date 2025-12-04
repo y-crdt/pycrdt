@@ -514,8 +514,6 @@ def test_stack_item_merge_handler_error():
         raise ValueError("Handler failed intentionally")
 
     # Merge should propagate the error
-    import pytest
-
     with pytest.raises(ValueError, match="Handler failed intentionally"):
         StackItem.merge(item_with_meta1, item_with_meta2, failing_handler)
 
