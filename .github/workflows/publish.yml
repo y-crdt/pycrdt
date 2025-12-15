@@ -35,7 +35,7 @@ jobs:
           pip install pycrdt --no-deps --no-index --find-links dist --force-reinstall
           pytest --ignore tests/test_types.py
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-macos
           path: dist
@@ -70,7 +70,7 @@ jobs:
           pip install pycrdt --no-deps --no-index --find-links dist --force-reinstall
           pytest --ignore tests/test_types.py
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-windows-${{ matrix.platform.target }}
           path: dist
@@ -106,7 +106,7 @@ jobs:
           pip install pycrdt --no-deps --no-index --find-links dist --force-reinstall
           pytest --ignore tests/test_types.py
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-linux-${{ matrix.target }}
           path: dist
@@ -144,7 +144,7 @@ jobs:
             pytest --ignore tests/test_types.py
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-linux-cross-${{ matrix.target }}
           path: dist
