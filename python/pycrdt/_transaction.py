@@ -15,8 +15,6 @@ if sys.version_info < (3, 11):
 if TYPE_CHECKING:
     from ._doc import Doc
 
-EXCEPTIONS: list[Exception] = []
-
 
 class Transaction:
     """
@@ -87,9 +85,9 @@ class Transaction:
                         del self._doc._origins[origin_hash]
                     if self._doc._allow_multithreading:
                         self._doc._txn_lock.release()
-                    if EXCEPTIONS:
-                        exceptions = tuple(EXCEPTIONS)
-                        EXCEPTIONS.clear()
+                    if self._doc._exceptions:
+                        exceptions = tuple(self._doc._exceptions)
+                        self._doc._exceptions.clear()
                         raise ExceptionGroup("Observer callback error", exceptions)
             finally:
                 self._txn.drop()

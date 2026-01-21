@@ -28,7 +28,7 @@ from ._pycrdt import Doc as _Doc
 from ._pycrdt import Subscription
 from ._pycrdt import Transaction as _Transaction
 from ._sticky_index import Assoc, StickyIndex
-from ._transaction import EXCEPTIONS, ReadTransaction, Transaction
+from ._transaction import ReadTransaction, Transaction
 
 if TYPE_CHECKING:
     from ._doc import Doc
@@ -47,6 +47,7 @@ class BaseDoc:
     _doc: _Doc
     _twin_doc: BaseDoc | None
     _txn: Transaction | None
+    _exceptions: list[Exception]
     _txn_lock: threading.Lock
     _txn_async_lock: anyio.Lock
     _allow_multithreading: bool
@@ -70,6 +71,7 @@ class BaseDoc:
             doc = _Doc(client_id, skip_gc)
         self._doc = doc
         self._txn = None
+        self._exceptions = []
         self._txn_lock = threading.Lock()
         self._txn_async_lock = anyio.Lock()
         self._Model = Model
@@ -305,7 +307,7 @@ def observe_callback(
         try:
             callback(*params[:param_nb])  # type: ignore[arg-type]
         except Exception as exc:
-            EXCEPTIONS.append(exc)
+            doc._exceptions.append(exc)
 
 
 def observe_deep_callback(
