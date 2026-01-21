@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from functools import partial
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
@@ -8,8 +9,13 @@ from anyio import create_task_group, to_thread
 
 from ._pycrdt import Transaction as _Transaction
 
+if sys.version_info < (3, 11):
+    from exceptiongroup import ExceptionGroup  # pragma: no cover
+
 if TYPE_CHECKING:
     from ._doc import Doc
+
+EXCEPTIONS = []
 
 
 class Transaction:
@@ -76,6 +82,10 @@ class Transaction:
             try:
                 if not isinstance(self, ReadTransaction):
                     self._txn.commit()
+                    if EXCEPTIONS:
+                        exceptions = tuple(EXCEPTIONS)
+                        EXCEPTIONS.clear()
+                        raise ExceptionGroup("Observer callback error", exceptions)
                     origin_hash = self._txn.origin()
                     if origin_hash is not None:
                         del self._doc._origins[origin_hash]

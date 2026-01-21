@@ -28,7 +28,7 @@ from ._pycrdt import Doc as _Doc
 from ._pycrdt import Subscription
 from ._pycrdt import Transaction as _Transaction
 from ._sticky_index import Assoc, StickyIndex
-from ._transaction import ReadTransaction, Transaction
+from ._transaction import EXCEPTIONS, ReadTransaction, Transaction
 
 if TYPE_CHECKING:
     from ._doc import Doc
@@ -302,7 +302,10 @@ def observe_callback(
     _event = event_types[type(event)](event, doc)
     with doc._read_transaction(event.transaction) as txn:
         params = (_event, txn)
-        callback(*params[:param_nb])  # type: ignore[arg-type]
+        try:
+            callback(*params[:param_nb])  # type: ignore[arg-type]
+        except Exception as exc:
+            EXCEPTIONS.append(exc)
 
 
 def observe_deep_callback(
