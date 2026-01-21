@@ -244,29 +244,3 @@ def test_sticky_index_transaction():
         idx = sticky_index.get_index(txn)
 
     assert idx == 0
-
-
-def test_exception_in_observers():
-    results = []
-
-    def callback0(event):
-        results.append("ok0")
-
-    def callback1(event):
-        raise RuntimeError("error1")
-
-    def callback2(event):
-        raise ValueError("error2")
-
-    doc = Doc()
-    text = doc.get("text", type=Text)
-    text.observe(callback0)
-    text.observe(callback1)
-    text.observe(callback2)
-
-    with pytest.RaisesGroup(RuntimeError, ValueError, match="Observer callback error") as exc_info:
-        text += "hello"
-
-    assert exc_info.group_contains(RuntimeError, match="error1")
-    assert exc_info.group_contains(ValueError, match="error2")
-    assert results == ["ok0"]

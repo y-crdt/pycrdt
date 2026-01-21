@@ -320,7 +320,10 @@ def observe_deep_callback(
         events[idx] = event_types[type(event)](event, doc)
     with doc._read_transaction(event.transaction) as txn:
         params = (events, txn)
-        callback(*params[:param_nb])  # type: ignore[arg-type]
+        try:
+            callback(*params[:param_nb])  # type: ignore[arg-type]
+        except Exception as exc:
+            doc._exceptions.append(exc)
 
 
 class BaseEvent:
