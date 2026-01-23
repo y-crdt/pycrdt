@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.45
+
+- Raise all exceptions from observer callbacks in an exception group.
+
 ## 0.12.44
 
 - Expose `UndoManager` stack items.
