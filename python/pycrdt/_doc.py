@@ -326,7 +326,7 @@ class Doc(BaseDoc, Generic[T]):
         if iscoroutinefunction(callback):
             cb = self._async_callback_to_sync(callback)
         else:
-            cb = cast(Callable[[TransactionEvent], None], callback)
+            cb = partial(observe_callback, cast(Callable[[TransactionEvent], None], callback), self)
         subscription = self._doc.observe(cb)
         self._subscriptions.append(subscription)
         return subscription
@@ -358,7 +358,7 @@ class Doc(BaseDoc, Generic[T]):
         if iscoroutinefunction(callback):
             cb = self._async_callback_to_sync(callback)
         else:
-            cb = cast(Callable[[SubdocsEvent], None], callback)
+            cb = partial(observe_callback, cast(Callable[[SubdocsEvent], None], callback), self)
         subscription = self._doc.observe_subdocs(cb)
         self._subscriptions.append(subscription)
         return subscription
@@ -501,6 +501,17 @@ class TypedDoc(Typed):
             if isinstance(root_type, Typed):
                 root_type = root_type._
             doc[name] = root_type
+
+
+def observe_callback(
+    callback: Callable[[TransactionEvent], None] | Callable[[SubdocsEvent], None],
+    doc: Doc,
+    event: Any,
+) -> None:
+    try:
+        callback(event)
+    except Exception as exc:
+        doc._exceptions.append(exc)
 
 
 base_types[_Doc] = Doc

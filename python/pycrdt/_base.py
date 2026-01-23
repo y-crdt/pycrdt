@@ -47,6 +47,7 @@ class BaseDoc:
     _doc: _Doc
     _twin_doc: BaseDoc | None
     _txn: Transaction | None
+    _exceptions: list[Exception]
     _txn_lock: threading.Lock
     _txn_async_lock: anyio.Lock
     _allow_multithreading: bool
@@ -70,6 +71,7 @@ class BaseDoc:
             doc = _Doc(client_id, skip_gc)
         self._doc = doc
         self._txn = None
+        self._exceptions = []
         self._txn_lock = threading.Lock()
         self._txn_async_lock = anyio.Lock()
         self._Model = Model
@@ -302,7 +304,10 @@ def observe_callback(
     _event = event_types[type(event)](event, doc)
     with doc._read_transaction(event.transaction) as txn:
         params = (_event, txn)
-        callback(*params[:param_nb])  # type: ignore[arg-type]
+        try:
+            callback(*params[:param_nb])  # type: ignore[arg-type]
+        except Exception as exc:
+            doc._exceptions.append(exc)
 
 
 def observe_deep_callback(
@@ -315,7 +320,10 @@ def observe_deep_callback(
         events[idx] = event_types[type(event)](event, doc)
     with doc._read_transaction(event.transaction) as txn:
         params = (events, txn)
-        callback(*params[:param_nb])  # type: ignore[arg-type]
+        try:
+            callback(*params[:param_nb])  # type: ignore[arg-type]
+        except Exception as exc:
+            doc._exceptions.append(exc)
 
 
 class BaseEvent:

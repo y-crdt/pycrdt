@@ -310,3 +310,60 @@ async def test_iterate_events_with_async_transactions():
     assert len(updates) == 2
     assert updates[0].endswith(b"Hello\x00")
     assert updates[1].endswith(b", World!\x00")
+
+
+def test_observer_exceptions():
+    values = []
+
+    def callback0(event):
+        values.append("val0")
+
+    def callback1(event):
+        values.append("val1")
+        raise RuntimeError("error1")
+
+    def callback2(event):
+        values.append("val2")
+        raise ValueError("error2")
+
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    doc.observe(callback0)
+    doc.observe(callback1)
+    doc.observe(callback2)
+
+    with pytest.RaisesGroup(RuntimeError, ValueError, match="Observer callback error") as exc_info:
+        text += "hello"
+
+    assert exc_info.group_contains(RuntimeError, match="error1")
+    assert exc_info.group_contains(ValueError, match="error2")
+    assert values == ["val2", "val1", "val0"]
+
+
+async def test_async_observer_exceptions():
+    values = []
+
+    def callback0(event):
+        values.append("val0")
+
+    async def callback1(event):
+        values.append("val1")
+        raise RuntimeError("error1")
+
+    async def callback2(event):
+        values.append("val2")
+        raise ValueError("error2")
+
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    doc.observe(callback0)
+    doc.observe(callback1)
+    doc.observe(callback2)
+
+    with pytest.RaisesGroup(RuntimeError, ValueError) as exc_info:
+        async with doc.transaction():
+            text += "hello"
+
+    assert exc_info.group_contains(RuntimeError, match="error1")
+    assert exc_info.group_contains(ValueError, match="error2")
+    assert set(values) == set(["val2", "val1", "val0"])

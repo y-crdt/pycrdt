@@ -327,3 +327,31 @@ def test_sticky_index(serialize: str):
     assert array1.to_py() in (first + second, second + first)
     new_idx = sticky_index.get_index()
     assert array1[new_idx] == "*"
+
+
+def test_observer_exceptions():
+    values = []
+
+    def callback0(event):
+        values.append("val0")
+
+    def callback1(event):
+        values.append("val1")
+        raise RuntimeError("error1")
+
+    def callback2(event):
+        values.append("val2")
+        raise ValueError("error2")
+
+    doc = Doc()
+    array = doc.get("array", type=Array)
+    array.observe(callback0)
+    array.observe(callback1)
+    array.observe_deep(callback2)
+
+    with pytest.RaisesGroup(RuntimeError, ValueError, match="Observer callback error") as exc_info:
+        array.append(0)
+
+    assert exc_info.group_contains(RuntimeError, match="error1")
+    assert exc_info.group_contains(ValueError, match="error2")
+    assert set(values) == set(["val2", "val1", "val0"])
