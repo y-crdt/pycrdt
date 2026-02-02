@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.46
+
+- Bump `pyo3` to v0.28.0.
+
 ## 0.12.45
 
 - Raise all exceptions from observer callbacks in an exception group.
