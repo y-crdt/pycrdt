@@ -40,7 +40,7 @@ dependencies = [
 test = [
     "pytest >=8.3.5,<10",
     "anyio",
-    "trio >=0.25.1,<0.33",
+    "trio >=0.25.1,<0.34",
     "pydantic >=2.5.2,<3",
     "coverage[toml] >=7",
 ]
