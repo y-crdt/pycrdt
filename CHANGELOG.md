@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.47
+
+- Build wheels for `musllinux` platform.
+
 ## 0.12.46
 
 - Bump `pyo3` to v0.28.0.
