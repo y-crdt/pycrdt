@@ -197,3 +197,51 @@ async def test_iterate_events():
     assert len(keys) == 2
     assert keys[0] == {"key0": {"action": "add", "newValue": "Hello"}}
     assert keys[1] == {"key1": {"action": "add", "newValue": ", World!"}}
+
+
+def test_tuple_handling():
+    """Test that tuples in nested dictionaries are properly preserved.
+
+    Related to issue #368 where tuples in nested dictionaries were being
+    converted to None values.
+    """
+    doc = Doc()
+    map0 = doc.get("map0", type=Map)
+
+    # Test basic tuple handling
+    test_data = {
+        "simple_tuple": (1, 2, 3),
+        "mixed_tuple": (1, "hello", True, None),
+        "empty_tuple": (),
+        "single_tuple": (42,),
+        "nested_dict": {"position": (5, 0), "range": (10, 20), "content": "hello"},
+    }
+
+    map0.update(test_data)
+
+    result = map0.to_py()
+
+    # Tuples should be converted to lists
+    assert result["simple_tuple"] == [1.0, 2.0, 3.0]
+    assert result["mixed_tuple"] == [1.0, "hello", True, None]
+    assert result["empty_tuple"] == []
+    assert result["single_tuple"] == [42.0]
+
+    # Nested dictionary with tuples
+    nested = result["nested_dict"]
+    assert nested["position"] == [5.0, 0.0]
+    assert nested["range"] == [10.0, 20.0]
+    assert nested["content"] == "hello"
+
+    # Test direct assignment
+    map0["direct_tuple"] = (100, 200)
+    assert map0["direct_tuple"] == [100.0, 200.0]
+
+    # Test the original issue case
+    selection_data = {"selection": {"start": (5, 0), "end": (10, 0), "content": "hello"}}
+    map0.update(selection_data)
+    selection_result = map0["selection"]
+
+    assert selection_result["start"] == [5.0, 0.0]
+    assert selection_result["end"] == [10.0, 0.0]
+    assert selection_result["content"] == "hello"
