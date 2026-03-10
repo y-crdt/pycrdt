@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.48
+
+- Fix tuple handling (convert to list).
+
 ## 0.12.47
 
 - Build wheels for `musllinux` platform.
