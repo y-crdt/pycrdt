@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
-use pyo3::types::{PyAny, PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyIterator, PyList, PyInt, PyString};
+use pyo3::types::{PyAny, PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyIterator, PyList, PyInt, PyString, PyTuple};
 use yrs::types::{Attrs, Change, EntryChange, Delta, Events, Path, PathSegment};
 use yrs::{Any, Out, TransactionMut, XmlOut};
 use std::collections::{VecDeque, HashMap};
@@ -237,6 +237,13 @@ pub fn py_to_any<'py>(value: &Bound<'py, PyAny>) -> Any {
         let v: f64 = value.extract().unwrap();
         Any::Number(v)
     } else if let Ok(v) = value.cast::<PyList>() {
+        let mut items = Vec::new();
+        for i in v.iter() {
+            let a = py_to_any(&i);
+            items.push(a);
+        }
+        Any::Array(items.into())
+    } else if let Ok(v) = value.cast::<PyTuple>() {
         let mut items = Vec::new();
         for i in v.iter() {
             let a = py_to_any(&i);
