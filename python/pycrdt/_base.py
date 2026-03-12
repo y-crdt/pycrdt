@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 from abc import ABC, abstractmethod
-from functools import lru_cache, partial
+from functools import partial
 from inspect import signature
 from types import UnionType
 from typing import (
@@ -185,7 +185,8 @@ class BaseType(ABC):
         return self._type_name
 
     def observe(self, callback: Callable[[BaseEvent], None]) -> Subscription:
-        _callback = partial(observe_callback, callback, self.doc)
+        param_nb = len(signature(callback).parameters)
+        _callback = partial(observe_callback, callback, self.doc, param_nb)
         subscription = self.integrated.observe(_callback)
         self._subscriptions.append(subscription)
         return subscription
@@ -197,7 +198,8 @@ class BaseType(ABC):
         Args:
             callback: The callback to call with the list of events.
         """
-        _callback = partial(observe_deep_callback, callback, self.doc)
+        param_nb = len(signature(callback).parameters)
+        _callback = partial(observe_deep_callback, callback, self.doc, param_nb)
         subscription = self.integrated.observe_deep(_callback)
         self._subscriptions.append(subscription)
         return subscription
@@ -298,9 +300,9 @@ class Sequence(BaseType):
 def observe_callback(
     callback: Callable[[], None] | Callable[[Any], None] | Callable[[Any, ReadTransaction], None],
     doc: Doc,
+    param_nb: int,
     event: Any,
 ):
-    param_nb = count_parameters(callback)
     _event = event_types[type(event)](event, doc)
     with doc._read_transaction(event.transaction) as txn:
         params = (_event, txn)
@@ -313,9 +315,9 @@ def observe_callback(
 def observe_deep_callback(
     callback: Callable[[], None] | Callable[[Any], None] | Callable[[Any, ReadTransaction], None],
     doc: Doc,
+    param_nb: int,
     events: list[Any],
 ):
-    param_nb = count_parameters(callback)
     for idx, event in enumerate(events):
         events[idx] = event_types[type(event)](event, doc)
     with doc._read_transaction(event.transaction) as txn:
@@ -362,12 +364,6 @@ def process_event(value: Any, doc: Doc) -> Any:
                 base_type = cast(Type[BaseType], base_types[val_type])
                 value = base_type(_integrated=value, _doc=doc)
     return value
-
-
-@lru_cache(maxsize=1024)
-def count_parameters(func: Callable) -> int:
-    """Count the number of parameters in a callable"""
-    return len(signature(func).parameters)
 
 
 class Typed:
