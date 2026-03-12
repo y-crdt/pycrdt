@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.49
+
+- Remove use of cache for observer callbacks.
+
 ## 0.12.48
 
 - Fix tuple handling (convert to list).
