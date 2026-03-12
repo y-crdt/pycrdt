@@ -1,7 +1,7 @@
 import gc
 import weakref
 
-from pycrdt import Doc, Text
+from pycrdt import Doc, Map, Text
 
 
 def test_observe_bound_method_gc():
@@ -18,6 +18,10 @@ def test_observe_bound_method_gc():
     weakref.finalize(observer, freed.append, True)
 
     sub = text.observe(observer.on_change)
+
+    # make an update (required for #371 to manifest in <=0.12.48)
+    text += "hello"
+
     text.unobserve(sub)
     del observer
 
@@ -34,12 +38,16 @@ def test_observe_deep_bound_method_gc():
             pass
 
     doc = Doc()
-    doc["text"] = text = Text()
+    doc["map"] = m = Map()
     observer = Observer()
     weakref.finalize(observer, freed.append, True)
 
-    sub = text.observe_deep(observer.on_change)
-    text.unobserve(sub)
+    sub = m.observe_deep(observer.on_change)
+
+    # make an update (required for #371 to manifest in <=0.12.48)
+    m["key"] = "value"
+
+    m.unobserve(sub)
     del observer
 
     gc.collect()
