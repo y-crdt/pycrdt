@@ -6,4 +6,3 @@ Cargo.lock
 /site
 /dist
 _pycrdt.*.pyd
-.DS_STORE
