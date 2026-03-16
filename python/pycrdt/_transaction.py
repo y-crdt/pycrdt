@@ -95,9 +95,10 @@ class Transaction:
                 self._doc._txn = None
 
     async def __aenter__(self, _acquire_transaction: bool = True) -> Transaction:
-        if self._leases > 0 and self._doc._task_group is None:
+        if self._leases == 0:
+            self._doc._task_group = await create_task_group().__aenter__()
+        elif self._doc._task_group is None:
             raise RuntimeError("Already in a non-async transaction")
-        self._doc._task_group = await create_task_group().__aenter__()
         return self.__enter__(_acquire_transaction)
 
     async def __aexit__(

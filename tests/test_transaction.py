@@ -359,3 +359,16 @@ async def test_async_transaction_in_existing_sync_transaction():
             async with doc.transaction():
                 pass  # pragma: nocover
         assert str(excinfo.value) == "Already in a non-async transaction"
+
+
+async def test_concurrent_async_transactions():
+    doc = Doc()
+
+    async def create_async_transaction(seconds, task_status):
+        async with doc.transaction():
+            task_status.started()
+            await sleep(seconds)
+
+    async with create_task_group() as tg:
+        await tg.start(create_async_transaction, 0.2)
+        await tg.start(create_async_transaction, 0.1)
