@@ -1,5 +1,9 @@
 # Version history
 
+## 0.12.50
+
+- Fix concurrent async transactions.
+
 ## 0.12.49
 
 - Remove use of cache for observer callbacks.
