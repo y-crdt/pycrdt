@@ -228,6 +228,159 @@ def test_sticky_index(serialize: str):
     assert text1[new_idx] == "*"
 
 
+def test_unicode_emoji_insert():
+    """Text.insert() after emoji characters should use character positions, not byte offsets."""
+    doc = Doc()
+    doc["text"] = text = Text()
+
+    text += "A📊B"
+    assert str(text) == "A📊B"
+    assert len(text) == 3
+
+    # Insert at position 2 = between 📊 and B
+    text.insert(2, "X")
+    assert str(text) == "A📊XB", f"Got {str(text)!r}, emoji insert position is wrong"
+
+
+def test_unicode_emoji_sequential_inserts():
+    """Sequential inserts after emoji should maintain correct positions."""
+    doc = Doc()
+    doc["text"] = text = Text()
+
+    text += "# Analysis 📊\n"
+    text.insert(len(text), "model = fit()\n")
+    text.insert(len(text), "# 特征工程\n")
+    text.insert(len(text), 'print("done")\n')
+
+    expected = '# Analysis 📊\nmodel = fit()\n# 特征工程\nprint("done")\n'
+    assert str(text) == expected, f"Got {str(text)!r}"
+
+
+def test_unicode_emoji_len():
+    """len() should return Python character count, not byte count."""
+    doc = Doc()
+    doc["text"] = text = Text()
+
+    text += "A📊B"
+    assert len(text) == 3  # 3 chars, not 6 bytes or 4 UTF-16 code units
+
+    text += "🎉"
+    assert len(text) == 4
+
+
+def test_unicode_emoji_delete():
+    """Deleting a character after an emoji should work correctly."""
+    doc = Doc()
+    doc["text"] = text = Text("A📊BC")
+
+    del text[2]  # delete B (after emoji)
+    assert str(text) == "A📊C", f"Got {str(text)!r}"
+
+
+def test_unicode_emoji_delete_emoji():
+    """Deleting an emoji character itself should work correctly."""
+    doc = Doc()
+    doc["text"] = text = Text("A📊B")
+
+    del text[1]  # delete 📊
+    assert str(text) == "AB", f"Got {str(text)!r}"
+
+
+def test_unicode_emoji_slice_delete():
+    """Slice deletion across emoji boundaries should work correctly."""
+    doc = Doc()
+    doc["text"] = text = Text("A📊B🎉C")
+
+    del text[1:4]  # delete 📊B🎉
+    assert str(text) == "AC", f"Got {str(text)!r}"
+
+
+def test_unicode_emoji_setitem():
+    """Replacing a character after an emoji should work correctly."""
+    doc = Doc()
+    doc["text"] = text = Text("A📊BC")
+
+    text[2] = "X"  # replace B (after emoji)
+    assert str(text) == "A📊XC", f"Got {str(text)!r}"
+
+
+def test_unicode_emoji_slice_setitem():
+    """Slice replacement spanning emoji should work correctly."""
+    doc = Doc()
+    doc["text"] = text = Text("A📊B🎉C")
+
+    text[1:4] = "XYZ"  # replace 📊B🎉 with XYZ
+    assert str(text) == "AXYZC", f"Got {str(text)!r}"
+
+
+def test_unicode_cjk():
+    """CJK characters (BMP, 1 UTF-16 code unit each) should work correctly."""
+    doc = Doc()
+    doc["text"] = text = Text()
+
+    text += "价格"
+    text.insert(2, "X")
+    assert str(text) == "价格X", f"Got {str(text)!r}"
+    assert len(text) == 3
+
+
+def test_unicode_mixed_scripts():
+    """Mixed ASCII, CJK, Cyrillic, and emoji in one text."""
+    doc = Doc()
+    doc["text"] = text = Text()
+
+    text += "Hello"
+    text.insert(5, " 世界")
+    text.insert(8, " 📊")
+    text.insert(11, " мир")
+    text.insert(15, "!")
+
+    expected = "Hello 世界 📊 мир!"
+    assert str(text) == expected, f"Got {str(text)!r}"
+    assert len(text) == 15
+
+
+def test_unicode_supplementary_plane():
+    """Characters outside BMP (require UTF-16 surrogate pairs)."""
+    doc = Doc()
+    doc["text"] = text = Text()
+
+    # 𝒜 (U+1D49C) = Mathematical Script Capital A
+    # 𠀀 (U+20000) = CJK Unified Ideograph Extension B
+    text += "A𝒜B𠀀C"
+    assert len(text) == 5
+
+    text.insert(2, "X")  # between 𝒜 and B
+    assert str(text) == "A𝒜XB𠀀C", f"Got {str(text)!r}"
+
+    text.insert(5, "Y")  # between 𠀀 and C
+    assert str(text) == "A𝒜XB𠀀YC", f"Got {str(text)!r}"
+
+
+def test_unicode_cross_doc_sync():
+    """Updates with Unicode content should sync correctly between two pycrdt docs."""
+    doc1 = Doc()
+    doc1["text"] = text1 = Text()
+
+    # Capture updates from doc1
+    updates = []
+    doc1.observe(lambda event: updates.append(event.update))
+
+    text1 += "# Analysis 📊\n"
+    text1.insert(len(text1), "model = fit()\n")
+    text1.insert(len(text1), "# 特征工程\n")
+
+    # Apply to doc2
+    doc2 = Doc()
+    doc2["text"] = Text()
+    for update in updates:
+        doc2.apply_update(update)
+
+    assert str(doc2["text"]) == str(text1), (
+        f"Docs diverged: doc1={str(text1)!r} doc2={str(doc2['text'])!r}"
+    )
+
+
 def test_sticky_index_transaction():
     doc = Doc()
     text = doc.get("text", type=Text)
