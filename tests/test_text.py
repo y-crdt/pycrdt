@@ -1,3 +1,5 @@
+from difflib import SequenceMatcher
+
 import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group
 from anyio.abc import TaskStatus
@@ -387,7 +389,6 @@ def test_unicode_cross_doc_sync():
 # initial content, then applies a granular edit (using SequenceMatcher on
 # byte offsets, matching how jupyter_ydoc.YUnicode.set() works), and verifies
 # the result is correct.
-from difflib import SequenceMatcher
 
 
 def _apply_diff(text, old_value, new_value):
