@@ -381,6 +381,122 @@ def test_unicode_cross_doc_sync():
     )
 
 
+# Test cases adapted from jupyter-server/jupyter_ydoc#370 (prior art for
+# the workaround at the jupyter_ydoc layer). These exercise pycrdt's Text
+# operations directly with the same Unicode edge cases. Each test sets
+# initial content, then applies a granular edit (using SequenceMatcher on
+# byte offsets, matching how jupyter_ydoc.YUnicode.set() works), and verifies
+# the result is correct.
+from difflib import SequenceMatcher
+
+
+def _apply_diff(text, old_value, new_value):
+    """Apply a granular diff from old_value to new_value using character-level
+    SequenceMatcher. With the UTF-16 offset fix, pycrdt Text indices are
+    character-based, so we diff on characters (not bytes)."""
+    matcher = SequenceMatcher(a=old_value, b=new_value)
+
+    offset = 0
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "replace":
+            text[i1 + offset : i2 + offset] = new_value[j1:j2]
+            offset += (j2 - j1) - (i2 - i1)
+        elif tag == "delete":
+            del text[i1 + offset : i2 + offset]
+            offset -= i2 - i1
+        elif tag == "insert":
+            text.insert(i1 + offset, new_value[j1:j2])
+            offset += j2 - j1
+
+
+@pytest.mark.parametrize(
+    "initial, updated",
+    [
+        # emojis swapped
+        (
+            "I like security 🎨 but I really love painting 🔒",
+            "I like security 🔒 but I really love painting 🎨",
+        ),
+        # text changes, emojis stay in place
+        (
+            "Here is a rocket: ⭐ and a star: 🚀",
+            "Here is a star: ⭐ and a rocket: 🚀",
+        ),
+        # change of text and emojis
+        (
+            "Here are some happy faces: 😀😁😂",
+            "Here are some sad faces: 😞😢😭",
+        ),
+        # change of characters with combining marks
+        (
+            "Combining characters: á é í ó ú",
+            "Combining characters: ú ó í é á",
+        ),
+        # flags (regional indicator sequences)
+        (
+            "Flags: 🇺🇸🇬🇧🇨🇦",
+            "Flags: 🇨🇦🇬🇧🇺🇸",
+        ),
+        # Zero-width joiner sequences (family emoji)
+        (
+            "A family 👨\u200d👩\u200d👧\u200d👦 (with two children)",
+            "A family 👨\u200d👩\u200d👧 (with one child)",
+        ),
+        # Mixed RTL/LTR text
+        (
+            "Hello שלום world",
+            "Hello עולם world",
+        ),
+        # Keycap sequences
+        (
+            "Numbers: 1️⃣2️⃣3️⃣",
+            "Numbers: 3️⃣2️⃣1️⃣",
+        ),
+        # Emoji at boundaries
+        (
+            "👋 middle text 🎉",
+            "🎉 middle text 👋",
+        ),
+        # Japanese characters
+        (
+            "こんにちは世界",
+            "こんにちは地球",
+        ),
+        # Julia math operators
+        (
+            "x ∈ [1, 2, 3] && y ≥ 0",
+            "x ∉ [1, 2, 3] || y ≤ 0",
+        ),
+    ],
+    ids=[
+        "emoji_swap",
+        "text_change_emoji_stay",
+        "emoji_change",
+        "combining_marks",
+        "flags",
+        "zwj_family",
+        "rtl_ltr",
+        "keycap",
+        "emoji_boundaries",
+        "japanese",
+        "math_operators",
+    ],
+)
+def test_unicode_granular_diff(initial, updated):
+    """Granular text edits with multi-byte Unicode should produce correct results.
+
+    Test cases adapted from jupyter-server/jupyter_ydoc#370.
+    """
+    doc = Doc()
+    doc["text"] = text = Text()
+
+    text += initial
+    assert str(text) == initial
+
+    _apply_diff(text, initial, updated)
+    assert str(text) == updated, f"Got {str(text)!r}, expected {updated!r}"
+
+
 def test_sticky_index_transaction():
     doc = Doc()
     text = doc.get("text", type=Text)
