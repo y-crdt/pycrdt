@@ -11,6 +11,36 @@ if TYPE_CHECKING:
     from ._doc import Doc
 
 
+def _char_to_utf16(text: str, char_index: int) -> int:
+    """Convert a Python character (code point) index to a UTF-16 code unit index.
+
+    Characters outside the Basic Multilingual Plane (e.g. emoji) occupy 2
+    UTF-16 code units but only 1 Python character.  The underlying yrs library
+    uses UTF-16 offsets, so all indices passed to it must be converted.
+
+    For pure-ASCII / BMP text this is a no-op (returns ``char_index``
+    unchanged).
+    """
+    if char_index == 0:
+        return 0
+    prefix = text[:char_index]
+    # Count characters that need a surrogate pair (code point > 0xFFFF)
+    extra = sum(1 for ch in prefix if ord(ch) > 0xFFFF)
+    return char_index + extra
+
+
+def _utf16_to_char(text: str, utf16_index: int) -> int:
+    """Convert a UTF-16 code unit index back to a Python character index."""
+    char_idx = 0
+    utf16_idx = 0
+    for ch in text:
+        if utf16_idx >= utf16_index:
+            break
+        utf16_idx += 2 if ord(ch) > 0xFFFF else 1
+        char_idx += 1
+    return char_idx
+
+
 class Text(Sequence):
     """
     A shared data type used for collaborative text editing, similar to a Python `str`.
@@ -89,10 +119,10 @@ class Text(Sequence):
         ```
 
         Returns:
-            The length of the text.
+            The length of the text (in Python characters, not UTF-16 code units).
         """
-        with self.doc.transaction() as txn:
-            return self.integrated.len(txn._txn)
+        # Return Python character count, not yrs UTF-16 code unit count
+        return len(str(self))
 
     def __str__(self) -> str:
         """
@@ -169,13 +199,19 @@ class Text(Sequence):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
+            current = str(self)
             if isinstance(key, int):
-                self.integrated.remove_range(txn._txn, key, 1)
+                utf16_idx = _char_to_utf16(current, key)
+                char_at = current[key]
+                utf16_len = 2 if ord(char_at) > 0xFFFF else 1
+                self.integrated.remove_range(txn._txn, utf16_idx, utf16_len)
             elif isinstance(key, slice):
                 start, stop = self._check_slice(key)
                 length = stop - start
                 if length > 0:
-                    self.integrated.remove_range(txn._txn, start, length)
+                    utf16_start = _char_to_utf16(current, start)
+                    utf16_stop = _char_to_utf16(current, stop)
+                    self.integrated.remove_range(txn._txn, utf16_start, utf16_stop - utf16_start)
             else:
                 raise RuntimeError(f"Index not supported: {key}")
 
@@ -214,20 +250,26 @@ class Text(Sequence):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
+            current = str(self)
             if isinstance(key, int):
                 value_len = len(value)
                 if value_len != 1:
                     raise RuntimeError(
                         f"Single item assigned value must have a length of 1, not {value_len}"
                     )
-                del self[key]
-                self.integrated.insert(txn._txn, key, value)
+                utf16_idx = _char_to_utf16(current, key)
+                char_at = current[key]
+                utf16_len = 2 if ord(char_at) > 0xFFFF else 1
+                self.integrated.remove_range(txn._txn, utf16_idx, utf16_len)
+                self.integrated.insert(txn._txn, utf16_idx, value)
             elif isinstance(key, slice):
                 start, stop = self._check_slice(key)
-                length = stop - start
+                utf16_start = _char_to_utf16(current, start)
+                utf16_stop = _char_to_utf16(current, stop)
+                length = utf16_stop - utf16_start
                 if length > 0:
-                    self.integrated.remove_range(txn._txn, start, length)
-                self.integrated.insert(txn._txn, start, value)
+                    self.integrated.remove_range(txn._txn, utf16_start, length)
+                self.integrated.insert(txn._txn, utf16_start, value)
             else:
                 raise RuntimeError(f"Index not supported: {key}")
 
@@ -251,8 +293,10 @@ class Text(Sequence):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
+            current = str(self)
+            utf16_index = _char_to_utf16(current, index)
             self.integrated.insert(
-                txn._txn, index, value, iter(attrs.items()) if attrs is not None else None
+                txn._txn, utf16_index, value, iter(attrs.items()) if attrs is not None else None
             )
 
     def insert_embed(self, index: int, value: Any, attrs: dict[str, Any] | None = None) -> None:
@@ -266,8 +310,10 @@ class Text(Sequence):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
+            current = str(self)
+            utf16_index = _char_to_utf16(current, index)
             self.integrated.insert_embed(
-                txn._txn, index, value, iter(attrs.items()) if attrs is not None else None
+                txn._txn, utf16_index, value, iter(attrs.items()) if attrs is not None else None
             )
 
     def format(self, start: int, stop: int, attrs: dict[str, Any]) -> None:
@@ -282,9 +328,12 @@ class Text(Sequence):
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
             start, stop = self._check_slice(slice(start, stop))
-            length = stop - start
+            current = str(self)
+            utf16_start = _char_to_utf16(current, start)
+            utf16_stop = _char_to_utf16(current, stop)
+            length = utf16_stop - utf16_start
             if length > 0:
-                self.integrated.format(txn._txn, start, length, iter(attrs.items()))
+                self.integrated.format(txn._txn, utf16_start, length, iter(attrs.items()))
 
     def diff(self) -> list[tuple[Any, dict[str, Any] | None]]:
         """

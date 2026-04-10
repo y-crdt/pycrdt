@@ -3,7 +3,7 @@ use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::types::{PyBool, PyBytes, PyDict, PyInt, PyList};
 use yrs::{
-    Doc as _Doc, Options, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
+    Doc as _Doc, OffsetKind, Options, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
 };
 use yrs::updates::encoder::{Encode, Encoder};
 use yrs::updates::decoder::Decode;
@@ -32,6 +32,7 @@ impl Doc {
         let mut options = yrs::Options::default();
         options.client_id = original.doc.client_id();
         options.skip_gc = original.doc.skip_gc();
+        options.offset_kind = OffsetKind::Utf16;
         if let Some(collection_id) = original.doc.collection_id() {
             options.collection_id = Some(collection_id);
         }
@@ -84,6 +85,11 @@ impl Doc {
                 .map_err(|_| PyValueError::new_err("skip_gc must be a valid bool"))?;
             options.skip_gc = _skip_gc;
         }
+        // Use UTF-16 offsets for compatibility with JS yjs clients.
+        // Without this, pycrdt uses UTF-8 byte offsets which causes
+        // findIndexSS crashes when JS yjs applies incremental updates
+        // containing multi-byte characters.
+        options.offset_kind = OffsetKind::Utf16;
         let doc = _Doc::with_options(options);
         Ok(Doc { doc })
     }
