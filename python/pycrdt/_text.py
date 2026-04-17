@@ -29,18 +29,6 @@ def _char_to_utf16(text: str, char_index: int) -> int:
     return char_index + extra
 
 
-def _utf16_to_char(text: str, utf16_index: int) -> int:
-    """Convert a UTF-16 code unit index back to a Python character index."""
-    char_idx = 0
-    utf16_idx = 0
-    for ch in text:
-        if utf16_idx >= utf16_index:
-            break
-        utf16_idx += 2 if ord(ch) > 0xFFFF else 1
-        char_idx += 1
-    return char_idx
-
-
 class Text(Sequence):
     """
     A shared data type used for collaborative text editing, similar to a Python `str`.
@@ -158,7 +146,9 @@ class Text(Sequence):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
-            self.integrated.insert(txn._txn, len(self), value)
+            current = str(self)
+            utf16_index = _char_to_utf16(current, len(current))
+            self.integrated.insert(txn._txn, utf16_index, value)
             return self
 
     def _check_slice(self, key: slice) -> tuple[int, int]:

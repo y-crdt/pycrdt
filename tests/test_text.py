@@ -4,7 +4,7 @@ import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group
 from anyio.abc import TaskStatus
 from pycrdt import Array, Assoc, Doc, Map, StickyIndex, Text
-from pycrdt._text import _char_to_utf16, _utf16_to_char
+from pycrdt._text import _char_to_utf16
 
 pytestmark = pytest.mark.anyio
 
@@ -259,6 +259,17 @@ def test_unicode_emoji_sequential_inserts():
     assert str(text) == expected, f"Got {str(text)!r}"
 
 
+def test_unicode_emoji_iadd():
+    """`+=` after emoji should append at the end (regression for UTF-16 offset bug)."""
+    doc = Doc()
+    doc["text"] = text = Text()
+
+    text += "A📊B"
+    text += "X"
+
+    assert str(text) == "A📊BX"
+
+
 def test_unicode_emoji_len():
     """len() should return Python character count, not byte count."""
     doc = Doc()
@@ -497,62 +508,6 @@ def test_unicode_granular_diff(initial, updated):
 
     _apply_diff(text, initial, updated)
     assert str(text) == updated, f"Got {str(text)!r}, expected {updated!r}"
-
-
-def test_utf16_to_char_ascii():
-    """_utf16_to_char is identity for pure ASCII text."""
-    text = "Hello, World!"
-    for i in range(len(text) + 1):
-        assert _utf16_to_char(text, i) == i
-
-
-def test_utf16_to_char_bmp():
-    """BMP characters (CJK, Cyrillic) are 1 UTF-16 code unit each."""
-    text = "价格分析"  # 4 BMP CJK chars = 4 UTF-16 code units
-    assert _utf16_to_char(text, 0) == 0
-    assert _utf16_to_char(text, 1) == 1
-    assert _utf16_to_char(text, 2) == 2
-    assert _utf16_to_char(text, 4) == 4
-
-
-def test_utf16_to_char_supplementary():
-    """Supplementary plane chars (emoji) take 2 UTF-16 code units."""
-    text = "A📊B"  # UTF-16: A(1) 📊(2) B(1) = 4 code units, 3 chars
-    assert _utf16_to_char(text, 0) == 0  # before A
-    assert _utf16_to_char(text, 1) == 1  # before 📊
-    assert _utf16_to_char(text, 3) == 2  # before B (1 + 2 = 3)
-    assert _utf16_to_char(text, 4) == 3  # end
-
-
-def test_utf16_to_char_multiple_emoji():
-    """Multiple supplementary plane characters."""
-    text = "A📊B🎉C"  # UTF-16: A(1) 📊(2) B(1) 🎉(2) C(1) = 7 units, 5 chars
-    assert _utf16_to_char(text, 0) == 0  # before A
-    assert _utf16_to_char(text, 1) == 1  # before 📊
-    assert _utf16_to_char(text, 3) == 2  # before B
-    assert _utf16_to_char(text, 4) == 3  # before 🎉
-    assert _utf16_to_char(text, 6) == 4  # before C
-    assert _utf16_to_char(text, 7) == 5  # end
-
-
-def test_utf16_to_char_roundtrip():
-    """_char_to_utf16 and _utf16_to_char are inverses."""
-    texts = [
-        "Hello",
-        "A📊B",
-        "价格分析",
-        "# Analysis 📊\n",
-        "A𝒜B𠀀C",
-        "Hello 世界 📊 мир!",
-        "🎉📊🔒",
-    ]
-    for text in texts:
-        for char_idx in range(len(text) + 1):
-            utf16_idx = _char_to_utf16(text, char_idx)
-            assert _utf16_to_char(text, utf16_idx) == char_idx, (
-                f"Roundtrip failed for {text!r} at char_idx={char_idx}: "
-                f"utf16={utf16_idx}, back={_utf16_to_char(text, utf16_idx)}"
-            )
 
 
 def test_sticky_index_transaction():
