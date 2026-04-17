@@ -322,9 +322,7 @@ class XmlText(_XmlTraitMixin):
                 if stop - start > 0:
                     utf16_start = _char_to_utf16(current, start)
                     utf16_stop = _char_to_utf16(current, stop)
-                    self.integrated.remove_range(
-                        txn._txn, utf16_start, utf16_stop - utf16_start
-                    )
+                    self.integrated.remove_range(txn._txn, utf16_start, utf16_stop - utf16_start)
             else:
                 raise TypeError(f"Index not supported: {key}")
 
