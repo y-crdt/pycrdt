@@ -166,6 +166,69 @@ def test_text():
     doc["test2"] = XmlFragment([XmlText()])
 
 
+def test_xml_text_unicode_len():
+    """XmlText.__len__ returns Python character count, matching Text."""
+    doc = Doc()
+    doc["x"] = frag = XmlFragment([XmlText("A📊B")])
+    text = frag.children[0]
+
+    assert len(text) == 3  # 3 Python chars, not 4 UTF-16 code units
+
+
+def test_xml_text_unicode_iadd():
+    """`+=` after emoji appends at the end (regression for UTF-16 offset bug)."""
+    doc = Doc()
+    doc["x"] = frag = XmlFragment([XmlText()])
+    text = frag.children[0]
+
+    text += "A📊B"
+    text += "X"
+
+    assert str(text) == "A📊BX"
+
+
+def test_xml_text_unicode_insert():
+    """insert() places text at the correct position after an emoji."""
+    doc = Doc()
+    doc["x"] = frag = XmlFragment([XmlText("A📊B")])
+    text = frag.children[0]
+
+    text.insert(2, "X")
+
+    assert str(text) == "A📊XB"
+
+
+def test_xml_text_unicode_delete():
+    """del by index and slice removes the correct character around an emoji."""
+    doc = Doc()
+    doc["x"] = frag = XmlFragment([XmlText("A📊BC")])
+    text = frag.children[0]
+
+    del text[1]  # remove 📊
+    assert str(text) == "ABC"
+
+    doc["y"] = frag2 = XmlFragment([XmlText("A📊BC🎉D")])
+    text2 = frag2.children[0]
+
+    del text2[1:4]  # remove 📊BC
+    assert str(text2) == "A🎉D"
+
+
+def test_xml_text_unicode_format():
+    """format() uses character-index bounds and wraps non-BMP chars correctly."""
+    doc = Doc()
+    doc["x"] = frag = XmlFragment([XmlText("A📊B")])
+    text = frag.children[0]
+
+    text.format(1, 2, {"bold": True})  # format just the emoji
+
+    assert text.diff() == [
+        ("A", None),
+        ("📊", {"bold": True}),
+        ("B", None),
+    ]
+
+
 def test_element_with_any_attribute():
     doc = Doc()
 
