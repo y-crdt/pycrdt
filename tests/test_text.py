@@ -4,7 +4,6 @@ import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group
 from anyio.abc import TaskStatus
 from pycrdt import Array, Assoc, Doc, Map, StickyIndex, Text
-from pycrdt._text import _char_to_utf16
 
 pytestmark = pytest.mark.anyio
 
