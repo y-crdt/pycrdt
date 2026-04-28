@@ -11,14 +11,19 @@ if TYPE_CHECKING:
     from ._doc import Doc
 
 
-def _char_to_utf16(text: str, char_index: int) -> int:
+def get_utf16_index(text: str, char_index: int) -> int:
     """Convert a Python character (code point) index to a UTF-16 code unit index.
 
     Characters outside the Basic Multilingual Plane (e.g. emoji) occupy 2
-    UTF-16 code units but only 1 Python character.
+    UTF-16 code units but only 1 Python character. For pure-ASCII / BMP
+    text this is a no-op.
 
-    For pure-ASCII / BMP text this is a no-op (returns ``char_index``
-    unchanged).
+    Args:
+        text: The string against which ``char_index`` is interpreted.
+        char_index: A Python (code point) index into ``text``.
+
+    Returns:
+        The corresponding UTF-16 code unit offset.
     """
     if char_index == 0:
         return 0
@@ -28,8 +33,16 @@ def _char_to_utf16(text: str, char_index: int) -> int:
     return char_index + extra
 
 
-def _char_to_utf8(text: str, char_index: int) -> int:
-    """Convert a Python character (code point) index to a UTF-8 byte index."""
+def get_utf8_index(text: str, char_index: int) -> int:
+    """Convert a Python character (code point) index to a UTF-8 byte index.
+
+    Args:
+        text: The string against which ``char_index`` is interpreted.
+        char_index: A Python (code point) index into ``text``.
+
+    Returns:
+        The corresponding UTF-8 byte offset.
+    """
     if char_index == 0:
         return 0
     return len(text[:char_index].encode("utf-8"))
@@ -37,8 +50,8 @@ def _char_to_utf8(text: str, char_index: int) -> int:
 
 def _char_to_offset(text: str, char_index: int, offset_kind: str) -> int:
     if offset_kind == "utf16":
-        return _char_to_utf16(text, char_index)
-    return _char_to_utf8(text, char_index)
+        return get_utf16_index(text, char_index)
+    return get_utf8_index(text, char_index)
 
 
 def _single_char_unit_len(char: str, offset_kind: str) -> int:
@@ -125,9 +138,8 @@ class Text(Sequence):
         ```
 
         Returns:
-            The length of the text (in Python characters, not UTF-16 code units).
+            The length of the text in Python characters.
         """
-        # Return Python character count, not yrs UTF-16 code unit count
         return len(str(self))
 
     def __str__(self) -> str:

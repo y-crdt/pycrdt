@@ -35,6 +35,8 @@ from ._sync import write_message as write_message
 from ._sync import write_var_uint as write_var_uint
 from ._text import Text as Text
 from ._text import TextEvent as TextEvent
+from ._text import get_utf8_index as get_utf8_index
+from ._text import get_utf16_index as get_utf16_index
 from ._transaction import NewTransaction as NewTransaction
 from ._transaction import ReadTransaction as ReadTransaction
 from ._transaction import Transaction as Transaction
