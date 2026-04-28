@@ -581,8 +581,7 @@ def test_offset_kind_snapshot_round_trip(offset_kind):
     snap = Snapshot.from_doc(doc)
     restored = Doc.from_snapshot(snap, doc)
     assert restored.offset_kind == offset_kind, (
-        f"snapshot lost offset_kind: expected {offset_kind}, "
-        f"got {restored.offset_kind}"
+        f"snapshot lost offset_kind: expected {offset_kind}, got {restored.offset_kind}"
     )
     assert str(restored["text"]) == "A📊B"
 

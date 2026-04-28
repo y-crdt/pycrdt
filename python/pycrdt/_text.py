@@ -230,9 +230,7 @@ class Text(Sequence):
                 if stop - start > 0:
                     offset_start = _char_to_offset(current, start, ok)
                     offset_stop = _char_to_offset(current, stop, ok)
-                    self.integrated.remove_range(
-                        txn._txn, offset_start, offset_stop - offset_start
-                    )
+                    self.integrated.remove_range(txn._txn, offset_start, offset_stop - offset_start)
             else:
                 raise RuntimeError(f"Index not supported: {key}")
 

@@ -72,8 +72,7 @@ class BaseDoc:
             doc = _Doc(client_id, skip_gc, offset_kind)
         elif offset_kind is not None and offset_kind != doc.offset_kind:
             raise ValueError(
-                f"offset_kind={offset_kind!r} does not match doc.offset_kind="
-                f"{doc.offset_kind!r}"
+                f"offset_kind={offset_kind!r} does not match doc.offset_kind={doc.offset_kind!r}"
             )
         self._doc = doc
         self._txn = None
