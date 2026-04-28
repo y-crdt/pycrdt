@@ -3,7 +3,16 @@ from difflib import SequenceMatcher
 import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group
 from anyio.abc import TaskStatus
-from pycrdt import Array, Assoc, Doc, Map, StickyIndex, Text
+from pycrdt import (
+    Array,
+    Assoc,
+    Doc,
+    Map,
+    StickyIndex,
+    Text,
+    get_utf8_index,
+    get_utf16_index,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -230,9 +239,14 @@ def test_sticky_index(serialize: str):
     assert text1[new_idx] == "*"
 
 
-def test_unicode_emoji_insert():
-    """Text.insert() after emoji characters should use character positions, not byte offsets."""
-    doc = Doc()
+@pytest.fixture(params=["utf8", "utf16"])
+def offset_kind(request):
+    return request.param
+
+
+def test_unicode_emoji_insert(offset_kind):
+    """Text.insert() after emoji characters should use character positions."""
+    doc = Doc(offset_kind=offset_kind)
     doc["text"] = text = Text()
 
     text += "A📊B"
@@ -244,9 +258,9 @@ def test_unicode_emoji_insert():
     assert str(text) == "A📊XB", f"Got {str(text)!r}, emoji insert position is wrong"
 
 
-def test_unicode_emoji_sequential_inserts():
+def test_unicode_emoji_sequential_inserts(offset_kind):
     """Sequential inserts after emoji should maintain correct positions."""
-    doc = Doc()
+    doc = Doc(offset_kind=offset_kind)
     doc["text"] = text = Text()
 
     text += "# Analysis 📊\n"
@@ -258,9 +272,11 @@ def test_unicode_emoji_sequential_inserts():
     assert str(text) == expected, f"Got {str(text)!r}"
 
 
-def test_unicode_emoji_iadd():
-    """`+=` after emoji should append at the end (regression for UTF-16 offset bug)."""
-    doc = Doc()
+def test_unicode_emoji_iadd(offset_kind):
+    """`+=` after emoji should append at the end (regression for the original
+    Text.__iadd__ bug where len(self) was passed to yrs as if it were already
+    in offset units)."""
+    doc = Doc(offset_kind=offset_kind)
     doc["text"] = text = Text()
 
     text += "A📊B"
@@ -269,66 +285,66 @@ def test_unicode_emoji_iadd():
     assert str(text) == "A📊BX"
 
 
-def test_unicode_emoji_len():
-    """len() should return Python character count, not byte count."""
-    doc = Doc()
+def test_unicode_emoji_len(offset_kind):
+    """len() should return Python character count, regardless of offset_kind."""
+    doc = Doc(offset_kind=offset_kind)
     doc["text"] = text = Text()
 
     text += "A📊B"
-    assert len(text) == 3  # 3 chars, not 6 bytes or 4 UTF-16 code units
+    assert len(text) == 3
 
     text += "🎉"
     assert len(text) == 4
 
 
-def test_unicode_emoji_delete():
+def test_unicode_emoji_delete(offset_kind):
     """Deleting a character after an emoji should work correctly."""
-    doc = Doc()
+    doc = Doc(offset_kind=offset_kind)
     doc["text"] = text = Text("A📊BC")
 
     del text[2]  # delete B (after emoji)
     assert str(text) == "A📊C", f"Got {str(text)!r}"
 
 
-def test_unicode_emoji_delete_emoji():
+def test_unicode_emoji_delete_emoji(offset_kind):
     """Deleting an emoji character itself should work correctly."""
-    doc = Doc()
+    doc = Doc(offset_kind=offset_kind)
     doc["text"] = text = Text("A📊B")
 
     del text[1]  # delete 📊
     assert str(text) == "AB", f"Got {str(text)!r}"
 
 
-def test_unicode_emoji_slice_delete():
+def test_unicode_emoji_slice_delete(offset_kind):
     """Slice deletion across emoji boundaries should work correctly."""
-    doc = Doc()
+    doc = Doc(offset_kind=offset_kind)
     doc["text"] = text = Text("A📊B🎉C")
 
     del text[1:4]  # delete 📊B🎉
     assert str(text) == "AC", f"Got {str(text)!r}"
 
 
-def test_unicode_emoji_setitem():
+def test_unicode_emoji_setitem(offset_kind):
     """Replacing a character after an emoji should work correctly."""
-    doc = Doc()
+    doc = Doc(offset_kind=offset_kind)
     doc["text"] = text = Text("A📊BC")
 
     text[2] = "X"  # replace B (after emoji)
     assert str(text) == "A📊XC", f"Got {str(text)!r}"
 
 
-def test_unicode_emoji_slice_setitem():
+def test_unicode_emoji_slice_setitem(offset_kind):
     """Slice replacement spanning emoji should work correctly."""
-    doc = Doc()
+    doc = Doc(offset_kind=offset_kind)
     doc["text"] = text = Text("A📊B🎉C")
 
     text[1:4] = "XYZ"  # replace 📊B🎉 with XYZ
     assert str(text) == "AXYZC", f"Got {str(text)!r}"
 
 
-def test_unicode_cjk():
-    """CJK characters (BMP, 1 UTF-16 code unit each) should work correctly."""
-    doc = Doc()
+def test_unicode_cjk(offset_kind):
+    """CJK characters (BMP, 1 UTF-16 code unit but 3 UTF-8 bytes each)."""
+    doc = Doc(offset_kind=offset_kind)
     doc["text"] = text = Text()
 
     text += "价格"
@@ -337,9 +353,9 @@ def test_unicode_cjk():
     assert len(text) == 3
 
 
-def test_unicode_mixed_scripts():
+def test_unicode_mixed_scripts(offset_kind):
     """Mixed ASCII, CJK, Cyrillic, and emoji in one text."""
-    doc = Doc()
+    doc = Doc(offset_kind=offset_kind)
     doc["text"] = text = Text()
 
     text += "Hello"
@@ -353,9 +369,9 @@ def test_unicode_mixed_scripts():
     assert len(text) == 15
 
 
-def test_unicode_supplementary_plane():
-    """Characters outside BMP (require UTF-16 surrogate pairs)."""
-    doc = Doc()
+def test_unicode_supplementary_plane(offset_kind):
+    """Characters outside BMP."""
+    doc = Doc(offset_kind=offset_kind)
     doc["text"] = text = Text()
 
     # 𝒜 (U+1D49C) = Mathematical Script Capital A
@@ -370,9 +386,14 @@ def test_unicode_supplementary_plane():
     assert str(text) == "A𝒜XB𠀀YC", f"Got {str(text)!r}"
 
 
-def test_unicode_cross_doc_sync():
-    """Updates with Unicode content should sync correctly between two pycrdt docs."""
-    doc1 = Doc()
+def test_unicode_cross_doc_sync(offset_kind):
+    """Updates with Unicode content should sync correctly between two pycrdt docs.
+
+    Both docs must use the same offset_kind — peers with mismatched offset
+    kinds is a known incompatibility (yrs and yjs both require all peers in
+    a swarm to agree).
+    """
+    doc1 = Doc(offset_kind=offset_kind)
     doc1["text"] = text1 = Text()
 
     # Capture updates from doc1
@@ -384,7 +405,7 @@ def test_unicode_cross_doc_sync():
     text1.insert(len(text1), "# 特征工程\n")
 
     # Apply to doc2
-    doc2 = Doc()
+    doc2 = Doc(offset_kind=offset_kind)
     doc2["text"] = Text()
     for update in updates:
         doc2.apply_update(update)
@@ -494,12 +515,12 @@ def _apply_diff(text, old_value, new_value):
         "math_operators",
     ],
 )
-def test_unicode_granular_diff(initial, updated):
+def test_unicode_granular_diff(initial, updated, offset_kind):
     """Granular text edits with multi-byte Unicode should produce correct results.
 
     Test cases adapted from jupyter-server/jupyter_ydoc#370.
     """
-    doc = Doc()
+    doc = Doc(offset_kind=offset_kind)
     doc["text"] = text = Text()
 
     text += initial
@@ -507,6 +528,63 @@ def test_unicode_granular_diff(initial, updated):
 
     _apply_diff(text, initial, updated)
     assert str(text) == updated, f"Got {str(text)!r}, expected {updated!r}"
+
+
+def test_get_utf16_index():
+    # ASCII: identity
+    assert get_utf16_index("hello", 0) == 0
+    assert get_utf16_index("hello", 5) == 5
+    # BMP CJK: 1 code point = 1 UTF-16 code unit
+    assert get_utf16_index("价格", 2) == 2
+    # Non-BMP emoji: 1 code point = 2 UTF-16 code units (surrogate pair)
+    assert get_utf16_index("A📊B", 1) == 1
+    assert get_utf16_index("A📊B", 2) == 3
+    assert get_utf16_index("A📊B", 3) == 4
+
+
+def test_get_utf8_index():
+    # ASCII: identity
+    assert get_utf8_index("hello", 0) == 0
+    assert get_utf8_index("hello", 5) == 5
+    # BMP CJK: 1 code point = 3 UTF-8 bytes
+    assert get_utf8_index("价格", 1) == 3
+    assert get_utf8_index("价格", 2) == 6
+    # Non-BMP emoji: 1 code point = 4 UTF-8 bytes
+    assert get_utf8_index("A📊B", 1) == 1
+    assert get_utf8_index("A📊B", 2) == 5
+    assert get_utf8_index("A📊B", 3) == 6
+
+
+def test_offset_kind_default_is_utf8():
+    assert Doc().offset_kind == "utf8"
+
+
+def test_offset_kind_explicit():
+    assert Doc(offset_kind="utf8").offset_kind == "utf8"
+    assert Doc(offset_kind="utf16").offset_kind == "utf16"
+    # hyphenated forms accepted
+    assert Doc(offset_kind="utf-8").offset_kind == "utf8"
+    assert Doc(offset_kind="utf-16").offset_kind == "utf16"
+
+
+def test_offset_kind_invalid_raises():
+    with pytest.raises(ValueError):
+        Doc(offset_kind="utf32")
+
+
+def test_offset_kind_snapshot_round_trip(offset_kind):
+    """from_snapshot must preserve the source doc's offset_kind."""
+    from pycrdt import Snapshot
+
+    doc = Doc(offset_kind=offset_kind, skip_gc=True)
+    doc["text"] = Text("A📊B")
+    snap = Snapshot.from_doc(doc)
+    restored = Doc.from_snapshot(snap, doc)
+    assert restored.offset_kind == offset_kind, (
+        f"snapshot lost offset_kind: expected {offset_kind}, "
+        f"got {restored.offset_kind}"
+    )
+    assert str(restored["text"]) == "A📊B"
 
 
 def test_sticky_index_transaction():
