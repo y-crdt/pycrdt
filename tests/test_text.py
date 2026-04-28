@@ -572,6 +572,13 @@ def test_offset_kind_invalid_raises():
         Doc(offset_kind="utf32")
 
 
+def test_offset_kind_doc_mismatch_raises():
+    """Doc(doc=existing, offset_kind=other) must reject conflicting values."""
+    utf8_doc = Doc(offset_kind="utf8")
+    with pytest.raises(ValueError, match="does not match"):
+        Doc(doc=utf8_doc._doc, offset_kind="utf16")
+
+
 def test_offset_kind_snapshot_round_trip(offset_kind):
     """from_snapshot must preserve the source doc's offset_kind."""
     from pycrdt import Snapshot
