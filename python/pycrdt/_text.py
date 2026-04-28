@@ -15,8 +15,7 @@ def _char_to_utf16(text: str, char_index: int) -> int:
     """Convert a Python character (code point) index to a UTF-16 code unit index.
 
     Characters outside the Basic Multilingual Plane (e.g. emoji) occupy 2
-    UTF-16 code units but only 1 Python character.  The underlying yrs library
-    uses UTF-16 offsets, so all indices passed to it must be converted.
+    UTF-16 code units but only 1 Python character.
 
     For pure-ASCII / BMP text this is a no-op (returns ``char_index``
     unchanged).
@@ -27,6 +26,25 @@ def _char_to_utf16(text: str, char_index: int) -> int:
     # Count characters that need a surrogate pair (code point > 0xFFFF)
     extra = sum(1 for ch in prefix if ord(ch) > 0xFFFF)
     return char_index + extra
+
+
+def _char_to_utf8(text: str, char_index: int) -> int:
+    """Convert a Python character (code point) index to a UTF-8 byte index."""
+    if char_index == 0:
+        return 0
+    return len(text[:char_index].encode("utf-8"))
+
+
+def _char_to_offset(text: str, char_index: int, offset_kind: str) -> int:
+    if offset_kind == "utf16":
+        return _char_to_utf16(text, char_index)
+    return _char_to_utf8(text, char_index)
+
+
+def _single_char_unit_len(char: str, offset_kind: str) -> int:
+    if offset_kind == "utf16":
+        return 2 if ord(char) > 0xFFFF else 1
+    return len(char.encode("utf-8"))
 
 
 class Text(Sequence):
@@ -147,8 +165,8 @@ class Text(Sequence):
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
             current = str(self)
-            utf16_index = _char_to_utf16(current, len(current))
-            self.integrated.insert(txn._txn, utf16_index, value)
+            offset = _char_to_offset(current, len(current), self.doc.offset_kind)
+            self.integrated.insert(txn._txn, offset, value)
             return self
 
     def _check_slice(self, key: slice) -> tuple[int, int]:
@@ -190,18 +208,19 @@ class Text(Sequence):
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
             current = str(self)
+            ok = self.doc.offset_kind
             if isinstance(key, int):
-                utf16_idx = _char_to_utf16(current, key)
-                char_at = current[key]
-                utf16_len = 2 if ord(char_at) > 0xFFFF else 1
-                self.integrated.remove_range(txn._txn, utf16_idx, utf16_len)
+                offset = _char_to_offset(current, key, ok)
+                unit_len = _single_char_unit_len(current[key], ok)
+                self.integrated.remove_range(txn._txn, offset, unit_len)
             elif isinstance(key, slice):
                 start, stop = self._check_slice(key)
-                length = stop - start
-                if length > 0:
-                    utf16_start = _char_to_utf16(current, start)
-                    utf16_stop = _char_to_utf16(current, stop)
-                    self.integrated.remove_range(txn._txn, utf16_start, utf16_stop - utf16_start)
+                if stop - start > 0:
+                    offset_start = _char_to_offset(current, start, ok)
+                    offset_stop = _char_to_offset(current, stop, ok)
+                    self.integrated.remove_range(
+                        txn._txn, offset_start, offset_stop - offset_start
+                    )
             else:
                 raise RuntimeError(f"Index not supported: {key}")
 
@@ -241,25 +260,25 @@ class Text(Sequence):
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
             current = str(self)
+            ok = self.doc.offset_kind
             if isinstance(key, int):
                 value_len = len(value)
                 if value_len != 1:
                     raise RuntimeError(
                         f"Single item assigned value must have a length of 1, not {value_len}"
                     )
-                utf16_idx = _char_to_utf16(current, key)
-                char_at = current[key]
-                utf16_len = 2 if ord(char_at) > 0xFFFF else 1
-                self.integrated.remove_range(txn._txn, utf16_idx, utf16_len)
-                self.integrated.insert(txn._txn, utf16_idx, value)
+                offset = _char_to_offset(current, key, ok)
+                unit_len = _single_char_unit_len(current[key], ok)
+                self.integrated.remove_range(txn._txn, offset, unit_len)
+                self.integrated.insert(txn._txn, offset, value)
             elif isinstance(key, slice):
                 start, stop = self._check_slice(key)
-                utf16_start = _char_to_utf16(current, start)
-                utf16_stop = _char_to_utf16(current, stop)
-                length = utf16_stop - utf16_start
+                offset_start = _char_to_offset(current, start, ok)
+                offset_stop = _char_to_offset(current, stop, ok)
+                length = offset_stop - offset_start
                 if length > 0:
-                    self.integrated.remove_range(txn._txn, utf16_start, length)
-                self.integrated.insert(txn._txn, utf16_start, value)
+                    self.integrated.remove_range(txn._txn, offset_start, length)
+                self.integrated.insert(txn._txn, offset_start, value)
             else:
                 raise RuntimeError(f"Index not supported: {key}")
 
@@ -284,9 +303,9 @@ class Text(Sequence):
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
             current = str(self)
-            utf16_index = _char_to_utf16(current, index)
+            offset = _char_to_offset(current, index, self.doc.offset_kind)
             self.integrated.insert(
-                txn._txn, utf16_index, value, iter(attrs.items()) if attrs is not None else None
+                txn._txn, offset, value, iter(attrs.items()) if attrs is not None else None
             )
 
     def insert_embed(self, index: int, value: Any, attrs: dict[str, Any] | None = None) -> None:
@@ -301,9 +320,9 @@ class Text(Sequence):
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
             current = str(self)
-            utf16_index = _char_to_utf16(current, index)
+            offset = _char_to_offset(current, index, self.doc.offset_kind)
             self.integrated.insert_embed(
-                txn._txn, utf16_index, value, iter(attrs.items()) if attrs is not None else None
+                txn._txn, offset, value, iter(attrs.items()) if attrs is not None else None
             )
 
     def format(self, start: int, stop: int, attrs: dict[str, Any]) -> None:
@@ -319,11 +338,12 @@ class Text(Sequence):
             self._forbid_read_transaction(txn)
             start, stop = self._check_slice(slice(start, stop))
             current = str(self)
-            utf16_start = _char_to_utf16(current, start)
-            utf16_stop = _char_to_utf16(current, stop)
-            length = utf16_stop - utf16_start
+            ok = self.doc.offset_kind
+            offset_start = _char_to_offset(current, start, ok)
+            offset_stop = _char_to_offset(current, stop, ok)
+            length = offset_stop - offset_start
             if length > 0:
-                self.integrated.format(txn._txn, utf16_start, length, iter(attrs.items()))
+                self.integrated.format(txn._txn, offset_start, length, iter(attrs.items()))
 
     def diff(self) -> list[tuple[Any, dict[str, Any] | None]]:
         """

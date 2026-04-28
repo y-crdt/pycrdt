@@ -61,6 +61,7 @@ class BaseDoc:
         *,
         client_id: int | None = None,
         skip_gc: bool | None = None,
+        offset_kind: str | None = None,
         doc: _Doc | None = None,
         Model=None,
         allow_multithreading: bool = False,
@@ -68,7 +69,12 @@ class BaseDoc:
     ) -> None:
         super().__init__(**data)
         if doc is None:
-            doc = _Doc(client_id, skip_gc)
+            doc = _Doc(client_id, skip_gc, offset_kind)
+        elif offset_kind is not None and offset_kind != doc.offset_kind:
+            raise ValueError(
+                f"offset_kind={offset_kind!r} does not match doc.offset_kind="
+                f"{doc.offset_kind!r}"
+            )
         self._doc = doc
         self._txn = None
         self._exceptions = []
