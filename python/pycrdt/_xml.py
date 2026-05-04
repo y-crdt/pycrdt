@@ -7,6 +7,7 @@ from ._pycrdt import XmlElement as _XmlElement
 from ._pycrdt import XmlEvent as _XmlEvent
 from ._pycrdt import XmlFragment as _XmlFragment
 from ._pycrdt import XmlText as _XmlText
+from ._text import _char_to_utf16
 
 if TYPE_CHECKING:
     from typing import Any, Iterable, Mapping, Sized, TypeVar
@@ -228,8 +229,9 @@ class XmlText(_XmlTraitMixin):
             self.integrated.insert(txn._txn, 0, value)
 
     def __len__(self) -> int:
-        with self.doc.transaction() as txn:
-            return self.integrated.len(txn._txn)
+        # Python character count, matching Text.__len__. yrs' internal len
+        # is in UTF-16 code units, which would misreport for non-BMP chars.
+        return len(str(self))
 
     def __iadd__(self, value: str) -> XmlText:
         with self.doc.transaction():
@@ -247,8 +249,12 @@ class XmlText(_XmlTraitMixin):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
+            utf16_index = _char_to_utf16(str(self), index)
             self.integrated.insert(
-                txn._txn, index, value, iter(attrs.items()) if attrs is not None else iter([])
+                txn._txn,
+                utf16_index,
+                value,
+                iter(attrs.items()) if attrs is not None else iter([]),
             )
 
     def insert_embed(self, index: int, value: Any, attrs: dict[str, Any] | None = None) -> None:
@@ -263,13 +269,14 @@ class XmlText(_XmlTraitMixin):
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
             _attrs = iter(attrs.items()) if attrs is not None else None
+            utf16_index = _char_to_utf16(str(self), index)
             if isinstance(value, BaseType):
                 # shared type
                 assert txn._txn is not None
-                self._do_and_integrate("insert", value, txn._txn, index, _attrs)
+                self._do_and_integrate("insert", value, txn._txn, utf16_index, _attrs)
             else:
                 # primitive type
-                self.integrated.insert_embed(txn._txn, index, value, _attrs)
+                self.integrated.insert_embed(txn._txn, utf16_index, value, _attrs)
 
     def format(self, start: int, stop: int, attrs: dict[str, Any]) -> None:
         """
@@ -283,9 +290,12 @@ class XmlText(_XmlTraitMixin):
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
             start, stop = _check_slice(self, slice(start, stop))
-            length = stop - start
+            current = str(self)
+            utf16_start = _char_to_utf16(current, start)
+            utf16_stop = _char_to_utf16(current, stop)
+            length = utf16_stop - utf16_start
             if length > 0:
-                self.integrated.format(txn._txn, start, length, iter(attrs.items()))
+                self.integrated.format(txn._txn, utf16_start, length, iter(attrs.items()))
 
     def diff(self) -> list[tuple[Any, dict[str, Any] | None]]:
         """
@@ -301,13 +311,18 @@ class XmlText(_XmlTraitMixin):
     def __delitem__(self, key: int | slice) -> None:
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
+            current = str(self)
             if isinstance(key, int):
-                self.integrated.remove_range(txn._txn, key, 1)
+                utf16_idx = _char_to_utf16(current, key)
+                char_at = current[key]
+                utf16_len = 2 if ord(char_at) > 0xFFFF else 1
+                self.integrated.remove_range(txn._txn, utf16_idx, utf16_len)
             elif isinstance(key, slice):
                 start, stop = _check_slice(self, key)
-                length = stop - start
-                if length > 0:
-                    self.integrated.remove_range(txn._txn, start, length)
+                if stop - start > 0:
+                    utf16_start = _char_to_utf16(current, start)
+                    utf16_stop = _char_to_utf16(current, stop)
+                    self.integrated.remove_range(txn._txn, utf16_start, utf16_stop - utf16_start)
             else:
                 raise TypeError(f"Index not supported: {key}")
 
