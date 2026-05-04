@@ -147,9 +147,8 @@ def test_observe():
 
     sub = map0.observe(partial(callback, events))
     map0["0"] = 0
-    assert (
-        str(events[0])
-        == """{target: {"0":0}, keys: {'0': {'action': 'add', 'newValue': 0.0}}, path: []}"""
+    assert str(events[0]).startswith(
+        """{target: {"0":0}, keys: {'0': {'action': 'add', 'newValue': 0.0}}, path: [],"""
     )
     events.clear()
     map0.unobserve(sub)
@@ -159,9 +158,8 @@ def test_observe():
     deep_events = []
     sub = map1.observe_deep(partial(callback_deep, deep_events))
     map1["1"] = 1
-    assert (
-        str(deep_events[0][0])
-        == """{target: {"1":1}, keys: {'1': {'action': 'add', 'newValue': 1.0}}, path: []}"""
+    assert str(deep_events[0][0]).startswith(
+        """{target: {"1":1}, keys: {'1': {'action': 'add', 'newValue': 1.0}}, path: [],"""
     )
     deep_events.clear()
     map1.unobserve(sub)

@@ -303,8 +303,9 @@ def observe_callback(
     param_nb: int,
     event: Any,
 ):
-    _event = event_types[type(event)](event, doc)
     with doc._read_transaction(event.transaction) as txn:
+        _event = event_types[type(event)](event, doc)
+        _event.transaction = txn
         params = (_event, txn)
         try:
             callback(*params[:param_nb])  # type: ignore[arg-type]
@@ -318,9 +319,11 @@ def observe_deep_callback(
     param_nb: int,
     events: list[Any],
 ):
-    for idx, event in enumerate(events):
-        events[idx] = event_types[type(event)](event, doc)
-    with doc._read_transaction(event.transaction) as txn:
+    with doc._read_transaction(events[0].transaction) as txn:
+        for idx, event in enumerate(events):
+            _event = event_types[type(event)](event, doc)
+            _event.transaction = txn
+            events[idx] = _event
         params = (events, txn)
         try:
             callback(*params[:param_nb])  # type: ignore[arg-type]
@@ -329,7 +332,8 @@ def observe_deep_callback(
 
 
 class BaseEvent:
-    __slots__ = ()
+    transaction: ReadTransaction
+    __slots__ = ("transaction",)
 
     def __init__(self, event: Any, doc: Doc):
         slot: str

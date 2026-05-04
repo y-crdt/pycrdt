@@ -152,21 +152,24 @@ def test_formatting():
 def test_observe():
     doc = Doc()
     doc["text"] = text = Text()
-    events = []
+    event = None
+    txn = None
 
-    def callback(event):
-        nonlocal text
+    def callback(_event, _txn):
+        nonlocal event, text, txn
+        event = _event
+        txn = _txn
         with pytest.raises(RuntimeError) as excinfo:
             text += world
         assert (
             str(excinfo.value)
             == "Read-only transaction cannot be used to modify document structure"
         )
-        events.append(event)
 
     sub = text.observe(callback)  # noqa: F841
     text += hello
-    assert str(events[0]) == """{target: Hello, delta: [{'insert': 'Hello'}], path: []}"""
+    assert str(event).startswith("""{target: Hello, delta: [{'insert': 'Hello'}], path: [],""")
+    assert event.transaction is txn
 
 
 async def test_iterate_events():
