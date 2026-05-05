@@ -9,5 +9,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 serde_json = "1.0.149"
-yrs = "0.25.0"
-pyo3 = "0.28.2"
+yrs = "0.26.0"
+pyo3 = "0.28.3"

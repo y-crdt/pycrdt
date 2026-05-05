@@ -3,7 +3,7 @@ use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::types::{PyBool, PyBytes, PyDict, PyInt, PyList};
 use yrs::{
-    Doc as _Doc, Options, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
+    ClientID, Doc as _Doc, Options, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
 };
 use yrs::updates::encoder::{Encode, Encoder};
 use yrs::updates::decoder::Decode;
@@ -16,7 +16,7 @@ use crate::type_conversions::ToPython;
 use crate::xml::XmlFragment;
 
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct Doc {
     pub doc: _Doc,
@@ -75,7 +75,7 @@ impl Doc {
                 .map_err(|_| PyValueError::new_err("client_id must be an integer"))?
                 .extract()
                 .map_err(|_| PyValueError::new_err("client_id must be a valid u64"))?;
-            options.client_id = _client_id;
+            options.client_id = ClientID::new(_client_id);
         }
         if !skip_gc.is_none() {
             let _skip_gc: bool = skip_gc.cast::<PyBool>()
@@ -100,7 +100,7 @@ impl Doc {
     }
 
     fn client_id(&mut self) -> u64 {
-        self.doc.client_id()
+        self.doc.client_id().get()
     }
 
     fn get_or_insert_text(&mut self, py: Python<'_>, txn: &mut Transaction, name: &str) -> PyResult<Py<Text>> {
