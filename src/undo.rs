@@ -3,7 +3,7 @@ use std::sync::Arc;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyBytes};
 use pyo3::exceptions::PyRuntimeError;
-use yrs::DeleteSet as _DeleteSet;
+use yrs::IdSet as _IdSet;
 use yrs::undo::{
     Options,
     StackItem as _StackItem,
@@ -18,49 +18,49 @@ use crate::array::Array;
 use crate::map::Map;
 use crate::xml::XmlFragment;
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone)]
-pub struct DeleteSet {
-    delete_set: _DeleteSet,
+pub struct IdSet {
+    id_set: _IdSet,
 }
 
 #[pymethods]
-impl DeleteSet {
-    /// Create a new empty DeleteSet
+impl IdSet {
+    /// Create a new empty IdSet
     #[new]
     pub fn new() -> Self {
-        DeleteSet {
-            delete_set: _DeleteSet::new(),
+        IdSet {
+            id_set: _IdSet::new(),
         }
     }
 
-    /// Encode the DeleteSet to bytes
+    /// Encode the IdSet to bytes
     pub fn encode(&self) -> Py<PyAny> {
-        let encoded = self.delete_set.encode_v1();
+        let encoded = self.id_set.encode_v1();
         Python::attach(|py: Python<'_>| PyBytes::new(py, &encoded).into())
     }
 
-    /// Decode a DeleteSet from bytes
+    /// Decode a IdSet from bytes
     #[staticmethod]
     pub fn decode(data: &Bound<'_, PyBytes>) -> PyResult<Self> {
         let bytes: &[u8] = data.as_bytes();
-        match _DeleteSet::decode_v1(bytes) {
-            Ok(delete_set) => Ok(DeleteSet { delete_set }),
+        match _IdSet::decode_v1(bytes) {
+            Ok(id_set) => Ok(IdSet { id_set }),
             Err(e) => Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "Failed to decode DeleteSet: {}",
+                "Failed to decode IdSet: {}",
                 e
             ))),
         }
     }
 
     fn __repr__(&self) -> String {
-        format!("{:?}", self.delete_set)
+        format!("{:?}", self.id_set)
     }
 }
 
-impl DeleteSet {
-    pub fn from(delete_set: _DeleteSet) -> Self {
-        DeleteSet { delete_set }
+impl IdSet {
+    pub fn from(id_set: _IdSet) -> Self {
+        IdSet { id_set }
     }
 }
 
@@ -175,7 +175,7 @@ impl UndoManager {
 }
 
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct StackItem {
     stack_item: _StackItem<PyMeta>
@@ -193,25 +193,25 @@ impl StackItem {
     /// Metadata can be any Python object (dict, string, int, etc.)
     #[new]
     #[pyo3(signature = (deletions, insertions, meta=None))]
-    pub fn new(deletions: &DeleteSet, insertions: &DeleteSet, meta: Option<Py<PyAny>>) -> Self {
+    pub fn new(deletions: &IdSet, insertions: &IdSet, meta: Option<Py<PyAny>>) -> Self {
         let stack_item = _StackItem::with_meta(
-            deletions.delete_set.clone(),
-            insertions.delete_set.clone(),
+            deletions.id_set.clone(),
+            insertions.id_set.clone(),
             PyMeta(meta),
         );
         StackItem { stack_item }
     }
 
-    /// Get the deletions DeleteSet as a Python property
+    /// Get the deletions IdSet as a Python property
     #[getter]
-    pub fn deletions(&self) -> DeleteSet {
-        DeleteSet::from(self.stack_item.deletions().clone())
+    pub fn deletions(&self) -> IdSet {
+        IdSet::from(self.stack_item.deletions().clone())
     }
 
-    /// Get the insertions DeleteSet as a Python property
+    /// Get the insertions IdSet as a Python property
     #[getter]
-    pub fn insertions(&self) -> DeleteSet {
-        DeleteSet::from(self.stack_item.insertions().clone())
+    pub fn insertions(&self) -> IdSet {
+        IdSet::from(self.stack_item.insertions().clone())
     }
 
     /// Get the metadata as a Python property

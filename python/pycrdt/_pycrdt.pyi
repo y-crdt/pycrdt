@@ -403,18 +403,18 @@ class UndoManager:
     def redo_stack(self) -> list[StackItem]:
         """Returns the undo manager's redo stack."""
 
-class DeleteSet:
+class IdSet:
     """A set of deletions in a CRDT document."""
 
     def __init__(self) -> None:
-        """Create a new empty DeleteSet."""
+        """Create a new empty IdSet."""
 
     def encode(self) -> bytes:
-        """Encode the DeleteSet to bytes."""
+        """Encode the IdSet to bytes."""
 
     @staticmethod
-    def decode(data: bytes) -> DeleteSet:
-        """Decode a DeleteSet from bytes."""
+    def decode(data: bytes) -> IdSet:
+        """Decode a IdSet from bytes."""
 
 MetaT = TypeVar("MetaT")
 
@@ -423,24 +423,22 @@ class StackItem(Generic[MetaT]):
     compressed information about all updates and deletions tracked by it.
     """
 
-    def __init__(
-        self, deletions: DeleteSet, insertions: DeleteSet, meta: MetaT | None = None
-    ) -> None:
+    def __init__(self, deletions: IdSet, insertions: IdSet, meta: MetaT | None = None) -> None:
         """Create a new StackItem.
 
         Args:
-            deletions: The DeleteSet of deletions.
-            insertions: The DeleteSet of insertions.
+            deletions: The IdSet of deletions.
+            insertions: The IdSet of insertions.
             meta: Optional metadata (can be any Python object).
         """
 
     @property
-    def deletions(self) -> DeleteSet:
-        """Get the deletions DeleteSet."""
+    def deletions(self) -> IdSet:
+        """Get the deletions IdSet."""
 
     @property
-    def insertions(self) -> DeleteSet:
-        """Get the insertions DeleteSet."""
+    def insertions(self) -> IdSet:
+        """Get the insertions IdSet."""
 
     @property
     def meta(self) -> MetaT | None:
