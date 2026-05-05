@@ -245,10 +245,10 @@ def test_invalid_client_id():
 
 
 def test_client_id_53_bit_overflow():
-    Doc(client_id=2 ** 53 - 1)
+    Doc(client_id=2**53 - 1)
 
     with pytest.raises(ValueError, match="client_id cannot overflow 53 bits"):
-        Doc(client_id=2 ** 53)
+        Doc(client_id=2**53)
 
 
 def test_invalid_skip_gc():
