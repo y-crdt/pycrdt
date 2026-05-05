@@ -423,9 +423,7 @@ class StackItem(Generic[MetaT]):
     compressed information about all updates and deletions tracked by it.
     """
 
-    def __init__(
-        self, deletions: IdSet, insertions: IdSet, meta: MetaT | None = None
-    ) -> None:
+    def __init__(self, deletions: IdSet, insertions: IdSet, meta: MetaT | None = None) -> None:
         """Create a new StackItem.
 
         Args:
