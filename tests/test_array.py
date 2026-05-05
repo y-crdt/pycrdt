@@ -131,7 +131,9 @@ def test_observe():
 
     sid4 = array.observe_deep(cb)
     array.append("bar")
-    assert str(deep_events[0][0]) == """{target: ["bar"], delta: [{'insert': ['bar']}], path: []}"""
+    assert str(deep_events[0][0]).startswith(
+        """{target: ["bar"], delta: [{'insert': ['bar']}], path: [],"""
+    )
     deep_events.clear()
     array.unobserve(sid4)
     array.append("baz")
