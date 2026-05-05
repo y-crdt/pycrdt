@@ -3,7 +3,7 @@ use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::types::{PyBool, PyBytes, PyDict, PyInt, PyList};
 use yrs::{
-    Doc as _Doc, Options, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
+    Doc as _Doc, OffsetKind, Options, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
 };
 use yrs::updates::encoder::{Encode, Encoder};
 use yrs::updates::decoder::Decode;
@@ -32,6 +32,7 @@ impl Doc {
         let mut options = yrs::Options::default();
         options.client_id = original.doc.client_id();
         options.skip_gc = original.doc.skip_gc();
+        options.offset_kind = original.doc.offset_kind();
         if let Some(collection_id) = original.doc.collection_id() {
             options.collection_id = Some(collection_id);
         }
@@ -68,7 +69,11 @@ impl Doc {
 #[pymethods]
 impl Doc {
     #[new]
-    fn new(client_id: &Bound<'_, PyAny>, skip_gc: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn new(
+        client_id: &Bound<'_, PyAny>,
+        skip_gc: &Bound<'_, PyAny>,
+        offset_kind: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
         let mut options = Options::default();
         if !client_id.is_none() {
             let _client_id: u64 = client_id.cast::<PyInt>()
@@ -84,8 +89,28 @@ impl Doc {
                 .map_err(|_| PyValueError::new_err("skip_gc must be a valid bool"))?;
             options.skip_gc = _skip_gc;
         }
+        if !offset_kind.is_none() {
+            let _offset_kind: String = offset_kind
+                .extract()
+                .map_err(|_| PyValueError::new_err("offset_kind must be a string"))?;
+            options.offset_kind = match _offset_kind.as_str() {
+                "utf8" | "utf-8" => OffsetKind::Bytes,
+                "utf16" | "utf-16" => OffsetKind::Utf16,
+                _ => return Err(PyValueError::new_err(
+                    "offset_kind must be 'utf8' or 'utf16'",
+                )),
+            };
+        }
         let doc = _Doc::with_options(options);
         Ok(Doc { doc })
+    }
+
+    #[getter]
+    fn offset_kind(&self) -> &'static str {
+        match self.doc.offset_kind() {
+            OffsetKind::Bytes => "utf8",
+            OffsetKind::Utf16 => "utf16",
+        }
     }
 
     #[staticmethod]

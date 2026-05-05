@@ -48,6 +48,7 @@ class Doc(BaseDoc, Generic[T]):
         *,
         client_id: int | None = None,
         skip_gc: bool | None = None,
+        offset_kind: str | None = None,
         doc: _Doc | None = None,
         Model=None,
         allow_multithreading: bool = False,
@@ -58,11 +59,18 @@ class Doc(BaseDoc, Generic[T]):
             client_id: An optional client ID for the document.
             skip_gc: Whether to skip garbage collection on deleted collections
                 on transaction commit.
+            offset_kind: How yrs counts text positions internally. ``"utf8"``
+                (the yrs default) uses byte offsets; ``"utf16"`` uses UTF-16
+                code unit offsets and is required for cross-runtime
+                compatibility with JS yjs. ``None`` (default) selects the yrs
+                default of ``"utf8"``. Regardless of this setting, the public
+                ``Text`` API always takes Python character indices.
             allow_multithreading: Whether to allow the document to be used in different threads.
         """
         super().__init__(
             client_id=client_id,
             skip_gc=skip_gc,
+            offset_kind=offset_kind,
             doc=doc,
             Model=Model,
             allow_multithreading=allow_multithreading,
@@ -85,6 +93,15 @@ class Doc(BaseDoc, Generic[T]):
     def client_id(self) -> int:
         """The document client ID."""
         return self._doc.client_id()
+
+    @property
+    def offset_kind(self) -> str:
+        """The text offset kind used internally by yrs.
+
+        Returns ``"utf8"`` or ``"utf16"``. See [Doc.__init__][pycrdt.Doc.__init__]
+        for the meaning.
+        """
+        return self._doc.offset_kind
 
     def transaction(self, origin: Any = None) -> Transaction:
         """

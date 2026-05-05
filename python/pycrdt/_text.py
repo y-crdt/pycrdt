@@ -11,6 +11,55 @@ if TYPE_CHECKING:
     from ._doc import Doc
 
 
+def get_utf16_index(text: str, char_index: int) -> int:
+    """Convert a Python character (code point) index to a UTF-16 code unit index.
+
+    Characters outside the Basic Multilingual Plane (e.g. emoji) occupy 2
+    UTF-16 code units but only 1 Python character. For pure-ASCII / BMP
+    text this is a no-op.
+
+    Args:
+        text: The string against which ``char_index`` is interpreted.
+        char_index: A Python (code point) index into ``text``.
+
+    Returns:
+        The corresponding UTF-16 code unit offset.
+    """
+    if char_index == 0:
+        return 0
+    prefix = text[:char_index]
+    # Count characters that need a surrogate pair (code point > 0xFFFF)
+    extra = sum(1 for ch in prefix if ord(ch) > 0xFFFF)
+    return char_index + extra
+
+
+def get_utf8_index(text: str, char_index: int) -> int:
+    """Convert a Python character (code point) index to a UTF-8 byte index.
+
+    Args:
+        text: The string against which ``char_index`` is interpreted.
+        char_index: A Python (code point) index into ``text``.
+
+    Returns:
+        The corresponding UTF-8 byte offset.
+    """
+    if char_index == 0:
+        return 0
+    return len(text[:char_index].encode("utf-8"))
+
+
+def _char_to_offset(text: str, char_index: int, offset_kind: str) -> int:
+    if offset_kind == "utf16":
+        return get_utf16_index(text, char_index)
+    return get_utf8_index(text, char_index)
+
+
+def _single_char_unit_len(char: str, offset_kind: str) -> int:
+    if offset_kind == "utf16":
+        return 2 if ord(char) > 0xFFFF else 1
+    return len(char.encode("utf-8"))
+
+
 class Text(Sequence):
     """
     A shared data type used for collaborative text editing, similar to a Python `str`.
@@ -89,10 +138,9 @@ class Text(Sequence):
         ```
 
         Returns:
-            The length of the text.
+            The length of the text in Python characters.
         """
-        with self.doc.transaction() as txn:
-            return self.integrated.len(txn._txn)
+        return len(str(self))
 
     def __str__(self) -> str:
         """
@@ -128,7 +176,9 @@ class Text(Sequence):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
-            self.integrated.insert(txn._txn, len(self), value)
+            current = str(self)
+            offset = _char_to_offset(current, len(current), self.doc.offset_kind)
+            self.integrated.insert(txn._txn, offset, value)
             return self
 
     def _check_slice(self, key: slice) -> tuple[int, int]:
@@ -169,13 +219,18 @@ class Text(Sequence):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
+            current = str(self)
+            ok = self.doc.offset_kind
             if isinstance(key, int):
-                self.integrated.remove_range(txn._txn, key, 1)
+                offset = _char_to_offset(current, key, ok)
+                unit_len = _single_char_unit_len(current[key], ok)
+                self.integrated.remove_range(txn._txn, offset, unit_len)
             elif isinstance(key, slice):
                 start, stop = self._check_slice(key)
-                length = stop - start
-                if length > 0:
-                    self.integrated.remove_range(txn._txn, start, length)
+                if stop - start > 0:
+                    offset_start = _char_to_offset(current, start, ok)
+                    offset_stop = _char_to_offset(current, stop, ok)
+                    self.integrated.remove_range(txn._txn, offset_start, offset_stop - offset_start)
             else:
                 raise RuntimeError(f"Index not supported: {key}")
 
@@ -214,20 +269,26 @@ class Text(Sequence):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
+            current = str(self)
+            ok = self.doc.offset_kind
             if isinstance(key, int):
                 value_len = len(value)
                 if value_len != 1:
                     raise RuntimeError(
                         f"Single item assigned value must have a length of 1, not {value_len}"
                     )
-                del self[key]
-                self.integrated.insert(txn._txn, key, value)
+                offset = _char_to_offset(current, key, ok)
+                unit_len = _single_char_unit_len(current[key], ok)
+                self.integrated.remove_range(txn._txn, offset, unit_len)
+                self.integrated.insert(txn._txn, offset, value)
             elif isinstance(key, slice):
                 start, stop = self._check_slice(key)
-                length = stop - start
+                offset_start = _char_to_offset(current, start, ok)
+                offset_stop = _char_to_offset(current, stop, ok)
+                length = offset_stop - offset_start
                 if length > 0:
-                    self.integrated.remove_range(txn._txn, start, length)
-                self.integrated.insert(txn._txn, start, value)
+                    self.integrated.remove_range(txn._txn, offset_start, length)
+                self.integrated.insert(txn._txn, offset_start, value)
             else:
                 raise RuntimeError(f"Index not supported: {key}")
 
@@ -251,8 +312,10 @@ class Text(Sequence):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
+            current = str(self)
+            offset = _char_to_offset(current, index, self.doc.offset_kind)
             self.integrated.insert(
-                txn._txn, index, value, iter(attrs.items()) if attrs is not None else None
+                txn._txn, offset, value, iter(attrs.items()) if attrs is not None else None
             )
 
     def insert_embed(self, index: int, value: Any, attrs: dict[str, Any] | None = None) -> None:
@@ -266,8 +329,10 @@ class Text(Sequence):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
+            current = str(self)
+            offset = _char_to_offset(current, index, self.doc.offset_kind)
             self.integrated.insert_embed(
-                txn._txn, index, value, iter(attrs.items()) if attrs is not None else None
+                txn._txn, offset, value, iter(attrs.items()) if attrs is not None else None
             )
 
     def format(self, start: int, stop: int, attrs: dict[str, Any]) -> None:
@@ -282,9 +347,13 @@ class Text(Sequence):
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
             start, stop = self._check_slice(slice(start, stop))
-            length = stop - start
+            current = str(self)
+            ok = self.doc.offset_kind
+            offset_start = _char_to_offset(current, start, ok)
+            offset_stop = _char_to_offset(current, stop, ok)
+            length = offset_stop - offset_start
             if length > 0:
-                self.integrated.format(txn._txn, start, length, iter(attrs.items()))
+                self.integrated.format(txn._txn, offset_start, length, iter(attrs.items()))
 
     def diff(self) -> list[tuple[Any, dict[str, Any] | None]]:
         """
