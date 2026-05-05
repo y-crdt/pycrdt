@@ -244,6 +244,13 @@ def test_invalid_client_id():
     assert "client_id must be" in str(excinfo.value)
 
 
+def test_client_id_53_bit_overflow():
+    Doc(client_id=2 ** 53 - 1)
+
+    with pytest.raises(ValueError, match="client_id cannot overflow 53 bits"):
+        Doc(client_id=2 ** 53)
+
+
 def test_invalid_skip_gc():
     with pytest.raises(ValueError) as excinfo:
         Doc(skip_gc="not_a_bool")

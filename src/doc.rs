@@ -75,6 +75,9 @@ impl Doc {
                 .map_err(|_| PyValueError::new_err("client_id must be an integer"))?
                 .extract()
                 .map_err(|_| PyValueError::new_err("client_id must be a valid u64"))?;
+            if _client_id > 9007199254740991 {  // 2 ** 53 - 1
+                return Err(PyValueError::new_err("client_id cannot overflow 53 bits"));
+            }
             options.client_id = ClientID::new(_client_id);
         }
         if !skip_gc.is_none() {
