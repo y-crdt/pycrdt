@@ -1,5 +1,14 @@
 # Version history
 
+## 0.13.0
+
+- Add transaction attribute to event.
+- Bump `yrs` to v0.26.0.
+- Bump `pyo3` to v0.28.3.
+
+This is a breaking change because document client IDs are now encoded using 53 bits (instead of 64 bits before),
+and `DeleteSet` was renamed to `IdSet`.
+
 ## 0.12.50
 
 - Fix concurrent async transactions.
