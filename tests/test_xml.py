@@ -166,6 +166,30 @@ def test_text():
     doc["test2"] = XmlFragment([XmlText()])
 
 
+def test_xmltext_embed_in_xmltext():
+    doc = Doc()
+    doc["root"] = XmlFragment()
+    root = doc["root"]
+
+    parent = XmlText()
+    root.children.insert(0, parent)
+    parent.attributes["__type"] = "table"
+
+    child = XmlText()
+    parent.insert_embed(0, child)
+    child.attributes["__type"] = "tablerow"
+
+    grandchild = XmlText()
+    child.insert_embed(0, grandchild)
+    grandchild.attributes["__type"] = "tablecell"
+    grandchild.insert(0, "cell content")
+
+    assert parent.attributes["__type"] == "table"
+    assert child.attributes["__type"] == "tablerow"
+    assert grandchild.attributes["__type"] == "tablecell"
+    assert grandchild.to_py() == "cell content"
+
+
 def test_element_with_any_attribute():
     doc = Doc()
 
