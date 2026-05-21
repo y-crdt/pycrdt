@@ -263,7 +263,14 @@ class XmlText(_XmlTraitMixin):
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
             _attrs = iter(attrs.items()) if attrs is not None else None
-            if isinstance(value, BaseType):
+            if isinstance(value, XmlElement) and value._prelim is not None:
+                assert txn._txn is not None
+                tag = value._prelim[0]
+                integrated = self.integrated.insert_xmlelement_prelim(txn._txn, index, tag, _attrs)
+                assert self._doc is not None
+                prelim = value._integrate(self._doc, integrated)
+                value._init(prelim)
+            elif isinstance(value, BaseType):
                 # shared type
                 assert txn._txn is not None
                 self._do_and_integrate("insert", value, txn._txn, index, _attrs)

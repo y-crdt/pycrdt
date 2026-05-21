@@ -190,6 +190,26 @@ def test_xmltext_embed_in_xmltext():
     assert grandchild.to_py() == "cell content"
 
 
+def test_xmlelement_embed_in_xmltext():
+    doc = Doc()
+    doc["root"] = XmlFragment()
+    root = doc["root"]
+
+    para = XmlText()
+    root.children.insert(0, para)
+    para.attributes["__type"] = "paragraph"
+
+    mention = XmlElement("mention-tag")
+    para.insert_embed(0, mention)
+    mention.attributes["__type"] = "resource-mention"
+    mention.attributes["__resource"] = {"resource_id": "abc", "resource_type": "entity"}
+
+    assert para.attributes["__type"] == "paragraph"
+    assert mention.attributes["__type"] == "resource-mention"
+    assert mention.attributes["__resource"] == {"resource_id": "abc", "resource_type": "entity"}
+    assert mention.tag == "mention-tag"
+
+
 def test_element_with_any_attribute():
     doc = Doc()
 
