@@ -1,5 +1,9 @@
 # Version history
 
+## 0.13.1
+
+- Add `insert_xmltext_prelim` and `insert_xmlelement_prelim` to `XmlText`.
+
 ## 0.13.0
 
 - Add transaction attribute to event.
