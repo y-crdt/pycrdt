@@ -307,6 +307,36 @@ impl_xml_methods!(XmlText[text, xml: text] {
         Ok(shared)
     }
 
+    #[pyo3(signature = (txn, index, attrs=None))]
+    fn insert_xmltext_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<XmlText> {
+        let mut _t = txn.transaction();
+        let mut t = _t.as_mut().unwrap().as_mut();
+        let integrated;
+        if let Some(attrs) = attrs {
+            let attrs = py_to_attrs(attrs)?;
+            integrated = self.text.insert_embed_with_attributes(&mut t, index, XmlTextPrelim::default(), attrs);
+        } else {
+            integrated = self.text.insert_embed(&mut t, index, XmlTextPrelim::default());
+        }
+        let shared = XmlText::from(integrated);
+        Ok(shared)
+    }
+
+    #[pyo3(signature = (txn, index, tag, attrs=None))]
+    fn insert_xmlelement_prelim<'py>(&self, txn: &mut Transaction, index: u32, tag: &str, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<XmlElement> {
+        let mut _t = txn.transaction();
+        let mut t = _t.as_mut().unwrap().as_mut();
+        let integrated;
+        if let Some(attrs) = attrs {
+            let attrs = py_to_attrs(attrs)?;
+            integrated = self.text.insert_embed_with_attributes(&mut t, index, XmlElementPrelim::empty(tag), attrs);
+        } else {
+            integrated = self.text.insert_embed(&mut t, index, XmlElementPrelim::empty(tag));
+        }
+        let shared = XmlElement::from(integrated);
+        Ok(shared)
+    }
+
     fn remove_range(&self, txn: &mut Transaction, index: u32, len: u32) {
         let mut _t = txn.transaction();
         let mut t = _t.as_mut().unwrap().as_mut();
