@@ -26,7 +26,7 @@ def undo_redo(data, undo_manager, val0, val1, val3):
     redone = undo_manager.redo()
     assert not redone
     assert undo_manager.can_undo()
-    undo_manager.clear()
+    undo_manager.clear_all()
     assert not undo_manager.can_undo()
 
 
@@ -303,7 +303,7 @@ def test_undo_from_restored_stack():
     insertions_bytes = saved_item.insertions.encode()
 
     # Clear the undo manager
-    undo_manager.clear()
+    undo_manager.clear_all()
     assert len(undo_manager.undo_stack) == 0
     assert str(text) == "Hello, World!"
 
@@ -343,7 +343,7 @@ def test_undo_multiple_from_restored():
     saved_items = [item for item in undo_manager.undo_stack]
 
     # Clear and restore
-    undo_manager.clear()
+    undo_manager.clear_all()
     assert len(undo_manager.undo_stack) == 0
 
     # Create new undo manager with all saved items
@@ -386,7 +386,7 @@ def test_undo_from_restored_stack_deletion():
     deletions_bytes = deletion_item.deletions.encode()
     insertions_bytes = deletion_item.insertions.encode()
     # Clear manager state (drops both items but leaves document as-is)
-    undo_manager.clear()
+    undo_manager.clear_all()
     assert len(undo_manager.undo_stack) == 0
     assert str(text) == "Hello "
 
@@ -423,7 +423,7 @@ def test_stack_item_merge_and_undo():
     merged = StackItem.merge(item1, item2)
 
     # Clear existing items and create new manager with merged item
-    undo_manager.clear()
+    undo_manager.clear_all()
     undo_manager = UndoManager(
         scopes=[text],
         undo_stack=[merged],
@@ -478,7 +478,7 @@ def test_stack_item_merge_with_meta_handler():
     assert merged.meta == {"cursor": 11, "user": "bob"}
 
     # Verify merged item works correctly in undo operations
-    undo_manager.clear()
+    undo_manager.clear_all()
     undo_manager = UndoManager(
         scopes=[text],
         undo_stack=[merged],
@@ -574,7 +574,7 @@ def test_stack_item_constructor_with_metadata():
     assert item_without_meta.meta is None
 
     # Verify it can be used in an UndoManager
-    undo_manager.clear()
+    undo_manager.clear_all()
     undo_manager = UndoManager(
         scopes=[text],
         undo_stack=[item_with_metadata],

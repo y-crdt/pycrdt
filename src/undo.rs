@@ -160,7 +160,7 @@ impl UndoManager {
         Ok(self.undo_manager.redo_blocking())
     }
 
-    pub fn clear(&mut self)  -> () {
+    pub fn clear_all(&mut self)  -> () {
         self.undo_manager.clear_all();
     }
 
