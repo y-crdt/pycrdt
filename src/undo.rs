@@ -1,3 +1,7 @@
+use futures_lite::future::FutureExt;
+use futures_task::noop_waker;
+use std::pin::pin;
+use std::task::{Context, Poll};
 use std::collections::HashSet;
 use std::sync::Arc;
 use pyo3::prelude::*;
@@ -10,7 +14,6 @@ use yrs::undo::{
     UndoManager as _UndoManager,
 };
 use yrs::sync::{Clock, Timestamp};
-use yrs::Transact;
 use yrs::updates::encoder::Encode;
 use yrs::updates::decoder::Decode;
 use crate::doc::Doc;
@@ -151,9 +154,13 @@ impl UndoManager {
     }
 
     pub fn undo(&mut self)  -> PyResult<bool> {
-        self.doc.doc.try_transact_mut()
-            .map_err(|_| PyRuntimeError::new_err("Cannot acquire transaction"))?;
-        Ok(self.undo_manager.undo_blocking())
+        let mut future = pin!(self.undo_manager.undo());
+        let waker = noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        match future.poll(&mut cx) {
+            Poll::Ready(value) => { Ok(value) }
+            Poll::Pending => { Err(PyRuntimeError::new_err("Cannot acquire transaction")) }
+        }
     }
 
     pub fn can_redo(&mut self)  -> bool {
@@ -161,9 +168,13 @@ impl UndoManager {
     }
 
     pub fn redo(&mut self)  -> PyResult<bool> {
-        self.doc.doc.try_transact_mut()
-            .map_err(|_| PyRuntimeError::new_err("Cannot acquire transaction"))?;
-        Ok(self.undo_manager.redo_blocking())
+        let mut future = pin!(self.undo_manager.redo());
+        let waker = noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        match future.poll(&mut cx) {
+            Poll::Ready(value) => { Ok(value) }
+            Poll::Pending => { Err(PyRuntimeError::new_err("Cannot acquire transaction")) }
+        }
     }
 
     pub fn clear_all(&mut self)  -> () {
