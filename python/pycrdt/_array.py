@@ -138,20 +138,6 @@ class Array(Sequence, Generic[T]):
             del self[index]
             return res
 
-    def move(self, source_index: int, destination_index: int) -> None:
-        """
-        Moves an item in the array from a source index to a destination index.
-
-        Args:
-            source_index: The index of the item to move.
-            destination_index: The index where the item will be inserted.
-        """
-        with self.doc.transaction() as txn:
-            self._forbid_read_transaction(txn)
-            source_index = self._check_index(source_index)
-            destination_index = self._check_index(destination_index)
-            self.integrated.move_to(txn._txn, source_index, destination_index)
-
     def __add__(self, value: list[T]) -> Array[T]:
         """
         Extends the array with a list of items:

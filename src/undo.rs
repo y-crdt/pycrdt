@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyBytes};
-use pyo3::exceptions::PyRuntimeError;
 use yrs::IdSet as _IdSet;
 use yrs::undo::{
     Options,
@@ -79,6 +78,7 @@ impl Clock for PythonClock {
 #[pyclass(unsendable)]
 pub struct UndoManager {
     undo_manager: _UndoManager<PyMeta>,
+    doc: Doc,
 }
 
 #[pymethods]
@@ -91,32 +91,49 @@ impl UndoManager {
         undo_stack: Vec<StackItem>,
         redo_stack: Vec<StackItem>,
     ) -> Self {
+        let doc_guid = doc.doc.guid();
+        let init_undo_stack = undo_stack.into_iter().map(|s| {
+            _StackItem::with_meta(
+                doc_guid.clone(),
+                s.stack_item.deletions().clone(),
+                s.stack_item.insertions().clone(),
+                s.stack_item.meta().clone(),
+            )
+        }).collect();
+        let init_redo_stack = redo_stack.into_iter().map(|s| {
+            _StackItem::with_meta(
+                doc_guid.clone(),
+                s.stack_item.deletions().clone(),
+                s.stack_item.insertions().clone(),
+                s.stack_item.meta().clone(),
+            )
+        }).collect();
         let options = Options::<PyMeta> {
             capture_timeout_millis,
             tracked_origins: HashSet::new(),
             capture_transaction: None,
             timestamp: Arc::new(PythonClock {timestamp}),
-            init_undo_stack: undo_stack.into_iter().map(|s| s.stack_item).collect(),
-            init_redo_stack: redo_stack.into_iter().map(|s| s.stack_item).collect(),
+            init_undo_stack,
+            init_redo_stack,
         };
-        let undo_manager = _UndoManager::with_options(&doc.doc, options);
-        UndoManager { undo_manager }
+        let undo_manager = _UndoManager::with_options(options);
+        UndoManager { undo_manager, doc: doc.clone() }
     }
 
     pub fn expand_scope_text(&mut self, scope: &Text) {
-        self.undo_manager.expand_scope(&scope.text);
+        self.undo_manager.expand_scope(&self.doc.doc, &scope.text);
     }
 
     pub fn expand_scope_array(&mut self, scope: &Array) {
-        self.undo_manager.expand_scope(&scope.array);
+        self.undo_manager.expand_scope(&self.doc.doc, &scope.array);
     }
 
     pub fn expand_scope_map(&mut self, scope: &Map) {
-        self.undo_manager.expand_scope(&scope.map);
+        self.undo_manager.expand_scope(&self.doc.doc, &scope.map);
     }
 
     pub fn expand_scope_xmlfragment(&mut self, scope: &XmlFragment) {
-        self.undo_manager.expand_scope(&scope.fragment);
+        self.undo_manager.expand_scope(&self.doc.doc, &scope.fragment);
     }
 
     pub fn include_origin(&mut self, origin: i128) {
@@ -132,12 +149,7 @@ impl UndoManager {
     }
 
     pub fn undo(&mut self)  -> PyResult<bool> {
-        if let Ok(res) = self.undo_manager.try_undo() {
-            return Ok(res);
-        }
-        else {
-            return Err(PyRuntimeError::new_err("Cannot acquire transaction"));
-        }
+        Ok(self.undo_manager.undo_blocking())
     }
 
     pub fn can_redo(&mut self)  -> bool {
@@ -145,16 +157,11 @@ impl UndoManager {
     }
 
     pub fn redo(&mut self)  -> PyResult<bool> {
-        if let Ok(res) = self.undo_manager.try_redo() {
-            return Ok(res);
-        }
-        else {
-            return Err(PyRuntimeError::new_err("Cannot acquire transaction"));
-        }
+        Ok(self.undo_manager.redo_blocking())
     }
 
     pub fn clear(&mut self)  -> () {
-        self.undo_manager.clear();
+        self.undo_manager.clear_all();
     }
 
     pub fn undo_stack<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyList> {
@@ -195,6 +202,7 @@ impl StackItem {
     #[pyo3(signature = (deletions, insertions, meta=None))]
     pub fn new(deletions: &IdSet, insertions: &IdSet, meta: Option<Py<PyAny>>) -> Self {
         let stack_item = _StackItem::with_meta(
+            Arc::from(""),
             deletions.id_set.clone(),
             insertions.id_set.clone(),
             PyMeta(meta),
