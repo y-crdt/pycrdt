@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from time import time_ns
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
 from ._base import BaseType
 from ._pycrdt import (
@@ -12,9 +12,6 @@ from ._pycrdt import (
 )
 from ._transaction import hash_origin
 
-if TYPE_CHECKING:
-    from ._doc import Doc
-
 
 def timestamp() -> int:
     return time_ns() // 1_000_000
@@ -23,9 +20,7 @@ def timestamp() -> int:
 class UndoManager:
     """
     The undo manager allows to perform undo/redo operations on shared types.
-    It can be initialized either with a [Doc][pycrdt.Doc] or with scopes.
     Scopes are a list of shared types integrated in a document.
-    If initialized with a `Doc`, scopes can later be expanded.
     Changes can be undone/redone by batches using time intervals.
     It is possible to include/exclude changes by transaction origin in undo/redo operations.
     """
@@ -33,8 +28,7 @@ class UndoManager:
     def __init__(
         self,
         *,
-        doc: Doc | None = None,
-        scopes: list[BaseType] = [],
+        scopes: list[BaseType] | None = None,
         capture_timeout_millis: int = 500,
         timestamp: Callable[[], int] = timestamp,
         undo_stack: list[StackItem] | None = None,
@@ -42,31 +36,21 @@ class UndoManager:
     ) -> None:
         """
         Args:
-            doc: The document the undo manager will work with.
             scopes: A list of shared types the undo manager will work with.
             capture_timeout_millis: A time interval for grouping changes that will be undone/redone.
             timestamp: A function that returns a timestamp as an integer number of milli-seconds.
             undo_stack: Pre-filled undo stack items.
             redo_stack: Pre-filled redo stack items.
-
-        Raises:
-            RuntimeError: UndoManager must be created with doc or scopes.
         """
-        if doc is None:
-            if not scopes:
-                raise RuntimeError("UndoManager must be created with doc or scopes")
-            doc = scopes[0].doc
-        elif scopes:
-            raise RuntimeError("UndoManager must be created with doc or scopes")
         self._undo_manager = _UndoManager(
-            doc._doc,
             capture_timeout_millis,
             timestamp,
             undo_stack or [],
             redo_stack or [],
         )
-        for scope in scopes:
-            self.expand_scope(scope)
+        if scopes:
+            for scope in scopes:
+                self.expand_scope(scope)
 
     def expand_scope(self, scope: BaseType) -> None:
         """
@@ -76,7 +60,7 @@ class UndoManager:
             scope: The shared type to include.
         """
         method = getattr(self._undo_manager, f"expand_scope_{scope.type_name}")
-        method(scope._integrated)
+        method(scope.doc._doc, scope._integrated)
 
     def include_origin(self, origin: Any) -> None:
         """

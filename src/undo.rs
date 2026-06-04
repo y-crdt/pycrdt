@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 use std::collections::HashSet;
 use std::sync::Arc;
 use pyo3::prelude::*;
-use pyo3::exceptions::PyRuntimeError;
+use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::types::{PyList, PyBytes};
 use yrs::IdSet as _IdSet;
 use yrs::undo::{
@@ -83,35 +83,22 @@ impl Clock for PythonClock {
 #[pyclass(unsendable)]
 pub struct UndoManager {
     undo_manager: _UndoManager<PyMeta>,
-    doc: Doc,
 }
 
 #[pymethods]
 impl UndoManager {
     #[new]
     fn new(
-        doc: &Doc,
         capture_timeout_millis: u64,
         timestamp: Py<PyAny>,
         undo_stack: Vec<StackItem>,
         redo_stack: Vec<StackItem>,
     ) -> Self {
-        let doc_guid = doc.doc.guid();
         let init_undo_stack = undo_stack.into_iter().map(|s| {
-            _StackItem::with_meta(
-                doc_guid.clone(),
-                s.stack_item.deletions().clone(),
-                s.stack_item.insertions().clone(),
-                s.stack_item.meta().clone(),
-            )
+            s.stack_item
         }).collect();
         let init_redo_stack = redo_stack.into_iter().map(|s| {
-            _StackItem::with_meta(
-                doc_guid.clone(),
-                s.stack_item.deletions().clone(),
-                s.stack_item.insertions().clone(),
-                s.stack_item.meta().clone(),
-            )
+            s.stack_item
         }).collect();
         let options = Options::<PyMeta> {
             capture_timeout_millis,
@@ -122,23 +109,23 @@ impl UndoManager {
             init_redo_stack,
         };
         let undo_manager = _UndoManager::with_options(options);
-        UndoManager { undo_manager, doc: doc.clone() }
+        UndoManager { undo_manager }
     }
 
-    pub fn expand_scope_text(&mut self, scope: &Text) {
-        self.undo_manager.expand_scope(&self.doc.doc, &scope.text);
+    pub fn expand_scope_text(&mut self, doc: &Doc, scope: &Text) {
+        self.undo_manager.expand_scope(&doc.doc, &scope.text);
     }
 
-    pub fn expand_scope_array(&mut self, scope: &Array) {
-        self.undo_manager.expand_scope(&self.doc.doc, &scope.array);
+    pub fn expand_scope_array(&mut self, doc: &Doc, scope: &Array) {
+        self.undo_manager.expand_scope(&doc.doc, &scope.array);
     }
 
-    pub fn expand_scope_map(&mut self, scope: &Map) {
-        self.undo_manager.expand_scope(&self.doc.doc, &scope.map);
+    pub fn expand_scope_map(&mut self, doc: &Doc, scope: &Map) {
+        self.undo_manager.expand_scope(&doc.doc, &scope.map);
     }
 
-    pub fn expand_scope_xmlfragment(&mut self, scope: &XmlFragment) {
-        self.undo_manager.expand_scope(&self.doc.doc, &scope.fragment);
+    pub fn expand_scope_xmlfragment(&mut self, doc: &Doc, scope: &XmlFragment) {
+        self.undo_manager.expand_scope(&doc.doc, &scope.fragment);
     }
 
     pub fn include_origin(&mut self, origin: i128) {
@@ -213,18 +200,25 @@ impl StackItem {
 
 #[pymethods]
 impl StackItem {
-    /// Create a new StackItem with deletions, insertions, and optional metadata
-    /// Metadata can be any Python object (dict, string, int, etc.)
+    /// Create a new StackItem with a document, deletions, insertions, and optional metadata.
+    /// Metadata can be any Python object (dict, string, int, etc.).
     #[new]
-    #[pyo3(signature = (deletions, insertions, meta=None))]
-    pub fn new(deletions: &IdSet, insertions: &IdSet, meta: Option<Py<PyAny>>) -> Self {
+    #[pyo3(signature = (doc, deletions, insertions, meta=None))]
+    pub fn new(doc: Bound<PyAny>, deletions: &IdSet, insertions: &IdSet, meta: Option<Py<PyAny>>) -> PyResult<Self> {
+        let _doc = if let Ok(d) = doc.extract::<Doc>() {
+            d
+        } else if let Ok(attr) = doc.getattr("_doc") {
+            attr.extract::<Doc>()?
+        } else {
+            return Err(PyTypeError::new_err("'doc' must be a Doc or pycrdt.Doc"));
+        };
         let stack_item = _StackItem::with_meta(
-            Arc::from(""),
+            _doc.doc.guid(),
             deletions.id_set.clone(),
             insertions.id_set.clone(),
             PyMeta(meta),
         );
-        StackItem { stack_item }
+        Ok(StackItem { stack_item })
     }
 
     /// Get the deletions IdSet as a Python property

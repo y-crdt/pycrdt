@@ -362,7 +362,6 @@ class UndoManager:
 
     def __init__(
         self,
-        doc: Doc,
         capture_timeout_millis: int,
         timestamp: Callable[[], int],
         undo_stack: list[StackItem] | None = None,
@@ -370,7 +369,7 @@ class UndoManager:
     ) -> None:
         """Creates an undo manager."""
 
-    def expand_scope(self, scope: Text | Array | Map) -> None:
+    def expand_scope(self, doc: Doc, scope: Text | Array | Map) -> None:
         """Extends a list of shared types tracked by current undo manager by a given scope."""
 
     def include_origin(self, origin: int) -> None:
@@ -420,10 +419,13 @@ class StackItem(Generic[MetaT]):
     compressed information about all updates and deletions tracked by it.
     """
 
-    def __init__(self, deletions: IdSet, insertions: IdSet, meta: MetaT | None = None) -> None:
+    def __init__(
+        self, doc: Doc, deletions: IdSet, insertions: IdSet, meta: MetaT | None = None
+    ) -> None:
         """Create a new StackItem.
 
         Args:
+            doc: The document this stack item belongs to.
             deletions: The IdSet of deletions.
             insertions: The IdSet of insertions.
             meta: Optional metadata (can be any Python object).
