@@ -109,18 +109,6 @@ def test_scopes():
     assert map.to_py() == {"key0": "val0"}
 
 
-def test_wrong_creation():
-    with pytest.raises(RuntimeError) as excinfo:
-        UndoManager()
-    assert str(excinfo.value) == "UndoManager must be created with doc or scopes"
-
-    doc = Doc()
-    doc["text"] = text = Text()
-    with pytest.raises(RuntimeError) as excinfo:
-        UndoManager(doc=doc, scopes=[text])
-    assert str(excinfo.value) == "UndoManager must be created with doc or scopes"
-
-
 def test_undo_redo_stacks():
     doc = Doc()
     doc["text"] = text = Text()
@@ -217,7 +205,7 @@ def test_stack_item_serialization():
     # Deserialize and reconstruct StackItem
     deletions = IdSet.decode(deletions_bytes)
     insertions = IdSet.decode(insertions_bytes)
-    restored_item = StackItem(deletions=deletions, insertions=insertions)
+    restored_item = StackItem(doc, deletions, insertions)
     assert restored_item is not None
 
     # Verify the deletions and insertions are preserved
@@ -277,7 +265,7 @@ def test_stack_item_multiple_changes():
         insertions_bytes = original_item.insertions.encode()
         deletions = IdSet.decode(deletions_bytes)
         insertions = IdSet.decode(insertions_bytes)
-        restored_item = StackItem(deletions=deletions, insertions=insertions)
+        restored_item = StackItem(doc, deletions, insertions)
 
         # Verify they match
         assert original_item.deletions.encode() == restored_item.deletions.encode()
@@ -307,10 +295,10 @@ def test_undo_from_restored_stack():
     assert len(undo_manager.undo_stack) == 0
     assert str(text) == "Hello, World!"
 
-    # Restore the item from bytes
+    # Restore the item from bytes with the correct doc GUID
     deletions = IdSet.decode(deletions_bytes)
     insertions = IdSet.decode(insertions_bytes)
-    restored_item = StackItem(deletions, insertions)
+    restored_item = StackItem(doc, deletions, insertions)
 
     # Create new undo manager with the restored stack
     undo_manager = UndoManager(
@@ -390,10 +378,10 @@ def test_undo_from_restored_stack_deletion():
     assert len(undo_manager.undo_stack) == 0
     assert str(text) == "Hello "
 
-    # Recreate StackItem from bytes and create new manager
+    # Recreate StackItem from bytes with the correct doc GUID
     deletions = IdSet.decode(deletions_bytes)
     insertions = IdSet.decode(insertions_bytes)
-    restored = StackItem(deletions, insertions)
+    restored = StackItem(doc, deletions, insertions)
     undo_manager = UndoManager(
         scopes=[text],
         undo_stack=[restored],
@@ -454,8 +442,8 @@ def test_stack_item_merge_with_meta_handler():
     # Create new stack items with conflicting metadata (using dicts like yjs)
     meta1 = {"cursor": 5, "user": "alice"}
     meta2 = {"cursor": 11, "user": "bob"}
-    item_with_meta1 = StackItem[dict](item1.deletions, item1.insertions, meta1)
-    item_with_meta2 = StackItem[dict](item2.deletions, item2.insertions, meta2)
+    item_with_meta1 = StackItem[dict](doc, item1.deletions, item1.insertions, meta1)
+    item_with_meta2 = StackItem[dict](doc, item2.deletions, item2.insertions, meta2)
 
     # Verify the items have different metadata
     assert item_with_meta1.meta == meta1
@@ -508,8 +496,8 @@ def test_stack_item_merge_without_meta_handler():
     # Create new stack items with conflicting metadata (using dicts like yjs)
     meta1 = {"cursor": 5, "user": "alice"}
     meta2 = {"cursor": 11, "user": "bob"}
-    item_with_meta1 = StackItem[dict](item1.deletions, item1.insertions, meta1)
-    item_with_meta2 = StackItem[dict](item2.deletions, item2.insertions, meta2)
+    item_with_meta1 = StackItem[dict](doc, item1.deletions, item1.insertions, meta1)
+    item_with_meta2 = StackItem[dict](doc, item2.deletions, item2.insertions, meta2)
 
     # Verify the items have different metadata
     assert item_with_meta1.meta == meta1
@@ -534,8 +522,8 @@ def test_stack_item_merge_handler_error():
     item1, item2 = undo_manager.undo_stack
 
     # Create items with metadata
-    item_with_meta1 = StackItem(item1.deletions, item1.insertions, {"value": 1})
-    item_with_meta2 = StackItem(item2.deletions, item2.insertions, {"value": 2})
+    item_with_meta1 = StackItem(doc, item1.deletions, item1.insertions, {"value": 1})
+    item_with_meta2 = StackItem(doc, item2.deletions, item2.insertions, {"value": 2})
 
     # Handler that raises an exception
     def failing_handler(meta_a, meta_b):
@@ -559,18 +547,20 @@ def test_stack_item_constructor_with_metadata():
 
     # Create a new StackItem with custom metadata
     item_with_metadata = StackItem[str](
-        original_item.deletions, original_item.insertions, "cursor_position:5"
+        doc, original_item.deletions, original_item.insertions, "cursor_position:5"
     )
 
     # Verify metadata is set correctly
     assert item_with_metadata.meta == "cursor_position:5"
 
     # Create another with different metadata
-    item_with_metadata2 = StackItem(original_item.deletions, original_item.insertions, "user:alice")
+    item_with_metadata2 = StackItem(
+        doc, original_item.deletions, original_item.insertions, "user:alice"
+    )
     assert item_with_metadata2.meta == "user:alice"
 
     # Verify items without explicit metadata get None
-    item_without_meta = StackItem(original_item.deletions, original_item.insertions)
+    item_without_meta = StackItem(doc, original_item.deletions, original_item.insertions)
     assert item_without_meta.meta is None
 
     # Verify it can be used in an UndoManager

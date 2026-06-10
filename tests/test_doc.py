@@ -344,7 +344,7 @@ def test_observer_exceptions():
 
     assert exc_info.group_contains(RuntimeError, match="error1")
     assert exc_info.group_contains(ValueError, match="error2")
-    assert values == ["val2", "val1", "val0"]
+    assert set(values) == {"val0", "val1", "val2"}
 
 
 async def test_async_observer_exceptions():

@@ -1,8 +1,12 @@
+use futures_lite::future::FutureExt;
+use futures_task::noop_waker;
+use std::pin::pin;
+use std::task::{Context, Poll};
 use std::collections::HashSet;
 use std::sync::Arc;
 use pyo3::prelude::*;
+use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::types::{PyList, PyBytes};
-use pyo3::exceptions::PyRuntimeError;
 use yrs::IdSet as _IdSet;
 use yrs::undo::{
     Options,
@@ -85,38 +89,43 @@ pub struct UndoManager {
 impl UndoManager {
     #[new]
     fn new(
-        doc: &Doc,
         capture_timeout_millis: u64,
         timestamp: Py<PyAny>,
         undo_stack: Vec<StackItem>,
         redo_stack: Vec<StackItem>,
     ) -> Self {
+        let init_undo_stack = undo_stack.into_iter().map(|s| {
+            s.stack_item
+        }).collect();
+        let init_redo_stack = redo_stack.into_iter().map(|s| {
+            s.stack_item
+        }).collect();
         let options = Options::<PyMeta> {
             capture_timeout_millis,
             tracked_origins: HashSet::new(),
             capture_transaction: None,
             timestamp: Arc::new(PythonClock {timestamp}),
-            init_undo_stack: undo_stack.into_iter().map(|s| s.stack_item).collect(),
-            init_redo_stack: redo_stack.into_iter().map(|s| s.stack_item).collect(),
+            init_undo_stack,
+            init_redo_stack,
         };
-        let undo_manager = _UndoManager::with_options(&doc.doc, options);
+        let undo_manager = _UndoManager::with_options(options);
         UndoManager { undo_manager }
     }
 
-    pub fn expand_scope_text(&mut self, scope: &Text) {
-        self.undo_manager.expand_scope(&scope.text);
+    pub fn expand_scope_text(&mut self, doc: &Doc, scope: &Text) {
+        self.undo_manager.expand_scope(&doc.doc, &scope.text);
     }
 
-    pub fn expand_scope_array(&mut self, scope: &Array) {
-        self.undo_manager.expand_scope(&scope.array);
+    pub fn expand_scope_array(&mut self, doc: &Doc, scope: &Array) {
+        self.undo_manager.expand_scope(&doc.doc, &scope.array);
     }
 
-    pub fn expand_scope_map(&mut self, scope: &Map) {
-        self.undo_manager.expand_scope(&scope.map);
+    pub fn expand_scope_map(&mut self, doc: &Doc, scope: &Map) {
+        self.undo_manager.expand_scope(&doc.doc, &scope.map);
     }
 
-    pub fn expand_scope_xmlfragment(&mut self, scope: &XmlFragment) {
-        self.undo_manager.expand_scope(&scope.fragment);
+    pub fn expand_scope_xmlfragment(&mut self, doc: &Doc, scope: &XmlFragment) {
+        self.undo_manager.expand_scope(&doc.doc, &scope.fragment);
     }
 
     pub fn include_origin(&mut self, origin: i128) {
@@ -132,11 +141,12 @@ impl UndoManager {
     }
 
     pub fn undo(&mut self)  -> PyResult<bool> {
-        if let Ok(res) = self.undo_manager.try_undo() {
-            return Ok(res);
-        }
-        else {
-            return Err(PyRuntimeError::new_err("Cannot acquire transaction"));
+        let mut future = pin!(self.undo_manager.undo());
+        let waker = noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        match future.poll(&mut cx) {
+            Poll::Ready(value) => { Ok(value) }
+            Poll::Pending => { Err(PyRuntimeError::new_err("Cannot acquire transaction")) }
         }
     }
 
@@ -145,16 +155,17 @@ impl UndoManager {
     }
 
     pub fn redo(&mut self)  -> PyResult<bool> {
-        if let Ok(res) = self.undo_manager.try_redo() {
-            return Ok(res);
-        }
-        else {
-            return Err(PyRuntimeError::new_err("Cannot acquire transaction"));
+        let mut future = pin!(self.undo_manager.redo());
+        let waker = noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        match future.poll(&mut cx) {
+            Poll::Ready(value) => { Ok(value) }
+            Poll::Pending => { Err(PyRuntimeError::new_err("Cannot acquire transaction")) }
         }
     }
 
-    pub fn clear(&mut self)  -> () {
-        self.undo_manager.clear();
+    pub fn clear_all(&mut self)  -> () {
+        self.undo_manager.clear_all();
     }
 
     pub fn undo_stack<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyList> {
@@ -189,17 +200,25 @@ impl StackItem {
 
 #[pymethods]
 impl StackItem {
-    /// Create a new StackItem with deletions, insertions, and optional metadata
-    /// Metadata can be any Python object (dict, string, int, etc.)
+    /// Create a new StackItem with a document, deletions, insertions, and optional metadata.
+    /// Metadata can be any Python object (dict, string, int, etc.).
     #[new]
-    #[pyo3(signature = (deletions, insertions, meta=None))]
-    pub fn new(deletions: &IdSet, insertions: &IdSet, meta: Option<Py<PyAny>>) -> Self {
+    #[pyo3(signature = (doc, deletions, insertions, meta=None))]
+    pub fn new(doc: Bound<PyAny>, deletions: &IdSet, insertions: &IdSet, meta: Option<Py<PyAny>>) -> PyResult<Self> {
+        let _doc = if let Ok(d) = doc.extract::<Doc>() {
+            d
+        } else if let Ok(attr) = doc.getattr("_doc") {
+            attr.extract::<Doc>()?
+        } else {
+            return Err(PyTypeError::new_err("'doc' must be a Doc or pycrdt.Doc"));
+        };
         let stack_item = _StackItem::with_meta(
+            _doc.doc.guid(),
             deletions.id_set.clone(),
             insertions.id_set.clone(),
             PyMeta(meta),
         );
-        StackItem { stack_item }
+        Ok(StackItem { stack_item })
     }
 
     /// Get the deletions IdSet as a Python property
