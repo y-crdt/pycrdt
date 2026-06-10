@@ -1,5 +1,12 @@
 # Version history
 
+## 0.14.0
+
+- Remove `Array.move` method.
+- `UndoManager` doesn't accept a `doc` anymore.
+
+This is a breaking change because it uses Yrs v0.27.0 which is also a breaking change.
+
 ## 0.13.1
 
 - Add `insert_xmltext_prelim` and `insert_xmlelement_prelim` to `XmlText`.
