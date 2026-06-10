@@ -112,7 +112,7 @@ class UndoManager:
         """
         return self._undo_manager.redo()
 
-    def clear_all(self) -> None:
+    def clear(self) -> None:
         """
         Clears all [StackItem][pycrdt.StackItem]s stored in this undo manager,
         effectively resetting its state.

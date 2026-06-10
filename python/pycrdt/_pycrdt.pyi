@@ -390,7 +390,7 @@ class UndoManager:
     def redo(self) -> bool:
         """Redo last action previously undone by current undo manager."""
 
-    def clear_all(self) -> None:
+    def clear(self) -> None:
         """Clear all items stored within current undo manager."""
 
     def undo_stack(self) -> list[StackItem]:
