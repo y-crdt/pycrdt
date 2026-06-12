@@ -184,9 +184,6 @@ class Array:
     def insert(self, txn: Transaction, index: int, value: Any) -> None:
         """Inserts `value` at the given `index`."""
 
-    def move_to(self, txn: Transaction, source: int, target: int) -> None:
-        """Moves element found at `source` index into `target` index position.."""
-
     def remove_range(self, txn: Transaction, index: int, len: int) -> None:
         """Removes 'len' elements starting at provided `index`."""
 
@@ -374,7 +371,6 @@ class UndoManager:
 
     def __init__(
         self,
-        doc: Doc,
         capture_timeout_millis: int,
         timestamp: Callable[[], int],
         undo_stack: list[StackItem] | None = None,
@@ -382,7 +378,7 @@ class UndoManager:
     ) -> None:
         """Creates an undo manager."""
 
-    def expand_scope(self, scope: Text | Array | Map) -> None:
+    def expand_scope(self, doc: Doc, scope: Text | Array | Map) -> None:
         """Extends a list of shared types tracked by current undo manager by a given scope."""
 
     def include_origin(self, origin: int) -> None:
@@ -403,7 +399,7 @@ class UndoManager:
     def redo(self) -> bool:
         """Redo last action previously undone by current undo manager."""
 
-    def clear(self) -> None:
+    def clear_all(self) -> None:
         """Clear all items stored within current undo manager."""
 
     def undo_stack(self) -> list[StackItem]:
@@ -412,18 +408,18 @@ class UndoManager:
     def redo_stack(self) -> list[StackItem]:
         """Returns the undo manager's redo stack."""
 
-class DeleteSet:
+class IdSet:
     """A set of deletions in a CRDT document."""
 
     def __init__(self) -> None:
-        """Create a new empty DeleteSet."""
+        """Create a new empty IdSet."""
 
     def encode(self) -> bytes:
-        """Encode the DeleteSet to bytes."""
+        """Encode the IdSet to bytes."""
 
     @staticmethod
-    def decode(data: bytes) -> DeleteSet:
-        """Decode a DeleteSet from bytes."""
+    def decode(data: bytes) -> IdSet:
+        """Decode a IdSet from bytes."""
 
 MetaT = TypeVar("MetaT")
 
@@ -433,23 +429,24 @@ class StackItem(Generic[MetaT]):
     """
 
     def __init__(
-        self, deletions: DeleteSet, insertions: DeleteSet, meta: MetaT | None = None
+        self, doc: Doc, deletions: IdSet, insertions: IdSet, meta: MetaT | None = None
     ) -> None:
         """Create a new StackItem.
 
         Args:
-            deletions: The DeleteSet of deletions.
-            insertions: The DeleteSet of insertions.
+            doc: The document this stack item belongs to.
+            deletions: The IdSet of deletions.
+            insertions: The IdSet of insertions.
             meta: Optional metadata (can be any Python object).
         """
 
     @property
-    def deletions(self) -> DeleteSet:
-        """Get the deletions DeleteSet."""
+    def deletions(self) -> IdSet:
+        """Get the deletions IdSet."""
 
     @property
-    def insertions(self) -> DeleteSet:
-        """Get the insertions DeleteSet."""
+    def insertions(self) -> IdSet:
+        """Get the insertions IdSet."""
 
     @property
     def meta(self) -> MetaT | None:

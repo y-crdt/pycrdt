@@ -166,6 +166,50 @@ def test_text():
     doc["test2"] = XmlFragment([XmlText()])
 
 
+def test_xmltext_embed_in_xmltext():
+    doc = Doc()
+    doc["root"] = XmlFragment()
+    root = doc["root"]
+
+    parent = XmlText()
+    root.children.insert(0, parent)
+    parent.attributes["__type"] = "table"
+
+    child = XmlText()
+    parent.insert_embed(0, child)
+    child.attributes["__type"] = "tablerow"
+
+    grandchild = XmlText()
+    child.insert_embed(0, grandchild)
+    grandchild.attributes["__type"] = "tablecell"
+    grandchild.insert(0, "cell content")
+
+    assert parent.attributes["__type"] == "table"
+    assert child.attributes["__type"] == "tablerow"
+    assert grandchild.attributes["__type"] == "tablecell"
+    assert grandchild.to_py() == "cell content"
+
+
+def test_xmlelement_embed_in_xmltext():
+    doc = Doc()
+    doc["root"] = XmlFragment()
+    root = doc["root"]
+
+    para = XmlText()
+    root.children.insert(0, para)
+    para.attributes["__type"] = "paragraph"
+
+    mention = XmlElement("mention-tag")
+    para.insert_embed(0, mention)
+    mention.attributes["__type"] = "resource-mention"
+    mention.attributes["__resource"] = {"resource_id": "abc", "resource_type": "entity"}
+
+    assert para.attributes["__type"] == "paragraph"
+    assert mention.attributes["__type"] == "resource-mention"
+    assert mention.attributes["__resource"] == {"resource_id": "abc", "resource_type": "entity"}
+    assert mention.tag == "mention-tag"
+
+
 def test_element_with_any_attribute():
     doc = Doc()
 

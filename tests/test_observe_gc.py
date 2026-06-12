@@ -21,6 +21,9 @@ def test_observe_bound_method_gc(method):
     sub = getattr(map_, method)(observer.on_change)
     map_["key"] = "value"
     map_.unobserve(sub)
+    # force Yrs observer to drain pending callback removals (Yrs 0.27.0+ defers removal)
+    dummy = getattr(map_, method)(lambda _: None)
+    map_.unobserve(dummy)
     del observer
     gc.collect()
     assert freed, "Observer was not garbage collected after unobserve()"

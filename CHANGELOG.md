@@ -1,5 +1,25 @@
 # Version history
 
+## 0.14.0
+
+- Remove `Array.move` method.
+- `UndoManager` doesn't accept a `doc` anymore.
+
+This is a breaking change because it uses Yrs v0.27.0 which is also a breaking change.
+
+## 0.13.1
+
+- Add `insert_xmltext_prelim` and `insert_xmlelement_prelim` to `XmlText`.
+
+## 0.13.0
+
+- Add transaction attribute to event.
+- Bump `yrs` to v0.26.0.
+- Bump `pyo3` to v0.28.3.
+
+This is a breaking change because document client IDs are now encoded using 53 bits (instead of 64 bits before),
+and `DeleteSet` was renamed to `IdSet`.
+
 ## 0.12.50
 
 - Fix concurrent async transactions.

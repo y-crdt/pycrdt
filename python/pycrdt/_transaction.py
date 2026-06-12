@@ -9,8 +9,11 @@ from anyio import create_task_group, to_thread
 
 from ._pycrdt import Transaction as _Transaction
 
-if sys.version_info < (3, 11):
-    from exceptiongroup import ExceptionGroup  # pragma: no cover
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:  # pragma: nocover
+    from exceptiongroup import ExceptionGroup
+    from typing_extensions import Self
 
 if TYPE_CHECKING:
     from ._doc import Doc
@@ -50,7 +53,7 @@ class Transaction:
             doc._origins[self._origin_hash] = origin
         self._timeout = -1 if timeout is None else timeout
 
-    def __enter__(self, _acquire_transaction: bool = True) -> Transaction:
+    def __enter__(self, _acquire_transaction: bool = True) -> Self:
         self._leases += 1
         if self._txn is None:
             if (
@@ -94,7 +97,7 @@ class Transaction:
                 self._txn = None
                 self._doc._txn = None
 
-    async def __aenter__(self, _acquire_transaction: bool = True) -> Transaction:
+    async def __aenter__(self, _acquire_transaction: bool = True) -> Self:
         if self._leases == 0:
             self._doc._task_group = await create_task_group().__aenter__()
         elif self._doc._task_group is None:
@@ -147,7 +150,7 @@ class NewTransaction(Transaction):
     ```
     """
 
-    async def __aenter__(self) -> Transaction:  # type: ignore[override]
+    async def __aenter__(self) -> Self:  # type: ignore[override]
         if self._doc._allow_multithreading:
             if not await to_thread.run_sync(
                 partial(self._doc._txn_lock.acquire, timeout=self._timeout), abandon_on_cancel=True

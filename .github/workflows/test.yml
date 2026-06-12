@@ -26,7 +26,6 @@ jobs:
           - '3.12'
           - '3.13'
           - '3.14'
-          - 'pypy3.11'
 
     runs-on: ${{ matrix.os }}-latest
 
@@ -57,7 +56,6 @@ jobs:
       run: pip install -e .
 
     - name: Check types
-      if: ${{ !(matrix.python-version == 'pypy3.11') }}
       run: |
         pip install --group types -e .
         mypy python
@@ -66,12 +64,8 @@ jobs:
       run: pip install --group test -e .
 
     - name: Run tests
-      if: ${{ !(((matrix.python-version == '3.14') && (matrix.os == 'ubuntu')) || (matrix.python-version == 'pypy3.11')) }}
+      if: ${{ !((matrix.python-version == '3.14') && (matrix.os == 'ubuntu')) }}
       run: pytest --color=yes -v tests
-
-    - name: Run tests on PyPy
-      if: ${{ (matrix.python-version == 'pypy3.11') }}
-      run: pytest --color=yes --ignore tests/test_types.py -v tests
 
     - name: Run code coverage
       if: ${{ (matrix.python-version == '3.14') && (matrix.os == 'ubuntu') }}

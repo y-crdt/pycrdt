@@ -131,7 +131,9 @@ def test_observe():
 
     sid4 = array.observe_deep(cb)
     array.append("bar")
-    assert str(deep_events[0][0]) == """{target: ["bar"], delta: [{'insert': ['bar']}], path: []}"""
+    assert str(deep_events[0][0]).startswith(
+        """{target: ["bar"], delta: [{'insert': ['bar']}], path: [],"""
+    )
     deep_events.clear()
     array.unobserve(sid4)
     array.append("baz")
@@ -228,13 +230,6 @@ def test_api():
 
     array = Array()
     assert array.to_py() is None
-
-
-def test_move():
-    doc = Doc()
-    doc["array"] = array = Array([1, 2, 3, 4])
-    array.move(1, 3)
-    assert str(array) == "[1,3,2,4]"
 
 
 def test_to_py():

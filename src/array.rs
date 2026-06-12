@@ -111,13 +111,6 @@ impl Array {
         Ok(())
     }
 
-    fn move_to(&self, txn: &mut Transaction, source: u32, target: u32) -> PyResult<()> {
-        let mut _t = txn.transaction();
-        let mut t = _t.as_mut().unwrap().as_mut();
-        self.array.move_to(&mut t, source, target);
-        Ok(())
-    }
-
     fn remove_range(&self, txn: &mut Transaction, index: u32, len: u32) -> PyResult<()> {
         let mut _t = txn.transaction();
         let mut t = _t.as_mut().unwrap().as_mut();
