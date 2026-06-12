@@ -371,6 +371,141 @@ def test_equality():
     assert a != "not an id map"
 
 
+# Pythonic operators, truthiness and iteration
+
+
+def test_bool():
+    assert not IdMap()
+    m = IdMap()
+    m.insert(1, 0, 3, [attr()])
+    assert m
+    assert bool(m) is (not m.is_empty())
+
+
+def test_iter_matches_entries():
+    m = IdMap()
+    m.insert(1, 0, 2, [ContentAttribute("a", 1)])
+    m.insert(2, 0, 2, [ContentAttribute("b", 2)])
+    from_iter = [(c, r.start, r.end) for c, r in m]
+    from_entries = [(c, r.start, r.end) for c, r in m.entries()]
+    assert from_iter == from_entries
+    assert len(list(m)) == 2
+
+
+def test_or_union():
+    a = IdMap()
+    a.insert(1, 0, 3, [attr("u", "a")])
+    b = IdMap()
+    b.insert(2, 0, 3, [attr("u", "b")])
+    union = a | b
+    assert union.contains(1, 0)
+    assert union.contains(2, 0)
+    # operands are left unchanged
+    assert not a.contains(2, 0)
+    assert not b.contains(1, 0)
+
+
+def test_or_matches_merge_with():
+    a = IdMap()
+    a.insert(1, 0, 3, [attr("u", "a")])
+    b = IdMap()
+    b.insert(2, 0, 3, [attr("u", "b")])
+    via_method = IdMap()
+    via_method.merge_with(a)
+    via_method.merge_with(b)
+    assert (a | b) == via_method
+
+
+def test_ior_in_place():
+    a = IdMap()
+    a.insert(1, 0, 3, [attr("u", "a")])
+    b = IdMap()
+    b.insert(2, 0, 3, [attr("u", "b")])
+    alias = a
+    a |= b
+    assert a.contains(1, 0)
+    assert a.contains(2, 0)
+    # truly in place: the same object is mutated, so an alias observes it
+    assert alias is a
+    assert alias.contains(2, 0)
+
+
+def test_and_intersection():
+    a = IdMap()
+    a.insert(1, 0, 10, [attr("t", "1")])
+    b = IdMap()
+    b.insert(1, 4, 10, [attr("t", "2")])
+    inter = a & b
+    assert not inter.contains(1, 0)
+    assert inter.contains(1, 4)
+    assert inter.contains(1, 9)
+    assert a.contains(1, 0)  # unchanged
+
+
+def test_iand_in_place():
+    a = IdMap()
+    a.insert(1, 0, 10, [attr("t", "1")])
+    b = IdMap()
+    b.insert(1, 4, 10, [attr("t", "2")])
+    a &= b
+    assert not a.contains(1, 0)
+    assert a.contains(1, 4)
+
+
+def test_sub_difference_idmap():
+    a = IdMap()
+    a.insert(1, 0, 10, [attr("t", "1")])
+    sub = IdMap()
+    sub.insert(1, 0, 3, [attr("t", "1")])
+    diff = a - sub
+    assert not diff.contains(1, 0)
+    assert diff.contains(1, 3)
+    assert a.contains(1, 0)  # unchanged
+
+
+def test_isub_difference_idmap():
+    a = IdMap()
+    a.insert(1, 0, 10, [attr("t", "1")])
+    sub = IdMap()
+    sub.insert(1, 0, 3, [attr("t", "1")])
+    a -= sub
+    assert not a.contains(1, 0)
+    assert a.contains(1, 3)
+
+
+def test_sub_difference_idset():
+    a = IdMap()
+    a.insert(1, 0, 10, [attr("t", "1")])
+    other = IdMap()
+    other.insert(1, 0, 4, [attr("t", "x")])
+    diff = a - other.as_id_set()
+    assert not diff.contains(1, 0)
+    assert diff.contains(1, 4)
+
+
+def test_isub_difference_idset():
+    a = IdMap()
+    a.insert(1, 0, 10, [attr("t", "1")])
+    other = IdMap()
+    other.insert(1, 0, 4, [attr("t", "x")])
+    a -= other.as_id_set()
+    assert not a.contains(1, 0)
+    assert a.contains(1, 4)
+
+
+@pytest.mark.parametrize("op", ["or", "and", "sub"])
+def test_operators_reject_bad_operands(op):
+    m = IdMap()
+    m.insert(1, 0, 3, [attr()])
+    with pytest.raises(TypeError):
+        if op == "or":
+            m | 5
+        elif op == "and":
+            m & 5
+        else:
+            m - 5
+
+
 # realistic flow: attribute the IDs tracked by an UndoManager
 
 

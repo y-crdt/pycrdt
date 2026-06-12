@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
+use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyInt, PyIterator, PyList, PyString, PyTuple};
 use pyo3::IntoPyObjectExt;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -346,6 +346,40 @@ impl IdMap {
         }
     }
 
+    // Set-style operators mirroring Python `set`: `|` union (merge), `&` intersection, `-`
+    // difference, with their in-place `|=`, `&=`, `-=` counterparts. The plain forms return a new
+    // map; the in-place forms mutate `self`. As with `diff_with`, `-`/`-=` also accept an `IdSet`.
+
+    fn __or__(&self, other: &IdMap) -> IdMap {
+        let mut result = self.clone();
+        result.inner.merge_with(other.inner.clone());
+        result
+    }
+
+    fn __ior__(&mut self, other: &IdMap) {
+        self.inner.merge_with(other.inner.clone());
+    }
+
+    fn __and__(&self, other: &IdMap) -> IdMap {
+        let mut result = self.clone();
+        result.inner.intersect_with(&other.inner);
+        result
+    }
+
+    fn __iand__(&mut self, other: &IdMap) {
+        self.inner.intersect_with(&other.inner);
+    }
+
+    fn __sub__(&self, other: &Bound<'_, PyAny>) -> PyResult<IdMap> {
+        let mut result = self.clone();
+        result.diff_with(other)?;
+        Ok(result)
+    }
+
+    fn __isub__(&mut self, other: &Bound<'_, PyAny>) -> PyResult<()> {
+        self.diff_with(other)
+    }
+
     /// Return a new map keeping only the ranges whose attributes satisfy `predicate`.
     ///
     /// `predicate` is called with the list of [`ContentAttribute`] of each range and must return a
@@ -409,6 +443,16 @@ impl IdMap {
             Ok(inner) => Ok(IdMap { inner }),
             Err(e) => Err(PyValueError::new_err(format!("Failed to decode IdMap: {}", e))),
         }
+    }
+
+    /// Return whether the map is non-empty (so `bool(id_map)` / `if id_map:` work).
+    fn __bool__(&self) -> bool {
+        !self.inner.is_empty()
+    }
+
+    /// Iterate over the `(client, AttrRange)` entries, so `for client, rng in id_map: ...` works.
+    fn __iter__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyIterator>> {
+        PyList::new(py, self.entries())?.into_any().try_iter()
     }
 
     fn __eq__(&self, other: &IdMap) -> bool {

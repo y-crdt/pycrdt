@@ -522,6 +522,30 @@ class IdMap:
     def decode(data: bytes) -> IdMap:
         """Decode a map from bytes."""
 
+    def __bool__(self) -> bool:
+        """Return whether the map is non-empty."""
+
+    def __iter__(self) -> Iterator[tuple[int, AttrRange]]:
+        """Iterate over the ``(client, AttrRange)`` entries."""
+
+    def __or__(self, other: IdMap) -> IdMap:
+        """Return the union (merge) of this map and `other`."""
+
+    def __ior__(self, other: IdMap) -> IdMap:
+        """Merge `other` into this map in place."""
+
+    def __and__(self, other: IdMap) -> IdMap:
+        """Return the intersection of this map and `other`."""
+
+    def __iand__(self, other: IdMap) -> IdMap:
+        """Intersect this map with `other` in place."""
+
+    def __sub__(self, other: IdMap | IdSet) -> IdMap:
+        """Return this map with every range present in `other` removed."""
+
+    def __isub__(self, other: IdMap | IdSet) -> IdMap:
+        """Remove from this map every range present in `other`, in place."""
+
 MetaT = TypeVar("MetaT")
 
 class StackItem(Generic[MetaT]):
