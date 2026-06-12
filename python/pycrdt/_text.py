@@ -174,12 +174,12 @@ class Text(Sequence):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
-            current = str(self)
-            offset = _char_to_offset(current, len(current), self.doc.offset_kind)
-            self.integrated.insert(txn._txn, offset, value)
+            # integrated.len is already in the doc's offset units, so the end
+            # offset is available without materializing the text
+            self.integrated.insert(txn._txn, self.integrated.len(txn._txn), value)
             return self
 
-    def _check_slice(self, key: slice) -> tuple[int, int]:
+    def _check_slice(self, length: int, key: slice) -> tuple[int, int]:
         if key.step is not None:
             raise RuntimeError("Step not supported")
         if key.start is None:
@@ -189,7 +189,7 @@ class Text(Sequence):
         else:
             start = key.start
         if key.stop is None:
-            stop = len(self)
+            stop = length
         elif key.stop < 0:
             raise RuntimeError("Negative stop not supported")
         else:
@@ -224,7 +224,7 @@ class Text(Sequence):
                 unit_len = _single_char_unit_len(current[key], ok)
                 self.integrated.remove_range(txn._txn, offset, unit_len)
             elif isinstance(key, slice):
-                start, stop = self._check_slice(key)
+                start, stop = self._check_slice(len(current), key)
                 if stop - start > 0:
                     offset_start = _char_to_offset(current, start, ok)
                     offset_stop = _char_to_offset(current, stop, ok)
@@ -280,7 +280,7 @@ class Text(Sequence):
                 self.integrated.remove_range(txn._txn, offset, unit_len)
                 self.integrated.insert(txn._txn, offset, value)
             elif isinstance(key, slice):
-                start, stop = self._check_slice(key)
+                start, stop = self._check_slice(len(current), key)
                 offset_start = _char_to_offset(current, start, ok)
                 offset_stop = _char_to_offset(current, stop, ok)
                 length = offset_stop - offset_start
@@ -344,8 +344,8 @@ class Text(Sequence):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
-            start, stop = self._check_slice(slice(start, stop))
             current = str(self)
+            start, stop = self._check_slice(len(current), slice(start, stop))
             ok = self.doc.offset_kind
             offset_start = _char_to_offset(current, start, ok)
             offset_stop = _char_to_offset(current, stop, ok)
