@@ -14,9 +14,11 @@ if TYPE_CHECKING:
 def get_utf16_index(text: str, char_index: int) -> int:
     """Convert a Python character (code point) index to a UTF-16 code unit index.
 
+    ``char_index`` is interpreted like a Python slice bound: negative values
+    count from the end of ``text`` and out-of-range values are clamped.
     Characters outside the Basic Multilingual Plane (e.g. emoji) occupy 2
     UTF-16 code units but only 1 Python character. For pure-ASCII / BMP
-    text this is a no-op.
+    text the returned index equals ``char_index``.
 
     Args:
         text: The string against which ``char_index`` is interpreted.
@@ -25,16 +27,14 @@ def get_utf16_index(text: str, char_index: int) -> int:
     Returns:
         The corresponding UTF-16 code unit offset.
     """
-    if char_index == 0:
-        return 0
-    prefix = text[:char_index]
-    # Count characters that need a surrogate pair (code point > 0xFFFF)
-    extra = sum(1 for ch in prefix if ord(ch) > 0xFFFF)
-    return char_index + extra
+    return len(text[:char_index].encode("utf-16-le")) // 2
 
 
 def get_utf8_index(text: str, char_index: int) -> int:
     """Convert a Python character (code point) index to a UTF-8 byte index.
+
+    ``char_index`` is interpreted like a Python slice bound: negative values
+    count from the end of ``text`` and out-of-range values are clamped.
 
     Args:
         text: The string against which ``char_index`` is interpreted.
@@ -43,8 +43,6 @@ def get_utf8_index(text: str, char_index: int) -> int:
     Returns:
         The corresponding UTF-8 byte offset.
     """
-    if char_index == 0:
-        return 0
     return len(text[:char_index].encode("utf-8"))
 
 

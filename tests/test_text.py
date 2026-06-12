@@ -543,6 +543,11 @@ def test_get_utf16_index():
     assert get_utf16_index("A📊B", 1) == 1
     assert get_utf16_index("A📊B", 2) == 3
     assert get_utf16_index("A📊B", 3) == 4
+    # Python slice-bound semantics: clamped when out of range, from the end
+    # when negative
+    assert get_utf16_index("A📊B", 100) == 4
+    assert get_utf16_index("A📊B", -1) == 3
+    assert get_utf16_index("A📊B", -100) == 0
 
 
 def test_get_utf8_index():
@@ -556,6 +561,49 @@ def test_get_utf8_index():
     assert get_utf8_index("A📊B", 1) == 1
     assert get_utf8_index("A📊B", 2) == 5
     assert get_utf8_index("A📊B", 3) == 6
+    # Python slice-bound semantics: clamped when out of range, from the end
+    # when negative
+    assert get_utf8_index("A📊B", 100) == 6
+    assert get_utf8_index("A📊B", -1) == 5
+    assert get_utf8_index("A📊B", -100) == 0
+
+
+def test_unicode_negative_index(offset_kind):
+    """Negative indices count from the end, identically in both offset kinds."""
+    doc = Doc(offset_kind=offset_kind)
+    doc["text"] = text = Text("A📊B")
+    del text[-1]
+    assert str(text) == "A📊"
+
+    doc["text2"] = text2 = Text("A📊B")
+    text2[-1] = "X"
+    assert str(text2) == "A📊X"
+
+    doc["text3"] = text3 = Text("A📊B")
+    text3.insert(-1, "X")
+    assert str(text3) == "A📊XB"
+
+
+def test_unicode_out_of_range_index(offset_kind):
+    """Out-of-range indices clamp like Python slices, identically in both
+    offset kinds (no panic, no partial mutation)."""
+    doc = Doc(offset_kind=offset_kind)
+    doc["text"] = text = Text("A📊B")
+    del text[1:100]
+    assert str(text) == "A"
+
+    doc["text2"] = text2 = Text("A📊B")
+    text2[1:100] = "Z"
+    assert str(text2) == "AZ"
+
+    doc["text3"] = text3 = Text("A📊B")
+    text3.insert(100, "X")
+    assert str(text3) == "A📊BX"
+
+    doc["text4"] = text4 = Text("A📊B")
+    with pytest.raises(IndexError):
+        del text4[5]
+    assert str(text4) == "A📊B"
 
 
 def test_offset_kind_default_is_utf8():
