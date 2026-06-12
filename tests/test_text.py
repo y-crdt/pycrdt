@@ -389,14 +389,15 @@ def test_unicode_supplementary_plane(offset_kind):
     assert str(text) == "A𝒜XB𠀀YC", f"Got {str(text)!r}"
 
 
-def test_unicode_cross_doc_sync(offset_kind):
+@pytest.mark.parametrize("source_kind", ["utf8", "utf16"])
+def test_unicode_cross_doc_sync(source_kind, offset_kind):
     """Updates with Unicode content should sync correctly between two pycrdt docs.
 
-    Both docs must use the same offset_kind — peers with mismatched offset
-    kinds is a known incompatibility (yrs and yjs both require all peers in
-    a swarm to agree).
+    The offset kind is a per-document setting that only affects how indices
+    passed to the yrs API are interpreted; the update wire format is the same
+    for both kinds, so documents with different offset kinds stay in sync.
     """
-    doc1 = Doc(offset_kind=offset_kind)
+    doc1 = Doc(offset_kind=source_kind)
     doc1["text"] = text1 = Text()
 
     # Capture updates from doc1
@@ -421,9 +422,8 @@ def test_unicode_cross_doc_sync(offset_kind):
 # Test cases adapted from jupyter-server/jupyter_ydoc#370 (prior art for
 # the workaround at the jupyter_ydoc layer). These exercise pycrdt's Text
 # operations directly with the same Unicode edge cases. Each test sets
-# initial content, then applies a granular edit (using SequenceMatcher on
-# byte offsets, matching how jupyter_ydoc.YUnicode.set() works), and verifies
-# the result is correct.
+# initial content, then applies a granular edit via _apply_diff, and
+# verifies the result is correct.
 
 
 def _apply_diff(text, old_value, new_value):
@@ -463,10 +463,12 @@ def _apply_diff(text, old_value, new_value):
             "Here are some happy faces: 😀😁😂",
             "Here are some sad faces: 😞😢😭",
         ),
-        # change of characters with combining marks
+        # change of characters with combining marks (decomposed: base letter
+        # followed by U+0301 COMBINING ACUTE ACCENT, so SequenceMatcher
+        # opcodes can split a base character from its mark)
         (
-            "Combining characters: á é í ó ú",
-            "Combining characters: ú ó í é á",
+            "Combining characters: a\u0301 e\u0301 i\u0301 o\u0301 u\u0301",
+            "Combining characters: u\u0301 o\u0301 i\u0301 e\u0301 a\u0301",
         ),
         # flags (regional indicator sequences)
         (
