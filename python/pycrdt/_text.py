@@ -218,16 +218,16 @@ class Text(Sequence):
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
             current = str(self)
-            ok = self.doc.offset_kind
+            offset_kind = self.doc.offset_kind
             if isinstance(key, int):
-                offset = _char_to_offset(current, key, ok)
-                unit_len = _single_char_unit_len(current[key], ok)
+                offset = _char_to_offset(current, key, offset_kind)
+                unit_len = _single_char_unit_len(current[key], offset_kind)
                 self.integrated.remove_range(txn._txn, offset, unit_len)
             elif isinstance(key, slice):
                 start, stop = self._check_slice(len(current), key)
                 if stop - start > 0:
-                    offset_start = _char_to_offset(current, start, ok)
-                    offset_stop = _char_to_offset(current, stop, ok)
+                    offset_start = _char_to_offset(current, start, offset_kind)
+                    offset_stop = _char_to_offset(current, stop, offset_kind)
                     self.integrated.remove_range(txn._txn, offset_start, offset_stop - offset_start)
             else:
                 raise RuntimeError(f"Index not supported: {key}")
@@ -268,21 +268,21 @@ class Text(Sequence):
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
             current = str(self)
-            ok = self.doc.offset_kind
+            offset_kind = self.doc.offset_kind
             if isinstance(key, int):
                 value_len = len(value)
                 if value_len != 1:
                     raise RuntimeError(
                         f"Single item assigned value must have a length of 1, not {value_len}"
                     )
-                offset = _char_to_offset(current, key, ok)
-                unit_len = _single_char_unit_len(current[key], ok)
+                offset = _char_to_offset(current, key, offset_kind)
+                unit_len = _single_char_unit_len(current[key], offset_kind)
                 self.integrated.remove_range(txn._txn, offset, unit_len)
                 self.integrated.insert(txn._txn, offset, value)
             elif isinstance(key, slice):
                 start, stop = self._check_slice(len(current), key)
-                offset_start = _char_to_offset(current, start, ok)
-                offset_stop = _char_to_offset(current, stop, ok)
+                offset_start = _char_to_offset(current, start, offset_kind)
+                offset_stop = _char_to_offset(current, stop, offset_kind)
                 length = offset_stop - offset_start
                 if length > 0:
                     self.integrated.remove_range(txn._txn, offset_start, length)
@@ -346,9 +346,9 @@ class Text(Sequence):
             self._forbid_read_transaction(txn)
             current = str(self)
             start, stop = self._check_slice(len(current), slice(start, stop))
-            ok = self.doc.offset_kind
-            offset_start = _char_to_offset(current, start, ok)
-            offset_stop = _char_to_offset(current, stop, ok)
+            offset_kind = self.doc.offset_kind
+            offset_start = _char_to_offset(current, start, offset_kind)
+            offset_stop = _char_to_offset(current, stop, offset_kind)
             length = offset_stop - offset_start
             if length > 0:
                 self.integrated.format(txn._txn, offset_start, length, iter(attrs.items()))
