@@ -613,14 +613,13 @@ def test_offset_kind_default_is_utf8():
 def test_offset_kind_explicit():
     assert Doc(offset_kind="utf8").offset_kind == "utf8"
     assert Doc(offset_kind="utf16").offset_kind == "utf16"
-    # hyphenated forms accepted
-    assert Doc(offset_kind="utf-8").offset_kind == "utf8"
-    assert Doc(offset_kind="utf-16").offset_kind == "utf16"
 
 
 def test_offset_kind_invalid_raises():
     with pytest.raises(ValueError):
         Doc(offset_kind="utf32")
+    with pytest.raises(ValueError):
+        Doc(offset_kind="utf-16")
 
 
 def test_offset_kind_doc_mismatch_raises():
@@ -628,6 +627,13 @@ def test_offset_kind_doc_mismatch_raises():
     utf8_doc = Doc(offset_kind="utf8")
     with pytest.raises(ValueError, match="does not match"):
         Doc(doc=utf8_doc._doc, offset_kind="utf16")
+
+
+def test_offset_kind_doc_match_accepted(offset_kind):
+    """Doc(doc=existing, offset_kind=same) must be accepted."""
+    doc = Doc(offset_kind=offset_kind)
+    wrapped = Doc(doc=doc._doc, offset_kind=offset_kind)
+    assert wrapped.offset_kind == offset_kind
 
 
 def test_offset_kind_snapshot_round_trip(offset_kind):

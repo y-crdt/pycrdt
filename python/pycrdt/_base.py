@@ -61,7 +61,7 @@ class BaseDoc:
         *,
         client_id: int | None = None,
         skip_gc: bool | None = None,
-        offset_kind: str | None = None,
+        offset_kind: Literal["utf8", "utf16"] | None = None,
         doc: _Doc | None = None,
         Model=None,
         allow_multithreading: bool = False,

@@ -48,7 +48,7 @@ class Doc(BaseDoc, Generic[T]):
         *,
         client_id: int | None = None,
         skip_gc: bool | None = None,
-        offset_kind: str | None = None,
+        offset_kind: Literal["utf8", "utf16"] | None = None,
         doc: _Doc | None = None,
         Model=None,
         allow_multithreading: bool = False,
@@ -95,7 +95,7 @@ class Doc(BaseDoc, Generic[T]):
         return self._doc.client_id()
 
     @property
-    def offset_kind(self) -> str:
+    def offset_kind(self) -> Literal["utf8", "utf16"]:
         """The text offset kind used internally by yrs.
 
         Returns ``"utf8"`` or ``"utf16"``. See [Doc.__init__][pycrdt.Doc.__init__]

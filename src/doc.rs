@@ -97,8 +97,8 @@ impl Doc {
                 .extract()
                 .map_err(|_| PyValueError::new_err("offset_kind must be a string"))?;
             options.offset_kind = match _offset_kind.as_str() {
-                "utf8" | "utf-8" => OffsetKind::Bytes,
-                "utf16" | "utf-16" => OffsetKind::Utf16,
+                "utf8" => OffsetKind::Bytes,
+                "utf16" => OffsetKind::Utf16,
                 _ => return Err(PyValueError::new_err(
                     "offset_kind must be 'utf8' or 'utf16'",
                 )),
