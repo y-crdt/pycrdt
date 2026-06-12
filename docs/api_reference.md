@@ -45,6 +45,8 @@
       - handle_sync_message
       - get_state
       - get_update
+      - get_utf8_index
+      - get_utf16_index
       - merge_updates
       - read_message
       - write_message

@@ -61,10 +61,16 @@ class Doc(BaseDoc, Generic[T]):
                 on transaction commit.
             offset_kind: How yrs counts text positions internally. ``"utf8"``
                 (the yrs default) uses byte offsets; ``"utf16"`` uses UTF-16
-                code unit offsets and is required for cross-runtime
-                compatibility with JS yjs. ``None`` (default) selects the yrs
-                default of ``"utf8"``. Regardless of this setting, the public
-                ``Text`` API always takes Python character indices.
+                code unit offsets, matching the index semantics of JS yjs.
+                ``None`` (default) selects the yrs default of ``"utf8"``.
+                The setting doesn't affect the update wire format, but it
+                matters when raw yrs offsets are shared with yjs peers (e.g.
+                sticky indices, event deltas). It applies to this document
+                only: a subdocument carries the offset kind chosen by the
+                peer that created it. Regardless of this setting, the public
+                ``Text`` API takes Python character indices into the text
+                content as returned by ``str()`` (embedded objects are not
+                accounted for).
             allow_multithreading: Whether to allow the document to be used in different threads.
         """
         super().__init__(
