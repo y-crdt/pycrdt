@@ -49,6 +49,19 @@ def test_content_attribute_value_types(value):
     assert a.value == value
 
 
+def test_attribute_values_use_js_number_semantics():
+    # Attribute values are encoded like native yrs/Yjs IdMaps, so they follow the same JS-number
+    # rules as every other pycrdt value: integers within the JS safe-integer range come back as
+    # floats, larger integers stay ints (BigInt).
+    assert ContentAttribute("k", 5).value == 5.0
+    assert isinstance(ContentAttribute("k", 5).value, float)
+    assert isinstance(ContentAttribute("k", 2**53).value, int)
+    # integers nested in arrays/objects normalize too
+    nested = ContentAttribute("k", {"n": 1, "xs": [2, 3]}).value
+    assert isinstance(nested["n"], float)
+    assert nested["xs"] == [2.0, 3.0]
+
+
 def test_content_attribute_equality_and_hash():
     a = ContentAttribute("author", "alice")
     b = ContentAttribute("author", "alice")
@@ -60,6 +73,15 @@ def test_content_attribute_equality_and_hash():
     # equal attributes hash equally and can live in a set
     assert hash(a) == hash(b)
     assert len({a, b, c}) == 2
+
+
+def test_content_attribute_dict_key_order_invariant():
+    # AttrValue equality/hashing uses sorted-key canonical JSON (BTreeMap-backed),
+    # so dicts with same k/v but different insertion order must compare equal.
+    a = ContentAttribute("k", {"a": 1, "b": 2})
+    b = ContentAttribute("k", {"b": 2, "a": 1})
+    assert a == b
+    assert hash(a) == hash(b)
 
 
 def test_content_attribute_repr():
@@ -187,7 +209,8 @@ def test_encode_decode_roundtrip_preserves_values(value):
     m.insert(7, 3, 4, [ContentAttribute("k", value)])
     restored = IdMap.decode(m.encode())
     assert restored == m
-    # the value itself survives unchanged (e.g. ints do not become floats)
+    # the value round-trips numerically (integers normalize to floats per JS number rules, so
+    # `42 == 42.0` still holds - see test_attribute_values_use_js_number_semantics)
     assert restored.attributions(7, 3, 4)[0].attributes[0].value == value
 
 

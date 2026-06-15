@@ -421,7 +421,9 @@ class ContentAttribute:
         Args:
             name: The attribute name.
             value: The attribute value. Must be JSON-serializable (None, bool, int,
-                float, str, list, tuple, or dict).
+                float, str, list, tuple, or dict). Like every other pycrdt value, numbers
+                follow JS semantics: integers within the JS safe-integer range (|n| < 2**53)
+                are stored and returned as floats; larger integers stay ints.
         """
 
     @property
@@ -430,7 +432,11 @@ class ContentAttribute:
 
     @property
     def value(self) -> Any:
-        """The attribute value, as a JSON-compatible object."""
+        """The attribute value, as a JSON-compatible object.
+
+        Numbers follow JS semantics: an integer like ``5`` is returned as ``5.0`` (unless it
+        exceeds the JS safe-integer range), matching how pycrdt represents Map/Array values.
+        """
 
 class AttrRange:
     """A contiguous clock range together with the attributes attached to it.

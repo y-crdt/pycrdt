@@ -4,8 +4,7 @@ use std::hash::{Hash, Hasher};
 
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyInt, PyIterator, PyList, PyString, PyTuple};
-use pyo3::IntoPyObjectExt;
+use pyo3::types::{PyBytes, PyIterator, PyList};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
@@ -13,24 +12,27 @@ use yrs::block::BlockRange;
 use yrs::updates::decoder::Decode;
 use yrs::updates::encoder::Encode;
 use yrs::{
-    AttrRange as _AttrRange, ClientID, ContentAttribute as _ContentAttribute, Diff, IdMap as _IdMap,
-    ID,
+    Any, AttrRange as _AttrRange, ClientID, ContentAttribute as _ContentAttribute, Diff,
+    IdMap as _IdMap, ID,
 };
 
+use crate::type_conversions::{any_to_value, py_to_json_any, value_to_any, ToPython};
 use crate::undo::IdSet;
 
 /// A JSON-compatible attribute value, used as the value type of [`yrs::IdMap`].
 ///
-/// `yrs::IdMap<A>` requires `A: Serialize + DeserializeOwned + PartialEq + Eq + Hash + Clone`.
-/// `serde_json::Value` provides everything except `Eq` and `Hash` (it holds `f64`), which we
-/// implement here on top of the canonical (sorted-key) JSON serialization so that equality and
-/// hashing stay consistent.
+/// We store the value as a [`yrs::Any`] so attribute values share pycrdt's standard value
+/// conversion (`py_to_any`/`ToPython`) and encode to the same wire format as native yrs/Yjs
+/// `IdMap`s. `yrs::IdMap<A>` requires `A: Serialize + DeserializeOwned + PartialEq + Eq + Hash +
+/// Clone`; `Any` doesn't usefully provide `Eq`/`Hash` (it holds `f64`), so we bridge through
+/// `serde_json::Value` for (de)serialization and derive equality/hashing from its canonical
+/// (sorted-key) JSON form.
 #[derive(Clone, Debug)]
-pub(crate) struct AttrValue(Value);
+pub(crate) struct AttrValue(Any);
 
 impl PartialEq for AttrValue {
     fn eq(&self, other: &Self) -> bool {
-        self.0.to_string() == other.0.to_string()
+        any_to_value(&self.0).to_string() == any_to_value(&other.0).to_string()
     }
 }
 
@@ -38,111 +40,21 @@ impl Eq for AttrValue {}
 
 impl Hash for AttrValue {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.to_string().hash(state);
+        any_to_value(&self.0).to_string().hash(state);
     }
 }
 
-// `yrs::IdMap` encodes attribute values through its `Any`-based wire format, which coerces all
-// JSON integers (including those nested in arrays/objects) to floats. To round-trip arbitrary JSON
-// losslessly, we encode the value as its JSON *string* representation (which the wire format
-// preserves verbatim) and parse it back on decode.
+// Encode/decode use the native `Any`-based wire format (matching yrs/Yjs `IdMap`s), bridging
+// `Any` <-> `serde_json::Value`.
 impl Serialize for AttrValue {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.0.to_string())
+        any_to_value(&self.0).serialize(serializer)
     }
 }
 
 impl<'de> Deserialize<'de> for AttrValue {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let json = String::deserialize(deserializer)?;
-        let value = serde_json::from_str(&json).map_err(serde::de::Error::custom)?;
-        Ok(AttrValue(value))
-    }
-}
-
-/// Convert a Python object into a `serde_json::Value`.
-fn py_to_json(value: &Bound<'_, PyAny>) -> PyResult<Value> {
-    if value.is_none() {
-        Ok(Value::Null)
-    } else if value.is_instance_of::<PyBool>() {
-        // `bool` must be checked before `int` (in Python `bool` is a subclass of `int`).
-        Ok(Value::Bool(value.extract()?))
-    } else if value.is_instance_of::<PyInt>() {
-        if let Ok(i) = value.extract::<i64>() {
-            Ok(Value::Number(i.into()))
-        } else if let Ok(u) = value.extract::<u64>() {
-            Ok(Value::Number(u.into()))
-        } else {
-            Err(PyValueError::new_err(
-                "Integer attribute value is out of the supported 64-bit range",
-            ))
-        }
-    } else if value.is_instance_of::<PyFloat>() {
-        let f: f64 = value.extract()?;
-        serde_json::Number::from_f64(f)
-            .map(Value::Number)
-            .ok_or_else(|| PyValueError::new_err("NaN and infinity cannot be used as attribute values"))
-    } else if value.is_instance_of::<PyString>() {
-        Ok(Value::String(value.extract()?))
-    } else if let Ok(list) = value.cast::<PyList>() {
-        let mut items = Vec::with_capacity(list.len());
-        for item in list.iter() {
-            items.push(py_to_json(&item)?);
-        }
-        Ok(Value::Array(items))
-    } else if let Ok(tuple) = value.cast::<PyTuple>() {
-        let mut items = Vec::with_capacity(tuple.len());
-        for item in tuple.iter() {
-            items.push(py_to_json(&item)?);
-        }
-        Ok(Value::Array(items))
-    } else if let Ok(dict) = value.cast::<PyDict>() {
-        let mut map = serde_json::Map::new();
-        for (k, v) in dict.iter() {
-            let key: String = k
-                .extract()
-                .map_err(|_| PyTypeError::new_err("JSON object keys must be strings"))?;
-            map.insert(key, py_to_json(&v)?);
-        }
-        Ok(Value::Object(map))
-    } else {
-        Err(PyTypeError::new_err(
-            "Attribute value must be JSON-serializable (None, bool, int, float, str, list, tuple, or dict)",
-        ))
-    }
-}
-
-/// Convert a `serde_json::Value` into a Python object.
-fn json_to_py<'py>(py: Python<'py>, value: &Value) -> Bound<'py, PyAny> {
-    match value {
-        Value::Null => py.None().into_bound(py),
-        Value::Bool(b) => PyBool::new(py, *b).into_bound_py_any(py).unwrap(),
-        Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                i.into_pyobject(py).unwrap().into_bound_py_any(py).unwrap()
-            } else if let Some(u) = n.as_u64() {
-                u.into_pyobject(py).unwrap().into_bound_py_any(py).unwrap()
-            } else {
-                PyFloat::new(py, n.as_f64().unwrap())
-                    .into_bound_py_any(py)
-                    .unwrap()
-            }
-        }
-        Value::String(s) => s.into_pyobject(py).unwrap().into_bound_py_any(py).unwrap(),
-        Value::Array(arr) => {
-            let items: Vec<Bound<PyAny>> = arr.iter().map(|v| json_to_py(py, v)).collect();
-            PyList::new(py, items)
-                .unwrap()
-                .into_bound_py_any(py)
-                .unwrap()
-        }
-        Value::Object(obj) => {
-            let dict = PyDict::new(py);
-            for (k, v) in obj {
-                dict.set_item(k, json_to_py(py, v)).unwrap();
-            }
-            dict.into_bound_py_any(py).unwrap()
-        }
+        Ok(AttrValue(value_to_any(&Value::deserialize(deserializer)?)))
     }
 }
 
@@ -158,9 +70,8 @@ impl ContentAttribute {
     /// Create a new attribute with the given `name` and JSON-compatible `value`.
     #[new]
     pub fn new(name: String, value: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let json = py_to_json(value)?;
         Ok(ContentAttribute {
-            inner: _ContentAttribute::new(name, AttrValue(json)),
+            inner: _ContentAttribute::new(name, AttrValue(py_to_json_any(value)?)),
         })
     }
 
@@ -173,7 +84,7 @@ impl ContentAttribute {
     /// The attribute value, as a JSON-compatible Python object.
     #[getter]
     pub fn value<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
-        json_to_py(py, &self.inner.value().0)
+        self.inner.value().0.clone().into_py(py)
     }
 
     fn __eq__(&self, other: &ContentAttribute) -> bool {
