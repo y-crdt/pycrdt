@@ -1,5 +1,10 @@
 # Version history
 
+## 0.14.1
+
+- Bump `yrs` to v0.27.2.
+- Add `IdMap`, `ContentAttribute` and `AttrRange`.
+
 ## 0.14.0
 
 - Remove `Array.move` method.
