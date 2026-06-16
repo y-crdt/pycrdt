@@ -6,9 +6,11 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Coroutine,
     Generic,
     Iterable,
     Literal,
+    Never,
     Type,
     TypeVar,
     Union,
@@ -333,7 +335,7 @@ class Doc(BaseDoc, Generic[T]):
 
     def _async_callback_to_sync(
         self,
-        async_callback: Callable[[TransactionOrSubdocsEvent], Awaitable[None]],
+        async_callback: Callable[[TransactionOrSubdocsEvent], Coroutine[Any, Any, Never]],
     ) -> Callable[[TransactionOrSubdocsEvent], None]:
         def callback(event: TransactionOrSubdocsEvent) -> None:
             if self._task_group is None:
