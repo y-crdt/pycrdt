@@ -1,6 +1,8 @@
 use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::types::{PyAny, PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyIterator, PyList, PyInt, PyString, PyTuple};
+use serde_json::Value;
 use yrs::types::{Attrs, Change, EntryChange, Delta, Events, Path, PathSegment};
 use yrs::{Any, Out, TransactionMut, XmlOut};
 use std::collections::{VecDeque, HashMap};
@@ -228,7 +230,7 @@ pub fn py_to_any<'py>(value: &Bound<'py, PyAny>) -> Any {
     } else if value.is_instance_of::<PyInt>() {
         const MAX_JS_NUMBER: i64 = 2_i64.pow(53) - 1;
         let v: i64 = value.extract().unwrap();
-        if v > MAX_JS_NUMBER {
+        if v.abs() > MAX_JS_NUMBER {
             Any::BigInt(v)
         } else {
             Any::Number(v as f64)
@@ -261,6 +263,75 @@ pub fn py_to_any<'py>(value: &Bound<'py, PyAny>) -> Any {
     } else {
         Any::Undefined
     }
+}
+
+/// Convert a Python object into a JSON-compatible [`Any`], used for `IdMap` attribute values
+/// (see [`crate::id_map`]).
+///
+/// This reuses [`py_to_any`] for the Python->Any traversal, so attribute values follow the same
+/// JS-number semantics as every other pycrdt value (small ints become `Any::Number`), and then
+/// rejects anything with no JSON representation: `bytes` (-> `Any::Buffer`), non-finite floats
+/// (`NaN`/`inf`), and unsupported types (-> `Any::Undefined`).
+///
+/// Note: a `dict` with non-string keys panics inside `py_to_any` before this validation runs (the
+/// same as for any other pycrdt value), surfacing as a `PanicException` rather than a `TypeError`.
+pub(crate) fn py_to_json_any(value: &Bound<'_, PyAny>) -> PyResult<Any> {
+    let any = py_to_any(value);
+    ensure_json_compatible(&any)?;
+    Ok(any)
+}
+
+/// Reject `Any` values that have no JSON representation.
+fn ensure_json_compatible(any: &Any) -> PyResult<()> {
+    match any {
+        Any::Null | Any::Bool(_) | Any::BigInt(_) | Any::String(_) => Ok(()),
+        Any::Number(n) if n.is_finite() => Ok(()),
+        Any::Number(_) => Err(PyValueError::new_err(
+            "NaN and infinity cannot be used as attribute values",
+        )),
+        Any::Buffer(_) => Err(PyTypeError::new_err(
+            "bytes cannot be used as a JSON attribute value",
+        )),
+        Any::Undefined => Err(PyTypeError::new_err(
+            "attribute value must be JSON-serializable (None, bool, int, float, str, list, tuple, or dict)",
+        )),
+        Any::Array(items) => {
+            for item in items.iter() {
+                ensure_json_compatible(item)?;
+            }
+            Ok(())
+        }
+        Any::Map(entries) => {
+            for (_key, value) in entries.iter() {
+                ensure_json_compatible(value)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Render a JSON-compatible [`Any`] (see [`py_to_json_any`]) as a [`serde_json::Value`].
+///
+/// `serde_json::Map` is `BTreeMap`-backed (no `preserve_order` feature), so map keys are always
+/// emitted in sorted order. This makes the output canonical and suitable for equality and hashing.
+pub(crate) fn any_to_value(any: &Any) -> Value {
+    match any {
+        Any::Null | Any::Undefined | Any::Buffer(_) => Value::Null,
+        Any::Bool(b) => Value::Bool(*b),
+        Any::Number(n) => serde_json::Number::from_f64(*n)
+            .map(Value::Number)
+            .unwrap_or(Value::Null),
+        Any::BigInt(i) => Value::Number((*i).into()),
+        Any::String(s) => Value::String(s.to_string()),
+        Any::Array(items) => Value::Array(items.iter().map(any_to_value).collect()),
+        Any::Map(map) => Value::Object(map.iter().map(|(k, v)| (k.clone(), any_to_value(v))).collect()),
+    }
+}
+
+/// Parse a [`serde_json::Value`] into an [`Any`], applying the same JS-number normalization as the
+/// rest of pycrdt (small integers become `Any::Number`).
+pub(crate) fn value_to_any(value: &Value) -> Any {
+    Any::from_json(&value.to_string()).expect("serde_json::Value renders to valid JSON for Any")
 }
 
 pub(crate) fn events_into_py<'py>(py: Python<'py>, txn: &TransactionMut, events: &Events) -> Bound<'py, PyList> {

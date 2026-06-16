@@ -66,6 +66,10 @@ impl IdSet {
     pub fn from(id_set: _IdSet) -> Self {
         IdSet { id_set }
     }
+
+    pub(crate) fn inner(&self) -> &_IdSet {
+        &self.id_set
+    }
 }
 
 struct PythonClock {

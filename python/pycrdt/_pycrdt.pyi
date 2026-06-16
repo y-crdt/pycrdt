@@ -412,6 +412,146 @@ class IdSet:
     def decode(data: bytes) -> IdSet:
         """Decode a IdSet from bytes."""
 
+class ContentAttribute:
+    """A named attribute attached to a range of block IDs in an [IdMap][pycrdt.IdMap]."""
+
+    def __init__(self, name: str, value: Any) -> None:
+        """Create a new attribute.
+
+        Args:
+            name: The attribute name.
+            value: The attribute value. Must be JSON-serializable (None, bool, int,
+                float, str, list, tuple, or dict). Like every other pycrdt value, numbers
+                follow JS semantics: integers within the JS safe-integer range (|n| < 2**53)
+                are stored and returned as floats; larger integers stay ints.
+        """
+
+    @property
+    def name(self) -> str:
+        """The attribute name."""
+
+    @property
+    def value(self) -> Any:
+        """The attribute value, as a JSON-compatible object.
+
+        Numbers follow JS semantics: an integer like `5` is returned as `5.0` (unless it
+        exceeds the JS safe-integer range), matching how pycrdt represents Map/Array values.
+        """
+
+class AttrRange:
+    """A contiguous clock range together with the attributes attached to it.
+
+    Returned by [IdMap.attributions][pycrdt.IdMap.attributions] and
+    [IdMap.entries][pycrdt.IdMap.entries].
+    """
+
+    @property
+    def start(self) -> int:
+        """The inclusive start clock of the range."""
+
+    @property
+    def end(self) -> int:
+        """The exclusive end clock of the range."""
+
+    @property
+    def attributes(self) -> list[ContentAttribute]:
+        """The attributes attached to this range (possibly empty)."""
+
+class IdMap:
+    """A set of block ID ranges, each associated with attribute metadata.
+
+    Similar to [IdSet][pycrdt.IdSet], but it additionally attaches
+    [ContentAttribute][pycrdt.ContentAttribute] metadata to individual block ranges.
+    """
+
+    def __init__(self) -> None:
+        """Create a new, empty IdMap."""
+
+    def insert(
+        self, client: int, clock: int, length: int, attributes: list[ContentAttribute]
+    ) -> None:
+        """Attach `attributes` to the range `[clock, clock + length)` of `client`.
+
+        Inserting an empty attribute list or a zero-length range is a no-op.
+        """
+
+    def remove(self, client: int, clock: int, length: int) -> None:
+        """Remove the range `[clock, clock + length)` of `client` from the map."""
+
+    def contains(self, client: int, clock: int) -> bool:
+        """Return whether the `(client, clock)` ID is contained in the map."""
+
+    def is_empty(self) -> bool:
+        """Return whether the map is empty."""
+
+    def attributions(self, client: int, clock: int, length: int) -> list[AttrRange]:
+        """Return the attributions covering `[clock, clock + length)` of `client`.
+
+        The result spans the whole queried range; gaps with no attributes are returned
+        as [AttrRange][pycrdt.AttrRange] objects with an empty `attributes` list.
+        """
+
+    def entries(self) -> list[tuple[int, AttrRange]]:
+        """Return every `(client, AttrRange)` entry stored in the map."""
+
+    def merge_with(self, other: IdMap) -> None:
+        """Merge `other` into this map in place (union of ranges and attributes)."""
+
+    @staticmethod
+    def merge_many(maps: list[IdMap]) -> IdMap:
+        """Return the union of several maps."""
+
+    def intersect_with(self, other: IdMap) -> None:
+        """Intersect this map with `other` in place."""
+
+    def diff_with(self, other: IdMap | IdSet) -> None:
+        """Remove from this map every range that is also present in `other`."""
+
+    def filter(self, predicate: Callable[[list[ContentAttribute]], bool]) -> IdMap:
+        """Return a new map keeping only the ranges whose attributes satisfy `predicate`.
+
+        `predicate` is called with the list of [ContentAttribute][pycrdt.ContentAttribute]
+        of each range and must return a boolean.
+        """
+
+    def as_id_set(self) -> IdSet:
+        """Return an [IdSet][pycrdt.IdSet] with the same ranges, stripped of attributes."""
+
+    @staticmethod
+    def from_set(id_set: IdSet, attributes: list[ContentAttribute]) -> IdMap:
+        """Build an IdMap from an IdSet, attaching `attributes` to every range."""
+
+    def encode(self) -> bytes:
+        """Encode the map to bytes."""
+
+    @staticmethod
+    def decode(data: bytes) -> IdMap:
+        """Decode a map from bytes."""
+
+    def __bool__(self) -> bool:
+        """Return whether the map is non-empty."""
+
+    def __iter__(self) -> Iterator[tuple[int, AttrRange]]:
+        """Iterate over the ``(client, AttrRange)`` entries."""
+
+    def __or__(self, other: IdMap) -> IdMap:
+        """Return the union (merge) of this map and `other`."""
+
+    def __ior__(self, other: IdMap) -> IdMap:
+        """Merge `other` into this map in place."""
+
+    def __and__(self, other: IdMap) -> IdMap:
+        """Return the intersection of this map and `other`."""
+
+    def __iand__(self, other: IdMap) -> IdMap:
+        """Intersect this map with `other` in place."""
+
+    def __sub__(self, other: IdMap | IdSet) -> IdMap:
+        """Return this map with every range present in `other` removed."""
+
+    def __isub__(self, other: IdMap | IdSet) -> IdMap:
+        """Remove from this map every range present in `other`, in place."""
+
 MetaT = TypeVar("MetaT")
 
 class StackItem(Generic[MetaT]):
