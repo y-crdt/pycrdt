@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from functools import partial
 from inspect import iscoroutinefunction
 from typing import (
@@ -10,7 +11,6 @@ from typing import (
     Generic,
     Iterable,
     Literal,
-    Never,
     Type,
     TypeVar,
     Union,
@@ -20,6 +20,11 @@ from typing import (
 
 from anyio import BrokenResourceError, create_memory_object_stream
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
+
+if sys.version_info >= (3, 11):
+    from typing import Never
+else:  # pragma: no cover
+    from typing_extensions import Never
 
 from ._base import BaseDoc, BaseType, Typed, base_types, forbid_read_transaction
 from ._pycrdt import Doc as _Doc
