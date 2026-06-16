@@ -434,7 +434,7 @@ class ContentAttribute:
     def value(self) -> Any:
         """The attribute value, as a JSON-compatible object.
 
-        Numbers follow JS semantics: an integer like ``5`` is returned as ``5.0`` (unless it
+        Numbers follow JS semantics: an integer like `5` is returned as `5.0` (unless it
         exceeds the JS safe-integer range), matching how pycrdt represents Map/Array values.
         """
 
@@ -470,29 +470,29 @@ class IdMap:
     def insert(
         self, client: int, clock: int, length: int, attributes: list[ContentAttribute]
     ) -> None:
-        """Attach `attributes` to the range ``[clock, clock + length)`` of `client`.
+        """Attach `attributes` to the range `[clock, clock + length)` of `client`.
 
         Inserting an empty attribute list or a zero-length range is a no-op.
         """
 
     def remove(self, client: int, clock: int, length: int) -> None:
-        """Remove the range ``[clock, clock + length)`` of `client` from the map."""
+        """Remove the range `[clock, clock + length)` of `client` from the map."""
 
     def contains(self, client: int, clock: int) -> bool:
-        """Return whether the ``(client, clock)`` ID is contained in the map."""
+        """Return whether the `(client, clock)` ID is contained in the map."""
 
     def is_empty(self) -> bool:
         """Return whether the map is empty."""
 
     def attributions(self, client: int, clock: int, length: int) -> list[AttrRange]:
-        """Return the attributions covering ``[clock, clock + length)`` of `client`.
+        """Return the attributions covering `[clock, clock + length)` of `client`.
 
         The result spans the whole queried range; gaps with no attributes are returned
         as [AttrRange][pycrdt.AttrRange] objects with an empty `attributes` list.
         """
 
     def entries(self) -> list[tuple[int, AttrRange]]:
-        """Return every ``(client, AttrRange)`` entry stored in the map."""
+        """Return every `(client, AttrRange)` entry stored in the map."""
 
     def merge_with(self, other: IdMap) -> None:
         """Merge `other` into this map in place (union of ranges and attributes)."""
