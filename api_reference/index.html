@@ -19,7 +19,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -27,7 +27,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -591,17 +591,6 @@
     <span class="md-ellipsis">
       
         insert
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pycrdt.Array.move" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        move
       
     </span>
   </a>
@@ -1693,6 +1682,67 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="StackItem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pycrdt.StackItem.deletions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deletions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pycrdt.StackItem.insertions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        insertions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pycrdt.StackItem.meta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        meta
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pycrdt.StackItem.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pycrdt.StackItem.merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        merge
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3018,17 +3068,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pycrdt.Array.move" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        move
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#pycrdt.Array.observe" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4113,6 +4152,67 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="StackItem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pycrdt.StackItem.deletions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deletions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pycrdt.StackItem.insertions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        insertions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pycrdt.StackItem.meta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        meta
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pycrdt.StackItem.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pycrdt.StackItem.merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        merge
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -5243,7 +5343,7 @@
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -5282,7 +5382,7 @@
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -6227,71 +6327,6 @@ than they are produced.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="pycrdt.Array.move" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">move</span><span class="p">(</span><span class="n">source_index</span><span class="p">,</span> <span class="n">destination_index</span><span class="p">)</span></code>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Moves an item in the array from a source index to a destination index.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>source_index</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The index of the item to move.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>destination_index</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The index where the item will be inserted.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h3 id="pycrdt.Array.observe" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">observe</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span></code>
 
@@ -6738,6 +6773,17 @@ returns <code>None</code> if the array was not initialized.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="pycrdt.ArrayEvent.transaction">transaction</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ReadTransaction (pycrdt._transaction.ReadTransaction)" href="#pycrdt.ReadTransaction">ReadTransaction</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The transaction this change was done in.</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -6751,7 +6797,7 @@ returns <code>None</code> if the array was not initialized.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -6800,7 +6846,7 @@ or on its right (<code>AFTER</code>).</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -6844,7 +6890,7 @@ or on its right (<code>AFTER</code>).</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -7533,7 +7579,7 @@ Sending messages is done with <code>send()</code>:
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -7699,7 +7745,7 @@ Sending messages is done with <code>send()</code>:
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -7964,7 +8010,7 @@ document.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -9265,7 +9311,7 @@ the passed origin must be the same as the origin of the current transaction.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -9451,7 +9497,7 @@ the passed origin must be the same as the origin of the current transaction.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -10608,6 +10654,17 @@ returns <code>None</code> if the map was not initialized.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="pycrdt.MapEvent.transaction">transaction</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ReadTransaction (pycrdt._transaction.ReadTransaction)" href="#pycrdt.ReadTransaction">ReadTransaction</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The transaction this change was done in.</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -10621,7 +10678,7 @@ returns <code>None</code> if the map was not initialized.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -10677,7 +10734,7 @@ It can be used with a context manager or an async context manager
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -10766,7 +10823,7 @@ It can be used with a context manager or an async context manager
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -10980,7 +11037,7 @@ However, a lower-level API can also be used:
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -11076,7 +11133,7 @@ Can be encoded to bytes for storage or transmission, and decoded back.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -11260,6 +11317,8 @@ Raises:
 
 
     <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="typing.Generic">Generic</span>[<span title="pycrdt._pycrdt.MetaT">MetaT</span>]</code></p>
 
 
 
@@ -11273,6 +11332,273 @@ compressed information about all updates and deletions tracked by it.</p>
 
 
 
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="pycrdt.StackItem.deletions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">deletions</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Get the deletions IdSet.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="pycrdt.StackItem.insertions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">insertions</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Get the insertions IdSet.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="pycrdt.StackItem.meta" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">meta</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Custom metadata. Can be any Python object.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pycrdt.StackItem.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">doc</span><span class="p">,</span> <span class="n">deletions</span><span class="p">,</span> <span class="n">insertions</span><span class="p">,</span> <span class="n">meta</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Create a new StackItem.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>doc</code>
+            </td>
+            <td>
+                  <code><span title="pycrdt._pycrdt.Doc">Doc</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The document this stack item belongs to.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>deletions</code>
+            </td>
+            <td>
+                  <code><span title="pycrdt._pycrdt.IdSet">IdSet</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The IdSet of deletions.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>insertions</code>
+            </td>
+            <td>
+                  <code><span title="pycrdt._pycrdt.IdSet">IdSet</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The IdSet of insertions.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>meta</code>
+            </td>
+            <td>
+                  <code><span title="pycrdt._pycrdt.MetaT">MetaT</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional metadata (can be any Python object).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pycrdt.StackItem.merge" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">merge</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">merge_meta</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Merge two StackItems into one containing the union of their deletions and insertions.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>a</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="StackItem (pycrdt._pycrdt.StackItem)" href="#pycrdt.StackItem">StackItem</a>[<span title="pycrdt._pycrdt.MetaT">MetaT</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>First StackItem to merge.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>b</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="StackItem (pycrdt._pycrdt.StackItem)" href="#pycrdt.StackItem">StackItem</a>[<span title="pycrdt._pycrdt.MetaT">MetaT</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Second StackItem to merge.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>merge_meta</code>
+            </td>
+            <td>
+                  <code><span title="typing.Callable">Callable</span>[[<span title="pycrdt._pycrdt.MetaT">MetaT</span> | None, <span title="pycrdt._pycrdt.MetaT">MetaT</span> | None], <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional function to handle metadata conflicts.
+Takes (meta_a, meta_b) and returns the merged metadata.
+If None, keeps the first item's metadata.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
 
     </div>
 
@@ -11309,7 +11635,7 @@ compressed information about all updates and deletions tracked by it.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -11853,7 +12179,7 @@ with (before or after).</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -11949,7 +12275,7 @@ emitted during the transaction commit phase.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -13379,6 +13705,17 @@ before or after the index.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="pycrdt.TextEvent.transaction">transaction</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ReadTransaction (pycrdt._transaction.ReadTransaction)" href="#pycrdt.ReadTransaction">ReadTransaction</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The transaction this change was done in.</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -13392,7 +13729,7 @@ before or after the index.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -13442,7 +13779,7 @@ It must be used with a context manager (see <a class="autorefs autorefs-internal
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -13534,7 +13871,7 @@ emitted during the transaction commit phase.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -13637,7 +13974,7 @@ The underlying <code>Array</code> can be accessed with the special <code>_</code
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -13700,7 +14037,7 @@ with specific keys. The underlying <code>Doc</code> can be accessed with the spe
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -13768,7 +14105,7 @@ specific keys. The underlying <code>Map</code> can be accessed with the special 
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -13803,9 +14140,7 @@ specific keys. The underlying <code>Map</code> can be accessed with the special 
 
 
         <p>The undo manager allows to perform undo/redo operations on shared types.
-It can be initialized either with a <a class="autorefs autorefs-internal" href="#pycrdt.Doc">Doc</a> or with scopes.
 Scopes are a list of shared types integrated in a document.
-If initialized with a <code>Doc</code>, scopes can later be expanded.
 Changes can be undone/redone by batches using time intervals.
 It is possible to include/exclude changes by transaction origin in undo/redo operations.</p>
 
@@ -13819,7 +14154,7 @@ It is possible to include/exclude changes by transaction origin in undo/redo ope
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -13878,7 +14213,7 @@ It is possible to include/exclude changes by transaction origin in undo/redo ope
 
 
 <h3 id="pycrdt.UndoManager.__init__" class="doc doc-heading">
-            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">doc</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">scopes</span><span class="o">=</span><span class="p">[],</span> <span class="n">capture_timeout_millis</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">timestamp</span><span class="o">=</span><span class="n">timestamp</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">scopes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">capture_timeout_millis</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">timestamp</span><span class="o">=</span><span class="n">timestamp</span><span class="p">,</span> <span class="n">undo_stack</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">redo_stack</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h3>
 
@@ -13900,26 +14235,10 @@ It is possible to include/exclude changes by transaction origin in undo/redo ope
       <tbody>
           <tr class="doc-section-item">
             <td>
-                <code>doc</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="Doc (pycrdt._doc.Doc)" href="#pycrdt.Doc">Doc</a> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The document the undo manager will work with.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
                 <code>scopes</code>
             </td>
             <td>
-                  <code><span title="list">list</span>[<span title="pycrdt._base.BaseType">BaseType</span>]</code>
+                  <code><span title="list">list</span>[<span title="pycrdt._base.BaseType">BaseType</span>] | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -13927,7 +14246,7 @@ It is possible to include/exclude changes by transaction origin in undo/redo ope
               </div>
             </td>
             <td>
-                  <code>[]</code>
+                  <code>None</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -13962,27 +14281,36 @@ It is possible to include/exclude changes by transaction origin in undo/redo ope
                   <code><span title="pycrdt._undo.timestamp">timestamp</span></code>
             </td>
           </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Raises:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="RuntimeError">RuntimeError</span></code>
+                <code>undo_stack</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="StackItem (pycrdt._pycrdt.StackItem)" href="#pycrdt.StackItem">StackItem</a>] | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>UndoManager must be created with doc or scopes.</p>
+                <p>Pre-filled undo stack items.</p>
               </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>redo_stack</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="StackItem (pycrdt._pycrdt.StackItem)" href="#pycrdt.StackItem">StackItem</a>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pre-filled redo stack items.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
@@ -14356,7 +14684,7 @@ effectively resetting its state.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -14814,7 +15142,7 @@ than they are produced.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -15151,7 +15479,7 @@ own, it is a child of <a class="autorefs autorefs-internal" href="#pycrdt.XmlEle
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -15824,7 +16152,7 @@ than they are produced.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -15918,7 +16246,7 @@ deletions.</p>
 
 
 
-  <div class="doc doc-children">
+<div class="doc doc-children">
 
 
 
@@ -16765,10 +17093,10 @@ been seen in the given state.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.top", "navigation.sections", "search.suggest", "search.highlight", "content.code.annotate", "content.code.copy"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.top", "navigation.sections", "search.suggest", "search.highlight", "content.code.annotate", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
