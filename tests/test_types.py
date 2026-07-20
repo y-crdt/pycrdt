@@ -46,7 +46,7 @@ def mypy_test_typed_map():
     v0: str = map0["name"]
     v1: str = map0["toggle"]  # E: Incompatible types in assignment (expression has type "bool", variable has type "str")
     v2: bool = map0["toggle"]
-    map0["key0"]  # E: TypedDict "MyMap@30" has no key "key0"
+    map0["key0"]  # E: TypedDict "MyMap" has no key "key0"
 
 
 @pytest.mark.mypy_testing
@@ -79,8 +79,8 @@ def mypy_test_typed_doc():
     doc = cast(MyDoc, Doc())
     map0 = cast(MyMap, Map())
     doc["map0"] = map0
-    doc["map0"] = Array()  # E: Value of "map0" has incompatible type "Array[Never]"; expected "MyMap@62"
-    doc["map0"] = Map()  # E: Value of "map0" has incompatible type "Map[Never]"; expected "MyMap@62"
+    doc["map0"] = Array()  # E: Value of "map0" has incompatible type "Array[Never]"; expected "MyMap"
+    doc["map0"] = Map()  # E: Value of "map0" has incompatible type "Map[Never]"; expected "MyMap"
     doc["text0"] = Text()
     doc["array0"] = Array[bool]()  # E: Value of "array0" has incompatible type "Array[bool]"; expected "Array[int]"
     doc["array0"] = Array()
