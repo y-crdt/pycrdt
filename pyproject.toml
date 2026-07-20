@@ -45,8 +45,8 @@ test = [
     "coverage[toml] >=7",
 ]
 types = [
-  "mypy >=1.19.0",
-  "pytest-mypy-testing",
+  "mypy >=2.3.0",
+  "pytest-mypy-testing >=0.2.0",
 ]
 docs = [
     "mkdocs",
