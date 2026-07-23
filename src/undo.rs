@@ -1,4 +1,3 @@
-use futures_lite::future::FutureExt;
 use futures_task::noop_waker;
 use std::pin::pin;
 use std::task::{Context, Poll};
@@ -145,7 +144,7 @@ impl UndoManager {
     }
 
     pub fn undo(&mut self)  -> PyResult<bool> {
-        let mut future = pin!(self.undo_manager.undo());
+        let future = pin!(self.undo_manager.undo());
         let waker = noop_waker();
         let mut cx = Context::from_waker(&waker);
         match future.poll(&mut cx) {
@@ -159,7 +158,7 @@ impl UndoManager {
     }
 
     pub fn redo(&mut self)  -> PyResult<bool> {
-        let mut future = pin!(self.undo_manager.redo());
+        let future = pin!(self.undo_manager.redo());
         let waker = noop_waker();
         let mut cx = Context::from_waker(&waker);
         match future.poll(&mut cx) {
