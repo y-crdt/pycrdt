@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Iterator, cast
 
-from ._base import BaseEvent, Sequence, base_types, event_types
+from ._base import BaseEvent, BaseType, Sequence, base_types, event_types
 from ._pycrdt import Subscription
 from ._pycrdt import Text as _Text
 from ._pycrdt import TextEvent as _TextEvent
@@ -266,9 +266,14 @@ class Text(Sequence):
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
-            self.integrated.insert_embed(
-                txn._txn, index, value, iter(attrs.items()) if attrs is not None else None
-            )
+            _attrs = iter(attrs.items()) if attrs is not None else None
+            if isinstance(value, BaseType):
+                # shared type
+                assert txn._txn is not None
+                self._do_and_integrate("insert", value, txn._txn, index, _attrs)
+            else:
+                # primitive type
+                self.integrated.insert_embed(txn._txn, index, value, _attrs)
 
     def format(self, start: int, stop: int, attrs: dict[str, Any]) -> None:
         """
