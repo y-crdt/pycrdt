@@ -297,10 +297,14 @@ class Text(Sequence):
             A list of formatted chunks that the current text corresponds to.
                 Each list item is a tuple containing the chunk's content and formatting attributes.
                 The content is usually the text as a string, but may be other data for embedded
-                objects.
+                objects. Embedded shared types are returned as their pycrdt type (e.g. an
+                [Array][pycrdt.Array], [Map][pycrdt.Map] or [Text][pycrdt.Text]).
         """
         with self.doc.transaction() as txn:
-            return self.integrated.diff(txn._txn)
+            return [
+                (self._maybe_as_type_or_doc(value), attrs)
+                for value, attrs in self.integrated.diff(txn._txn)
+            ]
 
     def observe(self, callback: Callable[[TextEvent], None]) -> Subscription:
         """

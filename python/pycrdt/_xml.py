@@ -300,10 +300,15 @@ class XmlText(_XmlTraitMixin):
             A list of formatted chunks that the current text corresponds to.
                 Each list item is a tuple containing the chunk's contents and formatting attributes.
                 The contents is usually the text as a string, but may be other data for embedded
-                objects.
+                objects. Embedded shared types are returned as their pycrdt type (e.g. an
+                [Array][pycrdt.Array], [Map][pycrdt.Map], [Text][pycrdt.Text] or
+                [XmlText][pycrdt.XmlText]).
         """
         with self.doc.transaction() as txn:
-            return self.integrated.diff(txn._txn)
+            return [
+                (self._maybe_as_type_or_doc(value), attrs)
+                for value, attrs in self.integrated.diff(txn._txn)
+            ]
 
     def __delitem__(self, key: int | slice) -> None:
         with self.doc.transaction() as txn:
