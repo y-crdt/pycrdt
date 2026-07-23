@@ -170,9 +170,9 @@ def test_insert_embed_shared_types():
 
     diff = text.diff()
     assert diff[0] == ("X", None)
-    assert type(diff[1][0]) is type(text0.integrated)
-    assert type(diff[2][0]) is type(map0.integrated)
-    assert type(diff[3][0]) is type(array0.integrated)
+    assert isinstance(diff[1][0], Text)
+    assert isinstance(diff[2][0], Map)
+    assert isinstance(diff[3][0], Array)
     assert diff[3][1] == {"kind": "list"}
     assert diff[4] == ("Y", None)
 
