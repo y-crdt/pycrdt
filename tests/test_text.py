@@ -149,6 +149,34 @@ def test_formatting():
     ]
 
 
+def test_insert_embed_shared_types():
+    doc = Doc()
+    doc["text"] = text = Text("XY")
+
+    array0 = Array(["foo", 2])
+    text.insert_embed(1, array0, {"kind": "list"})
+    map0 = Map({"key": "val"})
+    text.insert_embed(1, map0)
+    text0 = Text("bar")
+    text.insert_embed(1, text0)
+
+    # the returned shared types are integrated, and thus mutable
+    array0.append("baz")
+    map0["key2"] = 3
+    text0 += "!"
+    assert array0.to_py() == ["foo", 2, "baz"]
+    assert map0.to_py() == {"key": "val", "key2": 3}
+    assert str(text0) == "bar!"
+
+    diff = text.diff()
+    assert diff[0] == ("X", None)
+    assert isinstance(diff[1][0], Text)
+    assert isinstance(diff[2][0], Map)
+    assert isinstance(diff[3][0], Array)
+    assert diff[3][1] == {"kind": "list"}
+    assert diff[4] == ("Y", None)
+
+
 def test_observe():
     doc = Doc()
     doc["text"] = text = Text()
