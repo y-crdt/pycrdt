@@ -1,9 +1,5 @@
 # Version history
 
-## Unreleased
-
-- Support `Text` `insert_embed` shared types.
-
 ## 0.14.1
 
 - Bump `yrs` to v0.27.2.
