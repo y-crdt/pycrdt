@@ -1,5 +1,12 @@
 # Version history
 
+## 0.14.2
+
+- Allow embedding `Array`, `Map` and `Text` shared types in a `Text` via `insert_embed()`.
+- Return `pycrdt` types from `Text` and `XmlText` `diff()` for embeds.
+- Remove `futures-lite` dependency and bump other Rust dependencies.
+- Bump `mypy` v2.3.0 for tests.
+
 ## 0.14.1
 
 - Bump `yrs` to v0.27.2.
