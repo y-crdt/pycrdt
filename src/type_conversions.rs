@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::{PyOverflowError, PyTypeError, PyValueError};
 use pyo3::types::{PyAny, PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyIterator, PyList, PyInt, PyString, PyTuple};
 use serde_json::Value;
 use yrs::types::{Attrs, Change, EntryChange, Delta, Events, Path, PathSegment};
@@ -215,6 +215,27 @@ impl ToPython for Any {
     }
 }
 
+/// Convert a Python `int` into an [`Any`], following JavaScript number semantics: an integer that
+/// a JS number can hold exactly becomes `Any::Number`, a bigger one becomes `Any::BigInt`.
+///
+/// Fails with an `OverflowError` if the integer doesn't fit in 64 bits, which is the widest
+/// integer lib0 can encode. The caller must have checked that `value` is an `int` and not a
+/// `bool` (`bool` is a subclass of `int` in Python).
+fn py_to_int_any(value: &Bound<'_, PyAny>) -> PyResult<Any> {
+    const MAX_JS_NUMBER: i64 = 2_i64.pow(53) - 1;
+    let Ok(v) = value.extract::<i64>() else {
+        return Err(PyOverflowError::new_err(
+            "int is too large to be converted (it must fit in 64 bits)",
+        ));
+    };
+    // `unsigned_abs`, not `abs`: `i64::MIN.abs()` overflows.
+    Ok(if v.unsigned_abs() > MAX_JS_NUMBER as u64 {
+        Any::BigInt(v)
+    } else {
+        Any::Number(v as f64)
+    })
+}
+
 pub fn py_to_any<'py>(value: &Bound<'py, PyAny>) -> Any {
     if value.is_none() {
         Any::Null
@@ -228,13 +249,9 @@ pub fn py_to_any<'py>(value: &Bound<'py, PyAny>) -> Any {
         let v: bool = value.extract().unwrap();
         Any::Bool(v)
     } else if value.is_instance_of::<PyInt>() {
-        const MAX_JS_NUMBER: i64 = 2_i64.pow(53) - 1;
-        let v: i64 = value.extract().unwrap();
-        if v.abs() > MAX_JS_NUMBER {
-            Any::BigInt(v)
-        } else {
-            Any::Number(v as f64)
-        }
+        // An `int` that doesn't fit in 64 bits has no `Any` representation; callers that need to
+        // report that precisely use `py_to_any_strict`, everyone else treats it as unsupported.
+        py_to_int_any(value).unwrap_or(Any::Undefined)
     } else if value.is_instance_of::<PyFloat>() {
         let v: f64 = value.extract().unwrap();
         Any::Number(v)
@@ -263,6 +280,74 @@ pub fn py_to_any<'py>(value: &Bound<'py, PyAny>) -> Any {
     } else {
         Any::Undefined
     }
+}
+
+/// Convert a Python object into an [`Any`], rejecting a value that has no `Any` representation
+/// instead of storing it as `Any::Undefined`, which would read back as `None`.
+pub(crate) fn py_to_supported_any(value: &Bound<'_, PyAny>) -> PyResult<Any> {
+    match py_to_any(value) {
+        Any::Undefined => Err(PyTypeError::new_err("Type not supported")),
+        any => Ok(any),
+    }
+}
+
+/// Convert a Python object into an [`Any`], raising a `TypeError` instead of silently producing
+/// `Any::Undefined` for values that have no lib0 `Any` representation.
+///
+/// This is the conversion used by the public `encode_any` codec (see [`crate::any`]), where a
+/// silently dropped value would corrupt the encoded payload. It mirrors `json.dumps`, which raises
+/// `TypeError` rather than encoding unsupported objects.
+///
+/// Containers are traversed here so that nested failures (and non-`str` dict keys, which panic
+/// inside [`py_to_any`]) are reported as Python exceptions; every scalar is delegated to
+/// [`py_to_any`] so the JS-number rule and the type dispatch order live in a single place.
+pub(crate) fn py_to_any_strict(value: &Bound<'_, PyAny>) -> PyResult<Any> {
+    if let Ok(dict) = value.cast::<PyDict>() {
+        let mut items: HashMap<String, Any> = HashMap::new();
+        for (key, value) in dict.iter() {
+            let Ok(key) = key.cast::<PyString>() else {
+                return Err(PyTypeError::new_err(format!(
+                    "keys must be str, not {}",
+                    type_name(&key)
+                )));
+            };
+            items.insert(key.to_str()?.to_string(), py_to_any_strict(&value)?);
+        }
+        Ok(Any::Map(items.into()))
+    } else if let Ok(list) = value.cast::<PyList>() {
+        let items = list
+            .iter()
+            .map(|item| py_to_any_strict(&item))
+            .collect::<PyResult<Vec<Any>>>()?;
+        Ok(Any::Array(items.into()))
+    } else if let Ok(tuple) = value.cast::<PyTuple>() {
+        let items = tuple
+            .iter()
+            .map(|item| py_to_any_strict(&item))
+            .collect::<PyResult<Vec<Any>>>()?;
+        Ok(Any::Array(items.into()))
+    } else if value.is_instance_of::<PyInt>() && !value.is_instance_of::<PyBool>() {
+        py_to_int_any(value)
+    } else {
+        // Every scalar is handled by `py_to_any` before it reaches its own container branches, so
+        // those branches are unreachable from here.
+        match py_to_any(value) {
+            Any::Undefined => Err(PyTypeError::new_err(format!(
+                "Object of type {} is not any-serializable",
+                type_name(value)
+            ))),
+            any => Ok(any),
+        }
+    }
+}
+
+/// The name of a Python object's type, for use in error messages.
+fn type_name(value: &Bound<'_, PyAny>) -> String {
+    value
+        .get_type()
+        .name()
+        .map(|name| name.to_string())
+        .unwrap_or_else(|_| "object".to_string())
 }
 
 /// Convert a Python object into a JSON-compatible [`Any`], used for `IdMap` attribute values
