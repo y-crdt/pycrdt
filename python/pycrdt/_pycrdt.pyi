@@ -17,7 +17,7 @@ class Snapshot:
 class Doc:
     """Shared document."""
 
-    def __init__(self, client_id: int | None, skip_gc: bool | None) -> None:
+    def __init__(self, client_id: int | None, skip_gc: bool | None, guid: str | None) -> None:
         """Create a new document with an optional global client ID.
         If no client ID is passed, a random one will be generated."""
 
@@ -28,7 +28,7 @@ class Doc:
     def client_id(self) -> int:
         """Returns the document unique client identifier."""
 
-    def guid(self) -> int:
+    def guid(self) -> str:
         """Returns the document globally unique identifier."""
 
     def create_transaction(self) -> Transaction:

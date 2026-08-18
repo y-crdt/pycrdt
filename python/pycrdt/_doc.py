@@ -55,6 +55,7 @@ class Doc(BaseDoc, Generic[T]):
         *,
         client_id: int | None = None,
         skip_gc: bool | None = None,
+        guid: str | None = None,
         doc: _Doc | None = None,
         Model=None,
         allow_multithreading: bool = False,
@@ -65,11 +66,13 @@ class Doc(BaseDoc, Generic[T]):
             client_id: An optional client ID for the document.
             skip_gc: Whether to skip garbage collection on deleted collections
                 on transaction commit.
+            guid: An optional globally unique identifier for the document.
             allow_multithreading: Whether to allow the document to be used in different threads.
         """
         super().__init__(
             client_id=client_id,
             skip_gc=skip_gc,
+            guid=guid,
             doc=doc,
             Model=Model,
             allow_multithreading=allow_multithreading,
@@ -84,7 +87,7 @@ class Doc(BaseDoc, Generic[T]):
         self._event_subscription: dict[bool, Subscription] = {}
 
     @property
-    def guid(self) -> int:
+    def guid(self) -> str:
         """The GUID of the document."""
         return self._doc.guid()
 

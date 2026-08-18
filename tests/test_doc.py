@@ -175,6 +175,16 @@ def test_client_id():
     assert update[2 : 2 + len(b)] == b
 
 
+def test_guid():
+    guid = "my-document"
+    assert Doc(guid=guid).guid == guid
+
+
+def test_invalid_guid():
+    with pytest.raises(ValueError, match="guid must be a string"):
+        Doc(guid=1)  # type: ignore[arg-type]
+
+
 def test_roots():
     remote_doc = Doc(
         {
