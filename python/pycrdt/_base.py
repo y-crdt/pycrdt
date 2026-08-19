@@ -61,6 +61,7 @@ class BaseDoc:
         *,
         client_id: int | None = None,
         skip_gc: bool | None = None,
+        guid: str | None = None,
         doc: _Doc | None = None,
         Model=None,
         allow_multithreading: bool = False,
@@ -68,7 +69,7 @@ class BaseDoc:
     ) -> None:
         super().__init__(**data)
         if doc is None:
-            doc = _Doc(client_id, skip_gc)
+            doc = _Doc(client_id, skip_gc, guid)
         self._doc = doc
         self._txn = None
         self._exceptions = []
