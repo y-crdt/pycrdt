@@ -1,5 +1,9 @@
 # Version history
 
+## 0.14.3
+
+- Allow passing a `guid` to `Doc`.
+
 ## 0.14.2
 
 - Allow embedding `Array`, `Map` and `Text` shared types in a `Text` via `insert_embed()`.
