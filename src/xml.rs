@@ -24,7 +24,7 @@ use yrs::{
 };
 
 use crate::subscription::Subscription;
-use crate::type_conversions::{events_into_py, py_to_any, py_to_attrs, EntryChangeWrapper, ToPython};
+use crate::type_conversions::{events_into_py, py_to_any, py_to_attrs, py_to_supported_any, EntryChangeWrapper, ToPython};
 use crate::transaction::Transaction;
 use crate::array::Array;
 use crate::map::Map;
@@ -250,7 +250,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
 
     #[pyo3(signature = (txn, index, embed, attrs=None))]
     fn insert_embed<'py>(&self, txn: &mut Transaction, index: u32, embed: Bound<'py, PyAny>, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<()> {
-        let embed = py_to_any(&embed);
+        let embed = py_to_supported_any(&embed)?;
         let mut _t = txn.transaction();
         let mut t = _t.as_mut().unwrap().as_mut();
         if let Some(attrs) = attrs {
