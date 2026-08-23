@@ -1,5 +1,9 @@
 # Version history
 
+## 0.14.4
+
+- Bump `yrs` to v0.27.4.
+
 ## 0.14.3
 
 - Allow passing a `guid` to `Doc`.
