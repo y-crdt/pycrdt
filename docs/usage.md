@@ -136,6 +136,7 @@ will not exit until the async callback is done:
 async def async_callback(event):
     await send(event.update)
 
+
 doc.observe(async_callback)
 
 async with doc.transaction():
@@ -157,9 +158,11 @@ from pycrdt import Doc
 
 doc = Doc(allow_multithreading=True)
 
+
 def create_new_transaction():
     with doc.new_transaction(timeout=3):
         ...
+
 
 t0 = Thread(target=create_new_transaction)
 t1 = Thread(target=create_new_transaction)
@@ -179,14 +182,17 @@ from pycrdt import Doc
 
 doc = Doc()
 
+
 async def create_new_transaction():
     async with doc.new_transaction(timeout=3):
         ...
+
 
 async def main():
     async with create_task_group() as tg:
         tg.start_soon(create_new_transaction)
         tg.start_soon(create_new_transaction)
+
 
 run(main)
 ```
@@ -201,9 +207,11 @@ a text editor should insert the character in the text shown to the user. This is
 ```py
 from pycrdt import TextEvent
 
+
 def handle_changes(event: TextEvent):
     # process the event
     ...
+
 
 text0_subscription_id = text0.observe(handle_changes)
 ```
@@ -233,9 +241,11 @@ a list of events.
 ```py
 from pycrdt import ArrayEvent
 
+
 def handle_deep_changes(events: list[ArrayEvent]):
     # process the events
     ...
+
 
 array0_subscription_id = array0.observe_deep(handle_deep_changes)
 ```
@@ -259,9 +269,11 @@ Changes can be serialized to binary by getting the event's `update`:
 ```py
 from pycrdt import TransactionEvent
 
+
 def handle_doc_changes(event: TransactionEvent):
     update: bytes = event.update
     # send binary update on the wire
+
 
 doc.observe(handle_doc_changes)
 ```
@@ -325,8 +337,12 @@ from pycrdt import Array, Doc
 doc = Doc[Array[int]]()
 array0 = doc.get("array0", type=Array[int])
 array0.append(0)
-array0.append("foo")  # error: Argument 1 to "append" of "Array" has incompatible type "str"; expected "int"
-array1 = doc.get("array1", type=Array[str])  # error: Argument "type" to "get" of "Doc" has incompatible type "type[pycrdt._array.Array[Any]]"; expected "type[pycrdt._array.Array[int]]"
+array0.append(
+    "foo"
+)  # error: Argument 1 to "append" of "Array" has incompatible type "str"; expected "int"
+array1 = doc.get(
+    "array1", type=Array[str]
+)  # error: Argument "type" to "get" of "Doc" has incompatible type "type[pycrdt._array.Array[Any]]"; expected "type[pycrdt._array.Array[int]]"
 ```
 
 Trying to append a `str` to an `Array[int]` will result in a type check error. Likewise if trying to get a root type of `Array[str]` from the `Doc[Array[int]]`.
@@ -338,15 +354,18 @@ But if one wants to associate types with specific keys, a `TypedMap` can be used
 ```py
 from pycrdt import Array, Text, TypedDoc, TypedMap
 
+
 class MyMap(TypedMap):
     name: str
     toggle: bool
     nested: Array[bool]
 
+
 class MyDoc(TypedDoc):
     map0: MyMap
     array0: Array[int]
     text0: Text
+
 
 doc = MyDoc()
 
@@ -354,7 +373,9 @@ doc.map0.name = "foo"
 doc.map0.toggle = False
 doc.map0.toggle = 3  # error: Incompatible types in assignment (expression has type "int", variable has type "bool")  [assignment]
 doc.array0 = Array([1, 2, 3])
-doc.map0.nested = Array([4])  # error: List item 0 has incompatible type "int"; expected "bool"  [list-item]
+doc.map0.nested = Array(
+    [4]
+)  # error: List item 0 has incompatible type "int"; expected "bool"  [list-item]
 doc.map0.nested = Array([False, True])
 v0: str = doc.map0.name
 v1: str = doc.map0.toggle  # error: Incompatible types in assignment (expression has type "bool", variable has type "str")  [assignment]
