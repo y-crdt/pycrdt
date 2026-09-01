@@ -67,12 +67,8 @@ impl Transaction {
 
     pub fn origin(&self) -> Option<i128> {
         let transaction = self.0.borrow();
-        let origin: Option<&Origin> = transaction.as_ref().unwrap().as_ref().origin();
-        if origin.is_some() {
-            let data: [u8; 16] = origin.unwrap().as_ref().try_into().expect("Slice with incorrect length");
-            Some(i128::from_be_bytes(data))
-        } else {
-            None
-        }
+        let origin: &Origin = transaction.as_ref().unwrap().as_ref().origin()?;
+        let data: [u8; 16] = origin.as_ref().try_into().ok()?;
+        Some(i128::from_be_bytes(data))
     }
 }
