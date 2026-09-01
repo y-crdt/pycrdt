@@ -17,6 +17,15 @@ def callback_deep(_events, events):
     _events.append(events)
 
 
+def test_int_too_large():
+    """An int that has no lib0 representation must raise, not crash the interpreter."""
+    doc = Doc()
+    map0 = doc.get("map0", type=Map)
+    with pytest.raises(TypeError) as excinfo:
+        map0["key"] = 2**64
+    assert str(excinfo.value) == "Type not supported"
+
+
 def test_binary_entry():
     doc = Doc({"m": Map({"bytes": b"012"})})
     assert doc["m"]["bytes"] == b"012"
