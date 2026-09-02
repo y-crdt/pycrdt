@@ -157,6 +157,25 @@ def test_origin():
     assert not undo_manager.can_undo()
 
 
+def test_origin_in_observer_during_undo_redo():
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+    origins = []
+
+    def callback(event, txn):
+        origins.append(txn.origin)
+
+    text.observe(callback)
+    text += "Hello"
+    undo_manager.undo()
+    undo_manager.redo()
+
+    assert origins[0] is None
+    assert isinstance(origins[1], int)
+    assert origins[2] == origins[1]
+
+
 def test_timestamp():
     timestamp = 0
     timestamp_called = 0
