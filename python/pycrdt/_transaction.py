@@ -133,7 +133,7 @@ class Transaction:
         if origin_hash is None:
             return None
 
-        return self._doc._origins.get(origin_hash)
+        return self._doc._origins.get(origin_hash, origin_hash)
 
 
 class NewTransaction(Transaction):

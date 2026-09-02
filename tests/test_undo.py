@@ -171,7 +171,9 @@ def test_origin_in_observer_during_undo_redo():
     undo_manager.undo()
     undo_manager.redo()
 
-    assert origins == [None, None, None]
+    assert origins[0] is None
+    assert isinstance(origins[1], int)
+    assert origins[2] == origins[1]
 
 
 def test_timestamp():

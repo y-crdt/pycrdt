@@ -68,7 +68,14 @@ impl Transaction {
     pub fn origin(&self) -> Option<i128> {
         let transaction = self.0.borrow();
         let origin: &Origin = transaction.as_ref().unwrap().as_ref().origin()?;
-        let data: [u8; 16] = origin.as_ref().try_into().ok()?;
-        Some(i128::from_be_bytes(data))
+        let data = origin.as_ref();
+        if data.len() == std::mem::size_of::<usize>() {
+            let mut bytes = [0; 16];
+            bytes[16 - data.len()..].copy_from_slice(data);
+            Some(i128::from_be_bytes(bytes))
+        } else {
+            let data: [u8; 16] = data.try_into().ok()?;
+            Some(i128::from_be_bytes(data))
+        }
     }
 }
