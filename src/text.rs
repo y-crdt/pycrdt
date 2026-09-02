@@ -4,7 +4,6 @@ use pyo3::types::{PyDict, PyIterator, PyList, PyString, PyTuple};
 use yrs::{
     Assoc,
     GetString,
-    IndexedSequence,
     Observable,
     TextRef,
     Text as _Text,
@@ -175,8 +174,10 @@ impl Text {
             0 => _assoc = Assoc::After,
             _ => _assoc = Assoc::Before,
         }
-        let sticky_index = self.text.sticky_index(t, index, _assoc);
-        let s: Py<StickyIndex> = Py::new(py, StickyIndex::from(sticky_index))?;
+        let sticky_index =
+            StickyIndex::from_sequence(t, &self.text, index, self.text.len(t), _assoc)
+                .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Index out of range"))?;
+        let s: Py<StickyIndex> = Py::new(py, sticky_index)?;
         Ok(s)
     }
 

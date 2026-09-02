@@ -158,6 +158,9 @@ class Text:
     def diff(self, txn: Transaction) -> list[tuple[Any, dict[str, Any] | None]]:
         """Returns a sequence of formatted chunks."""
 
+    def sticky_index(self, txn: Transaction, index: int, assoc: int) -> "StickyIndex":
+        """Creates a sticky index at the given position."""
+
     def observe(self, callback: Callable[[TextEvent], None]) -> Subscription:
         """Subscribes a callback to be called with the shared text change event.
         Returns a subscription that can be used to unsubscribe."""
@@ -183,6 +186,9 @@ class Array:
 
     def to_json(self, txn: Transaction) -> str:
         """Returns a JSON representation of the current array."""
+
+    def sticky_index(self, txn: Transaction, index: int, assoc: int) -> "StickyIndex":
+        """Creates a sticky index at the given position."""
 
     def observe(self, callback: Callable[[TextEvent], None]) -> Subscription:
         """Subscribes a callback to be called with the array change event.
@@ -600,7 +606,8 @@ class StackItem(Generic[MetaT]):
         """
 
 class StickyIndex:
-    def get_offset(self, txn: Transaction) -> int: ...
+    def get_offset(self, txn: Transaction) -> int | None: ...
+    def resolve(self, txn: Transaction, sequence: Text | Array) -> int | None: ...
     def encode(self) -> bytes: ...
     def to_json_string(self) -> str: ...
     def get_assoc(self) -> int: ...

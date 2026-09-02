@@ -1,5 +1,12 @@
 # Version history
 
+## Unreleased
+
+- Add exact `Text`/`Array` owner validation with `StickyIndex.resolve()` and reject a mismatched
+  owner in sequence-backed `get_index()` calls.
+- Return Python `ValueError`/`None` outcomes for malformed or unresolvable sticky indices instead
+  of propagating Rust panics.
+
 ## 0.14.4
 
 - Bump `yrs` to v0.27.4.
