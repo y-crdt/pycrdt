@@ -50,6 +50,39 @@ def test_resolve_owner_across_replica_and_fresh_wrapper(sequence_type, value, as
     assert decoded.get_index() == 2
 
 
+@pytest.mark.parametrize(("sequence_type", "value"), SEQUENCE_CASES)
+def test_nested_end_anchor_resolves_after_decode_and_across_replica(sequence_type, value):
+    source = Doc(client_id=1)
+    source_root = source.get("root", type=Map)
+    owner = sequence_type(value)
+    source_root["owner"] = owner
+    start_encoded = owner.sticky_index(0, Assoc.AFTER).encode()
+    end_encoded = owner.sticky_index(len(value), Assoc.AFTER).encode()
+
+    fresh_owner = source_root["owner"]
+    assert StickyIndex.decode(start_encoded, fresh_owner).resolve(fresh_owner) == 0
+    decoded = StickyIndex.decode(end_encoded, fresh_owner)
+    assert decoded.resolve(fresh_owner) == len(value)
+    assert decoded.get_index() == len(value)
+    with source.transaction() as txn:
+        assert StickyIndex.decode(end_encoded).get_index(txn) == len(value)
+
+    sibling = sequence_type(value)
+    source_root["sibling"] = sibling
+    decoded = StickyIndex.decode(end_encoded, sibling)
+    assert decoded.resolve(sibling) is None
+    with pytest.raises(ValueError, match="Sticky index cannot be resolved"):
+        decoded.get_index()
+
+    replica = Doc(client_id=2)
+    replica.apply_update(source.get_update())
+    replica_owner = replica.get("root", type=Map)["owner"]
+    assert StickyIndex.decode(start_encoded, replica_owner).resolve(replica_owner) == 0
+    decoded = StickyIndex.decode(end_encoded, replica_owner)
+    assert decoded.resolve(replica_owner) == len(value)
+    assert decoded.get_index() == len(value)
+
+
 @pytest.mark.parametrize(("sequence_type", "value"), EMPTY_SEQUENCE_CASES)
 @pytest.mark.parametrize("assoc", [Assoc.AFTER, Assoc.BEFORE])
 def test_resolve_empty_sequence(sequence_type, value, assoc: Assoc):
