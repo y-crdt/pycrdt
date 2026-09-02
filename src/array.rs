@@ -9,7 +9,6 @@ use yrs::{
     Assoc,
     DeepObservable,
     Doc as _Doc,
-    IndexedSequence,
     Observable,
     TransactionMut,
     XmlFragmentPrelim,
@@ -147,8 +146,10 @@ impl Array {
             0 => _assoc = Assoc::After,
             _ => _assoc = Assoc::Before,
         }
-        let sticky_index = self.array.sticky_index(t, index, _assoc);
-        let s: Py<StickyIndex> = Py::new(py, StickyIndex::from(sticky_index))?;
+        let sticky_index =
+            StickyIndex::from_sequence(t, &self.array, index, self.array.len(t), _assoc)
+                .ok_or_else(|| PyValueError::new_err("Index out of range"))?;
+        let s: Py<StickyIndex> = Py::new(py, sticky_index)?;
         Ok(s)
     }
 

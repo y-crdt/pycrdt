@@ -84,6 +84,33 @@ After receiving the other user's update, if no special care is taken, machine A 
 In other words, their document states will diverge, and thus users won't collaborate on the same document anymore.
 CRDTs ensure that documents don't diverge, their shared documents will eventually have the same state. It will arbitrary be "ab" or "ba", but it will be the same on both machines.
 
+## Sticky indices
+
+A sticky index tracks a position in a `Text` or `Array` while edits move its current numeric
+index. It can be serialized for another process and resolved later:
+
+```py
+from pycrdt import Assoc, Doc, StickyIndex, Text
+
+doc = Doc()
+text = doc.get("text", type=Text)
+text += "abc"
+
+encoded = text.sticky_index(1, Assoc.AFTER).encode()
+position = StickyIndex.decode(encoded)
+assert position.resolve(text) == 1
+```
+
+`resolve(sequence)` validates the exact shared type returned in the resolved Yrs offset. It returns
+`None` when the position belongs to a sibling, its owner was deleted, or the position is not yet
+available in the sequence's document. Resolution does not change the document.
+
+Passing a sequence to `decode()` or `from_json()` associates that validation target with the sticky
+index. In that form, `get_index()` remains convenient for existing callers but raises `ValueError`
+if the position cannot be resolved against that sequence; it never returns an offset belonging to a
+sibling. A sticky index deserialized without a sequence can still use the existing
+`get_index(transaction)` form, which resolves without owner validation.
+
 ## Transactions
 
 Every change to a shared data happens in a document transaction, and there can only be one transaction at a time. Pycrdt offers two methods for creating transactions:

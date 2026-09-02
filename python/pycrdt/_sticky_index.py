@@ -53,19 +53,48 @@ class StickyIndex:
         Raises:
             RuntimeError: No transaction was provided and no shared type was associated
                 with the deserialized sticky index.
+            ValueError: The sticky index cannot be resolved, or its resolved owner is not
+                the associated shared type.
         """
         if transaction is not None:
             _txn = transaction._txn
             assert _txn is not None
-            return self._sticky_index.get_offset(_txn)
+            if self._sequence is None:
+                index = self._sticky_index.get_offset(_txn)
+            elif self._sequence.is_integrated:
+                index = self._sticky_index.resolve(_txn, self._sequence.integrated)
+            else:
+                index = None
+        elif self._sequence is not None:
+            index = self.resolve(self._sequence)
+        else:
+            raise RuntimeError("No transaction available")
 
-        if self._sequence is not None:
-            with self._sequence.doc.transaction() as txn:
-                _txn = txn._txn
-                assert _txn is not None
-                return self._sticky_index.get_offset(_txn)
+        if index is None:
+            raise ValueError("Sticky index cannot be resolved")
+        return index
 
-        raise RuntimeError("No transaction available")
+    def resolve(self, sequence: Sequence) -> int | None:
+        """
+        Resolve the current index only if it belongs to an exact shared type.
+
+        Resolution does not mutate the document. A position owned by a sibling shared type,
+        a deleted shared type, or data that is not yet available in the document is not resolved.
+
+        Args:
+            sequence: The [Array][pycrdt.Array] or [Text][pycrdt.Text] against which to validate
+                the resolved owner.
+
+        Returns:
+            The current index, or `None` if the position cannot be resolved against `sequence`.
+        """
+        if not sequence.is_integrated:
+            return None
+
+        with sequence.doc.transaction() as txn:
+            _txn = txn._txn
+            assert _txn is not None
+            return self._sticky_index.resolve(_txn, sequence.integrated)
 
     @property
     def assoc(self) -> Assoc:
@@ -105,6 +134,9 @@ class StickyIndex:
 
         Returns:
             The sticky index.
+
+        Raises:
+            ValueError: The index is outside the sequence.
         """
         with sequence.doc.transaction() as txn:
             self = cls(sequence.integrated.sticky_index(txn._txn, index, assoc), sequence)
@@ -117,12 +149,15 @@ class StickyIndex:
 
         Args:
             data: The binary data to get the sticky index from.
-            sequence: The [Array][pycrdt.Array] or [Text][pycrdt.Text] the sticky index belongs to.
-                If not provided, a [Transaction][pycrdt.Transaction] will be needed when getting
-                the index.
+            sequence: The [Array][pycrdt.Array] or [Text][pycrdt.Text] against which the resolved
+                owner will be validated. If not provided, a [Transaction][pycrdt.Transaction]
+                will be needed when getting the index.
 
         Returns:
             The decoded sticky index.
+
+        Raises:
+            ValueError: The binary data is malformed.
         """
         self = cls(decode_sticky_index(data), sequence)
         return self
@@ -134,12 +169,15 @@ class StickyIndex:
 
         Args:
             data: The JSON dictionary to get the sticky index from.
-            sequence: The [Array][pycrdt.Array] or [Text][pycrdt.Text] the sticky index belongs to.
-                If not provided, a [Transaction][pycrdt.Transaction] will be needed when getting
-                the index.
+            sequence: The [Array][pycrdt.Array] or [Text][pycrdt.Text] against which the resolved
+                owner will be validated. If not provided, a [Transaction][pycrdt.Transaction]
+                will be needed when getting the index.
 
         Returns:
             The deserialized sticky index.
+
+        Raises:
+            ValueError: The JSON data is malformed.
         """
         self = cls(get_sticky_index_from_json_string(json.dumps(data)), sequence)
         return self
