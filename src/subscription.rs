@@ -3,6 +3,8 @@ use std::cell::RefCell;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
+// Keys wrap after 2^64 registrations, potentially colliding with a still-active
+// subscription on the same observer. Reaching that limit is impractical.
 static NEXT_KEY: AtomicU64 = AtomicU64::new(0);
 
 /// The observer owns this state, so a subscription can detect when its target was destroyed.
@@ -41,20 +43,24 @@ impl Subscription {
         }))));
         (sub, Callback { key, callback })
     }
+
+    fn unsubscribe(&self) {
+        let unobserve = self.0.borrow_mut().take();
+        if let Some(unobserve) = unobserve {
+            unobserve();
+        }
+    }
 }
 
 impl Drop for Subscription {
     fn drop(&mut self) {
-        Subscription::drop(self);
+        self.unsubscribe();
     }
 }
 
 #[pymethods]
 impl Subscription {
     pub fn drop(&self) {
-        let unobserve = self.0.borrow_mut().take();
-        if let Some(unobserve) = unobserve {
-            unobserve();
-        }
+        self.unsubscribe();
     }
 }
