@@ -160,25 +160,41 @@ impl From<XmlFragmentRef> for XmlFragment {
 
 impl_xml_methods!(XmlFragment[fragment, fragment: fragment] {
     fn observe(&self, f: Py<PyAny>) -> Subscription {
-        self.fragment.observe(move |txn, e| {
+        let target = self.fragment.clone();
+        let (sub, callback) = Subscription::new(f, move |key| {
+            let _ = target.unobserve(key);
+        });
+        self.fragment.observe(callback.key, move |txn, e| {
             Python::attach(|py| {
+                let Some(f) = callback.get(py) else {
+                    return;
+                };
                 let e = unsafe { XmlEvent::from_xml_event(e, txn, py) };
                 if let Err(err) = f.call1(py, (e,)) {
                     err.restore(py)
                 }
             });
-        }).into()
+        });
+        sub
     }
 
     fn observe_deep(&self, f: Py<PyAny>) -> Subscription {
-        self.fragment.observe_deep(move |txn, events| {
+        let target = self.fragment.clone();
+        let (sub, callback) = Subscription::new(f, move |key| {
+            let _ = target.unobserve_deep(key);
+        });
+        self.fragment.observe_deep(callback.key, move |txn, events| {
             Python::attach(|py| {
+                let Some(f) = callback.get(py) else {
+                    return;
+                };
                 let events = events_into_py(py, txn, events);
                 if let Err(err) = f.call1(py, (events,)) {
                     err.restore(py);
                 }
             })
-        }).into()
+        });
+        sub
     }
 });
 
@@ -200,25 +216,41 @@ impl_xml_methods!(XmlElement[element, fragment: element, xml: element] {
     }
 
     fn observe(&self, f: Py<PyAny>) -> Subscription {
-        self.element.observe(move |txn, e| {
+        let target = self.element.clone();
+        let (sub, callback) = Subscription::new(f, move |key| {
+            let _ = target.unobserve(key);
+        });
+        self.element.observe(callback.key, move |txn, e| {
             Python::attach(|py| {
+                let Some(f) = callback.get(py) else {
+                    return;
+                };
                 let e = unsafe { XmlEvent::from_xml_event(e, txn, py) };
                 if let Err(err) = f.call1(py, (e,)) {
                     err.restore(py)
                 }
             });
-        }).into()
+        });
+        sub
     }
 
     fn observe_deep(&self, f: Py<PyAny>) -> Subscription {
-        self.element.observe_deep(move |txn, events| {
+        let target = self.element.clone();
+        let (sub, callback) = Subscription::new(f, move |key| {
+            let _ = target.unobserve_deep(key);
+        });
+        self.element.observe_deep(callback.key, move |txn, events| {
             Python::attach(|py| {
+                let Some(f) = callback.get(py) else {
+                    return;
+                };
                 let events = events_into_py(py, txn, events);
                 if let Err(err) = f.call1(py, (events,)) {
                     err.restore(py);
                 }
             })
-        }).into()
+        });
+        sub
     }
 });
 
@@ -383,18 +415,41 @@ impl_xml_methods!(XmlText[text, xml: text] {
     }
 
     fn observe(&self, f: Py<PyAny>) -> Subscription {
-        self.text.observe(move |txn, e| {
+        let target = self.text.clone();
+        let (sub, callback) = Subscription::new(f, move |key| {
+            let _ = target.unobserve(key);
+        });
+        self.text.observe(callback.key, move |txn, e| {
             Python::attach(|py| {
+                let Some(f) = callback.get(py) else {
+                    return;
+                };
                 let e = unsafe { XmlEvent::from_xml_text_event(e, txn, py) };
                 if let Err(err) = f.call1(py, (e,)) {
                     err.restore(py)
                 }
             });
-        }).into()
+        });
+        sub
     }
 
     fn observe_deep(&self, f: Py<PyAny>) -> Subscription {
-        self.observe(f)
+        let target = self.text.clone();
+        let (sub, callback) = Subscription::new(f, move |key| {
+            let _ = target.unobserve_deep(key);
+        });
+        self.text.observe_deep(callback.key, move |txn, events| {
+            Python::attach(|py| {
+                let Some(f) = callback.get(py) else {
+                    return;
+                };
+                let events = events_into_py(py, txn, events);
+                if let Err(err) = f.call1(py, (events,)) {
+                    err.restore(py)
+                }
+            });
+        });
+        sub
     }
 });
 

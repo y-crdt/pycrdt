@@ -203,10 +203,19 @@ impl Doc {
     }
 
     pub fn observe(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
-        let sub = self.doc
-            .observe_transaction_cleanup(move |txn, event| {
+        let target = self.doc.clone();
+        let (sub, callback) = Subscription::new(f, move |key| {
+            let _ = target.unobserve_transaction_cleanup(key);
+        });
+        self.doc
+            .observe_transaction_cleanup(callback.key, move |txn, event| {
                 if !event.delete_set.is_empty() || event.before_state != event.after_state {
                     Python::attach(|py| {
+                        let Some(f) = callback.get(py) else {
+                            // Unsubscribing during a transaction cannot acquire a new one.
+                            txn.unobserve_transaction_cleanup(callback.key);
+                            return;
+                        };
                         let event = TransactionEvent::new(py, event, txn);
                         if let Err(err) = f.call1(py, (event,)) {
                             err.restore(py)
@@ -215,14 +224,22 @@ impl Doc {
                 }
             })
             .unwrap();
-        let s: Py<Subscription> = Py::new(py, Subscription::from(sub))?;
+        let s: Py<Subscription> = Py::new(py, sub)?;
         Ok(s)
     }
 
     pub fn observe_subdocs(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
-        let sub = self.doc
-            .observe_subdocs(move |_, event| {
+        let target = self.doc.clone();
+        let (sub, callback) = Subscription::new(f, move |key| {
+            let _ = target.unobserve_subdocs(key);
+        });
+        self.doc
+            .observe_subdocs(callback.key, move |txn, event| {
                 Python::attach(|py| {
+                    let Some(f) = callback.get(py) else {
+                        txn.unobserve_subdocs(callback.key);
+                        return;
+                    };
                     let event = SubdocsEvent::new(py, event);
                     if let Err(err) = f.call1(py, (event,)) {
                         err.restore(py)
@@ -230,7 +247,7 @@ impl Doc {
                 })
             })
             .unwrap();
-        let s: Py<Subscription> = Py::new(py, Subscription::from(sub))?;
+        let s: Py<Subscription> = Py::new(py, sub)?;
         Ok(s)
     }
 }
