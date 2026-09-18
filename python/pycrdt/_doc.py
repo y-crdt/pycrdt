@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import sys
 from functools import partial
 from inspect import iscoroutinefunction
 from typing import (
     Any,
     Awaitable,
     Callable,
+    Coroutine,
     Generic,
     Iterable,
     Literal,
@@ -18,6 +20,11 @@ from typing import (
 
 from anyio import BrokenResourceError, create_memory_object_stream
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
+
+if sys.version_info >= (3, 11):
+    from typing import Never
+else:  # pragma: no cover
+    from typing_extensions import Never
 
 from ._base import BaseDoc, BaseType, Typed, base_types, forbid_read_transaction
 from ._pycrdt import Doc as _Doc
@@ -48,6 +55,7 @@ class Doc(BaseDoc, Generic[T]):
         *,
         client_id: int | None = None,
         skip_gc: bool | None = None,
+        guid: str | None = None,
         offset_kind: Literal["utf8", "utf16"] | None = None,
         doc: _Doc | None = None,
         Model=None,
@@ -59,6 +67,7 @@ class Doc(BaseDoc, Generic[T]):
             client_id: An optional client ID for the document.
             skip_gc: Whether to skip garbage collection on deleted collections
                 on transaction commit.
+            guid: An optional globally unique identifier for the document.
             offset_kind: How yrs counts text positions internally. ``"utf8"``
                 (the yrs default) uses byte offsets; ``"utf16"`` uses UTF-16
                 code unit offsets, matching the index semantics of JS yjs.
@@ -76,6 +85,7 @@ class Doc(BaseDoc, Generic[T]):
         super().__init__(
             client_id=client_id,
             skip_gc=skip_gc,
+            guid=guid,
             offset_kind=offset_kind,
             doc=doc,
             Model=Model,
@@ -91,7 +101,7 @@ class Doc(BaseDoc, Generic[T]):
         self._event_subscription: dict[bool, Subscription] = {}
 
     @property
-    def guid(self) -> int:
+    def guid(self) -> str:
         """The GUID of the document."""
         return self._doc.guid()
 
@@ -356,7 +366,7 @@ class Doc(BaseDoc, Generic[T]):
 
     def _async_callback_to_sync(
         self,
-        async_callback: Callable[[TransactionOrSubdocsEvent], Awaitable[None]],
+        async_callback: Callable[[TransactionOrSubdocsEvent], Coroutine[Any, Any, Never]],
     ) -> Callable[[TransactionOrSubdocsEvent], None]:
         def callback(event: TransactionOrSubdocsEvent) -> None:
             if self._task_group is None:

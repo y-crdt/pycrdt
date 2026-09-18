@@ -10,10 +10,14 @@ use yrs::{
     Text as _Text,
     TransactionMut,
 };
-use yrs::types::text::{TextEvent as _TextEvent, YChange};
+use yrs::types::array::ArrayPrelim;
+use yrs::types::map::MapPrelim;
+use yrs::types::text::{TextEvent as _TextEvent, TextPrelim, YChange};
 use crate::transaction::Transaction;
 use crate::subscription::Subscription;
 use crate::type_conversions::{py_to_any, py_to_attrs, ToPython};
+use crate::array::Array;
+use crate::map::Map;
 use crate::sticky_index::StickyIndex;
 
 
@@ -65,6 +69,51 @@ impl Text {
             self.text.insert_embed(&mut t, index, embed);
         }
         Ok(())
+    }
+
+    #[pyo3(signature = (txn, index, attrs=None))]
+    fn insert_array_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Array> {
+        let mut _t = txn.transaction();
+        let mut t = _t.as_mut().unwrap().as_mut();
+        let integrated;
+        if let Some(attrs) = attrs {
+            let attrs = py_to_attrs(attrs)?;
+            integrated = self.text.insert_embed_with_attributes(&mut t, index, ArrayPrelim::default(), attrs);
+        } else {
+            integrated = self.text.insert_embed(&mut t, index, ArrayPrelim::default());
+        }
+        let shared = Array::from(integrated);
+        Ok(shared)
+    }
+
+    #[pyo3(signature = (txn, index, attrs=None))]
+    fn insert_map_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Map> {
+        let mut _t = txn.transaction();
+        let mut t = _t.as_mut().unwrap().as_mut();
+        let integrated;
+        if let Some(attrs) = attrs {
+            let attrs = py_to_attrs(attrs)?;
+            integrated = self.text.insert_embed_with_attributes(&mut t, index, MapPrelim::default(), attrs);
+        } else {
+            integrated = self.text.insert_embed(&mut t, index, MapPrelim::default());
+        }
+        let shared = Map::from(integrated);
+        Ok(shared)
+    }
+
+    #[pyo3(signature = (txn, index, attrs=None))]
+    fn insert_text_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Text> {
+        let mut _t = txn.transaction();
+        let mut t = _t.as_mut().unwrap().as_mut();
+        let integrated;
+        if let Some(attrs) = attrs {
+            let attrs = py_to_attrs(attrs)?;
+            integrated = self.text.insert_embed_with_attributes(&mut t, index, TextPrelim::default(), attrs);
+        } else {
+            integrated = self.text.insert_embed(&mut t, index, TextPrelim::default());
+        }
+        let shared = Text::from(integrated);
+        Ok(shared)
     }
 
     fn format(&self, txn: &mut Transaction, index: u32, len: u32, attrs: Bound<'_, PyIterator>) -> PyResult<()> {

@@ -1,4 +1,3 @@
-use futures_lite::future::FutureExt;
 use futures_task::noop_waker;
 use std::pin::pin;
 use std::task::{Context, Poll};
@@ -66,6 +65,10 @@ impl IdSet {
     pub fn from(id_set: _IdSet) -> Self {
         IdSet { id_set }
     }
+
+    pub(crate) fn inner(&self) -> &_IdSet {
+        &self.id_set
+    }
 }
 
 struct PythonClock {
@@ -128,6 +131,14 @@ impl UndoManager {
         self.undo_manager.expand_scope(&doc.doc, &scope.fragment);
     }
 
+    pub fn origin(&self) -> i128 {
+        let origin = self.undo_manager.as_origin();
+        let data = origin.as_ref();
+        let mut bytes = [0; 16];
+        bytes[16 - data.len()..].copy_from_slice(data);
+        i128::from_be_bytes(bytes)
+    }
+
     pub fn include_origin(&mut self, origin: i128) {
         self.undo_manager.include_origin(origin);
     }
@@ -141,7 +152,7 @@ impl UndoManager {
     }
 
     pub fn undo(&mut self)  -> PyResult<bool> {
-        let mut future = pin!(self.undo_manager.undo());
+        let future = pin!(self.undo_manager.undo());
         let waker = noop_waker();
         let mut cx = Context::from_waker(&waker);
         match future.poll(&mut cx) {
@@ -155,7 +166,7 @@ impl UndoManager {
     }
 
     pub fn redo(&mut self)  -> PyResult<bool> {
-        let mut future = pin!(self.undo_manager.redo());
+        let future = pin!(self.undo_manager.redo());
         let waker = noop_waker();
         let mut cx = Context::from_waker(&waker);
         match future.poll(&mut cx) {

@@ -1,0 +1,376 @@
+use std::cell::RefCell;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
+use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::prelude::*;
+use pyo3::types::{PyBytes, PyIterator, PyList};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::Value;
+
+use yrs::block::BlockRange;
+use yrs::updates::decoder::Decode;
+use yrs::updates::encoder::Encode;
+use yrs::{
+    Any, AttrRange as _AttrRange, ClientID, ContentAttribute as _ContentAttribute, Diff,
+    IdMap as _IdMap, ID,
+};
+
+use crate::type_conversions::{any_to_value, py_to_json_any, value_to_any, ToPython};
+use crate::undo::IdSet;
+
+/// A JSON-compatible attribute value, used as the value type of [`yrs::IdMap`].
+///
+/// We store the value as a [`yrs::Any`] so attribute values share pycrdt's standard value
+/// conversion (`py_to_any`/`ToPython`) and encode to the same wire format as native yrs/Yjs
+/// `IdMap`s. `yrs::IdMap<A>` requires `A: Serialize + DeserializeOwned + PartialEq + Eq + Hash +
+/// Clone`; `Any` doesn't usefully provide `Eq`/`Hash` (it holds `f64`), so we bridge through
+/// `serde_json::Value` for (de)serialization and derive equality/hashing from its canonical
+/// (sorted-key) JSON form.
+#[derive(Clone, Debug)]
+pub(crate) struct AttrValue(Any);
+
+impl PartialEq for AttrValue {
+    fn eq(&self, other: &Self) -> bool {
+        any_to_value(&self.0).to_string() == any_to_value(&other.0).to_string()
+    }
+}
+
+impl Eq for AttrValue {}
+
+impl Hash for AttrValue {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        any_to_value(&self.0).to_string().hash(state);
+    }
+}
+
+// Encode/decode use the native `Any`-based wire format (matching yrs/Yjs `IdMap`s), bridging
+// `Any` <-> `serde_json::Value`.
+impl Serialize for AttrValue {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        any_to_value(&self.0).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for AttrValue {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(AttrValue(value_to_any(&Value::deserialize(deserializer)?)))
+    }
+}
+
+/// A named attribute attached to a range of block IDs.
+#[pyclass(from_py_object)]
+#[derive(Clone)]
+pub struct ContentAttribute {
+    pub(crate) inner: _ContentAttribute<AttrValue>,
+}
+
+#[pymethods]
+impl ContentAttribute {
+    /// Create a new attribute with the given `name` and JSON-compatible `value`.
+    #[new]
+    pub fn new(name: String, value: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(ContentAttribute {
+            inner: _ContentAttribute::new(name, AttrValue(py_to_json_any(value)?)),
+        })
+    }
+
+    /// The attribute name.
+    #[getter]
+    pub fn name(&self) -> String {
+        self.inner.name().to_string()
+    }
+
+    /// The attribute value, as a JSON-compatible Python object.
+    #[getter]
+    pub fn value<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
+        self.inner.value().0.clone().into_py(py)
+    }
+
+    fn __eq__(&self, other: &ContentAttribute) -> bool {
+        self.inner == other.inner
+    }
+
+    fn __hash__(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.inner.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn __repr__(&self, py: Python<'_>) -> String {
+        let value = self.value(py);
+        format!("ContentAttribute(name={:?}, value={})", self.inner.name(), value)
+    }
+}
+
+/// A contiguous clock range together with the attributes attached to it.
+///
+/// Returned by [`IdMap.attributions`][crate::id_map::IdMap::attributions] and
+/// [`IdMap.entries`][crate::id_map::IdMap::entries]. Ranges produced by `attributions` that fall
+/// outside any attributed region carry an empty `attributes` list.
+#[pyclass(skip_from_py_object)]
+#[derive(Clone)]
+pub struct AttrRange {
+    /// Inclusive start clock of the range.
+    #[pyo3(get)]
+    start: u32,
+    /// Exclusive end clock of the range.
+    #[pyo3(get)]
+    end: u32,
+    attributes: Vec<ContentAttribute>,
+}
+
+impl AttrRange {
+    fn from_inner(range: _AttrRange<AttrValue>) -> Self {
+        AttrRange {
+            start: range.range.start,
+            end: range.range.end,
+            attributes: range
+                .attrs
+                .0
+                .into_iter()
+                .map(|inner| ContentAttribute { inner })
+                .collect(),
+        }
+    }
+}
+
+#[pymethods]
+impl AttrRange {
+    /// The attributes attached to this range (may be empty).
+    #[getter]
+    fn attributes(&self) -> Vec<ContentAttribute> {
+        self.attributes.clone()
+    }
+
+    fn __repr__(&self, py: Python<'_>) -> String {
+        let attrs: Vec<String> = self
+            .attributes
+            .iter()
+            .map(|a| a.__repr__(py))
+            .collect();
+        format!("AttrRange(start={}, end={}, attributes=[{}])", self.start, self.end, attrs.join(", "))
+    }
+}
+
+/// A set of block ID ranges, each associated with attribute metadata.
+///
+/// This is the Python binding for `yrs::IdMap`. It is similar to [`IdSet`][crate::undo.IdSet],
+/// but it additionally attaches [`ContentAttribute`] metadata to individual block ranges.
+#[pyclass(from_py_object)]
+#[derive(Clone)]
+pub struct IdMap {
+    inner: _IdMap<AttrValue>,
+}
+
+impl IdMap {
+    fn extract_attrs(attributes: Vec<ContentAttribute>) -> Vec<_ContentAttribute<AttrValue>> {
+        attributes.into_iter().map(|a| a.inner).collect()
+    }
+}
+
+#[pymethods]
+impl IdMap {
+    /// Create a new, empty IdMap.
+    #[new]
+    pub fn new() -> Self {
+        IdMap {
+            inner: _IdMap::new(),
+        }
+    }
+
+    /// Attach `attributes` to the range `[clock, clock + length)` of the given `client`.
+    ///
+    /// Inserting an empty attribute list or a zero-length range is a no-op.
+    pub fn insert(&mut self, client: u64, clock: u32, length: u32, attributes: Vec<ContentAttribute>) {
+        let range = BlockRange::new(ID::new(ClientID::new(client), clock), length);
+        self.inner.insert(range, IdMap::extract_attrs(attributes));
+    }
+
+    /// Remove the range `[clock, clock + length)` of the given `client` from the map.
+    pub fn remove(&mut self, client: u64, clock: u32, length: u32) {
+        let range = BlockRange::new(ID::new(ClientID::new(client), clock), length);
+        self.inner.remove(&range);
+    }
+
+    /// Return whether the `(client, clock)` ID is contained in the map.
+    pub fn contains(&self, client: u64, clock: u32) -> bool {
+        self.inner.contains(&ID::new(ClientID::new(client), clock))
+    }
+
+    /// Return whether the map is empty.
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    /// Return the attributions covering `[clock, clock + length)` of the given `client`.
+    ///
+    /// The result is a list of [`AttrRange`] objects spanning the whole queried range; gaps with no
+    /// attributes are returned as ranges with an empty `attributes` list.
+    pub fn attributions(&self, client: u64, clock: u32, length: u32) -> Vec<AttrRange> {
+        let range = BlockRange::new(ID::new(ClientID::new(client), clock), length);
+        self.inner
+            .attributions(&range)
+            .into_iter()
+            .map(AttrRange::from_inner)
+            .collect()
+    }
+
+    /// Return every `(client, AttrRange)` entry stored in the map.
+    pub fn entries(&self) -> Vec<(u64, AttrRange)> {
+        self.inner
+            .iter()
+            .map(|(client, range)| (client.get(), AttrRange::from_inner(range)))
+            .collect()
+    }
+
+    /// Merge `other` into this map in place (union of ranges and attributes).
+    pub fn merge_with(&mut self, other: &IdMap) {
+        self.inner.merge_with(other.inner.clone());
+    }
+
+    /// Return the union of several maps.
+    #[staticmethod]
+    pub fn merge_many(maps: Vec<IdMap>) -> IdMap {
+        let inners: Vec<_IdMap<AttrValue>> = maps.into_iter().map(|m| m.inner).collect();
+        IdMap {
+            inner: _IdMap::merge_many(&inners),
+        }
+    }
+
+    /// Intersect this map with `other` in place.
+    pub fn intersect_with(&mut self, other: &IdMap) {
+        self.inner.intersect_with(&other.inner);
+    }
+
+    /// Remove from this map every range that is present in `other`, which may be an `IdMap` or an
+    /// `IdSet`.
+    pub fn diff_with(&mut self, other: &Bound<'_, PyAny>) -> PyResult<()> {
+        if let Ok(map) = other.cast::<IdMap>() {
+            self.inner.diff_with(&map.borrow().inner);
+            Ok(())
+        } else if let Ok(set) = other.cast::<IdSet>() {
+            self.inner.diff_with(set.borrow().inner());
+            Ok(())
+        } else {
+            Err(PyTypeError::new_err("diff_with() expects an IdMap or IdSet"))
+        }
+    }
+
+    // Set-style operators mirroring Python `set`: `|` union (merge), `&` intersection, `-`
+    // difference, with their in-place `|=`, `&=`, `-=` counterparts. The plain forms return a new
+    // map; the in-place forms mutate `self`. As with `diff_with`, `-`/`-=` also accept an `IdSet`.
+
+    fn __or__(&self, other: &IdMap) -> IdMap {
+        let mut result = self.clone();
+        result.inner.merge_with(other.inner.clone());
+        result
+    }
+
+    fn __ior__(&mut self, other: &IdMap) {
+        self.inner.merge_with(other.inner.clone());
+    }
+
+    fn __and__(&self, other: &IdMap) -> IdMap {
+        let mut result = self.clone();
+        result.inner.intersect_with(&other.inner);
+        result
+    }
+
+    fn __iand__(&mut self, other: &IdMap) {
+        self.inner.intersect_with(&other.inner);
+    }
+
+    fn __sub__(&self, other: &Bound<'_, PyAny>) -> PyResult<IdMap> {
+        let mut result = self.clone();
+        result.diff_with(other)?;
+        Ok(result)
+    }
+
+    fn __isub__(&mut self, other: &Bound<'_, PyAny>) -> PyResult<()> {
+        self.diff_with(other)
+    }
+
+    /// Return a new map keeping only the ranges whose attributes satisfy `predicate`.
+    ///
+    /// `predicate` is called with the list of [`ContentAttribute`] of each range and must return a
+    /// boolean.
+    pub fn filter(&self, predicate: Py<PyAny>) -> PyResult<IdMap> {
+        let error: RefCell<Option<PyErr>> = RefCell::new(None);
+        let filtered = self.inner.filter(|attrs: &[_ContentAttribute<AttrValue>]| {
+            if error.borrow().is_some() {
+                return false;
+            }
+            Python::attach(|py| {
+                let items: Vec<ContentAttribute> = attrs
+                    .iter()
+                    .map(|inner| ContentAttribute { inner: inner.clone() })
+                    .collect();
+                match PyList::new(py, items) {
+                    Ok(list) => match predicate.call1(py, (list,)) {
+                        Ok(result) => result.extract::<bool>(py).unwrap_or(false),
+                        Err(e) => {
+                            *error.borrow_mut() = Some(e);
+                            false
+                        }
+                    },
+                    Err(e) => {
+                        *error.borrow_mut() = Some(e.into());
+                        false
+                    }
+                }
+            })
+        });
+        if let Some(e) = error.into_inner() {
+            return Err(e);
+        }
+        Ok(IdMap { inner: filtered })
+    }
+
+    /// Return an [`IdSet`] with the same ranges as this map, stripped of attributes.
+    pub fn as_id_set(&self) -> IdSet {
+        IdSet::from(self.inner.as_id_set())
+    }
+
+    /// Build an `IdMap` from an `IdSet`, attaching `attributes` to every range.
+    #[staticmethod]
+    pub fn from_set(id_set: &IdSet, attributes: Vec<ContentAttribute>) -> IdMap {
+        IdMap {
+            inner: _IdMap::from_set(id_set.inner().clone(), IdMap::extract_attrs(attributes)),
+        }
+    }
+
+    /// Encode the map to bytes.
+    pub fn encode(&self) -> Py<PyAny> {
+        let encoded = self.inner.encode_v1();
+        Python::attach(|py: Python<'_>| PyBytes::new(py, &encoded).into())
+    }
+
+    /// Decode a map from bytes.
+    #[staticmethod]
+    pub fn decode(data: &Bound<'_, PyBytes>) -> PyResult<Self> {
+        let bytes: &[u8] = data.as_bytes();
+        match _IdMap::<AttrValue>::decode_v1(bytes) {
+            Ok(inner) => Ok(IdMap { inner }),
+            Err(e) => Err(PyValueError::new_err(format!("Failed to decode IdMap: {}", e))),
+        }
+    }
+
+    /// Return whether the map is non-empty (so `bool(id_map)` / `if id_map:` work).
+    fn __bool__(&self) -> bool {
+        !self.inner.is_empty()
+    }
+
+    /// Iterate over the `(client, AttrRange)` entries, so `for client, rng in id_map: ...` works.
+    fn __iter__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyIterator>> {
+        PyList::new(py, self.entries())?.into_any().try_iter()
+    }
+
+    fn __eq__(&self, other: &IdMap) -> bool {
+        self.inner == other.inner
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{:?}", self.inner)
+    }
+}

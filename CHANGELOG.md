@@ -1,5 +1,29 @@
 # Version history
 
+## 0.14.5
+
+- Support undo manager origins.
+
+## 0.14.4
+
+- Bump `yrs` to v0.27.4.
+
+## 0.14.3
+
+- Allow passing a `guid` to `Doc`.
+
+## 0.14.2
+
+- Allow embedding `Array`, `Map` and `Text` shared types in a `Text` via `insert_embed()`.
+- Return `pycrdt` types from `Text` and `XmlText` `diff()` for embeds.
+- Remove `futures-lite` dependency and bump other Rust dependencies.
+- Bump `mypy` v2.3.0 for tests.
+
+## 0.14.1
+
+- Bump `yrs` to v0.27.2.
+- Add `IdMap`, `ContentAttribute` and `AttrRange`.
+
 ## 0.14.0
 
 - Remove `Array.move` method.

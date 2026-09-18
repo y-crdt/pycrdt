@@ -52,6 +52,14 @@ class UndoManager:
             for scope in scopes:
                 self.expand_scope(scope)
 
+    @property
+    def origin(self) -> int:
+        """The transaction origin used by this manager for undo and redo operations.
+
+        Compare with a transaction's origin to identify changes made by this manager.
+        """
+        return self._undo_manager.origin()
+
     def expand_scope(self, scope: BaseType) -> None:
         """
         Expands the scope of shared types for this undo manager.

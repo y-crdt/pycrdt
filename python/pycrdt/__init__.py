@@ -14,6 +14,9 @@ from ._map import MapEvent as MapEvent
 from ._map import TypedMap as TypedMap
 from ._provider import Channel as Channel
 from ._provider import Provider as Provider
+from ._pycrdt import AttrRange as AttrRange
+from ._pycrdt import ContentAttribute as ContentAttribute
+from ._pycrdt import IdMap as IdMap
 from ._pycrdt import IdSet as IdSet
 from ._pycrdt import StackItem as StackItem
 from ._pycrdt import SubdocsEvent as SubdocsEvent

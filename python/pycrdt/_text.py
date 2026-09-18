@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Iterator, cast
 
-from ._base import BaseEvent, Sequence, base_types, event_types
+from ._base import BaseEvent, BaseType, Sequence, base_types, event_types
 from ._pycrdt import Subscription
 from ._pycrdt import Text as _Text
 from ._pycrdt import TextEvent as _TextEvent
@@ -329,9 +329,14 @@ class Text(Sequence):
             self._forbid_read_transaction(txn)
             current = str(self)
             offset = _char_to_offset(current, index, self.doc.offset_kind)
-            self.integrated.insert_embed(
-                txn._txn, offset, value, iter(attrs.items()) if attrs is not None else None
-            )
+            _attrs = iter(attrs.items()) if attrs is not None else None
+            if isinstance(value, BaseType):
+                # shared type
+                assert txn._txn is not None
+                self._do_and_integrate("insert", value, txn._txn, offset, _attrs)
+            else:
+                # primitive type
+                self.integrated.insert_embed(txn._txn, offset, value, _attrs)
 
     def format(self, start: int, stop: int, attrs: dict[str, Any]) -> None:
         """
@@ -359,10 +364,14 @@ class Text(Sequence):
             A list of formatted chunks that the current text corresponds to.
                 Each list item is a tuple containing the chunk's content and formatting attributes.
                 The content is usually the text as a string, but may be other data for embedded
-                objects.
+                objects. Embedded shared types are returned as their pycrdt type (e.g. an
+                [Array][pycrdt.Array], [Map][pycrdt.Map] or [Text][pycrdt.Text]).
         """
         with self.doc.transaction() as txn:
-            return self.integrated.diff(txn._txn)
+            return [
+                (self._maybe_as_type_or_doc(value), attrs)
+                for value, attrs in self.integrated.diff(txn._txn)
+            ]
 
     def observe(self, callback: Callable[[TextEvent], None]) -> Subscription:
         """

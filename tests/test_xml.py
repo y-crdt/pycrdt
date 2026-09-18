@@ -146,9 +146,9 @@ def test_text():
     text0 = Text("bar")
     text.insert_embed(0, text0)
     diff = text.diff()
-    assert type(diff[0][0]) is type(text0.integrated)
-    assert type(diff[1][0]) is type(map0.integrated)
-    assert type(diff[2][0]) is type(array0.integrated)
+    assert isinstance(diff[0][0], Text)
+    assert isinstance(diff[1][0], Map)
+    assert isinstance(diff[2][0], Array)
     assert diff[3:] == [
         ("dbye", None),
         (" World!", {"href": "some-url"}),

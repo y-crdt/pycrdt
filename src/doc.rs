@@ -1,7 +1,8 @@
 use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
-use pyo3::types::{PyBool, PyBytes, PyDict, PyInt, PyList};
+use pyo3::types::{PyBool, PyBytes, PyDict, PyInt, PyList, PyString};
+use std::sync::Arc;
 use yrs::{
     ClientID, Doc as _Doc, OffsetKind, Options, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
 };
@@ -72,6 +73,7 @@ impl Doc {
     fn new(
         client_id: &Bound<'_, PyAny>,
         skip_gc: &Bound<'_, PyAny>,
+        guid: &Bound<'_, PyAny>,
         offset_kind: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
         let mut options = Options::default();
@@ -103,6 +105,14 @@ impl Doc {
                     "offset_kind must be 'utf8' or 'utf16'",
                 )),
             };
+        }
+        if !guid.is_none() {
+            let guid: String = guid
+                .cast::<PyString>()
+                .map_err(|_| PyValueError::new_err("guid must be a string"))?
+                .extract()
+                .map_err(|_| PyValueError::new_err("guid must be a valid string"))?;
+            options.guid = Arc::<str>::from(guid);
         }
         let doc = _Doc::with_options(options);
         Ok(Doc { doc })
