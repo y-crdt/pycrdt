@@ -77,9 +77,8 @@ class Doc(BaseDoc, Generic[T]):
                 sticky indices, event deltas). It applies to this document
                 only: a subdocument carries the offset kind chosen by the
                 peer that created it. Regardless of this setting, the public
-                ``Text`` API takes Python character indices into the text
-                content as returned by ``str()`` (embedded objects are not
-                accounted for).
+                ``Text`` API counts each Python character and embedded object
+                as one position; ``str()`` omits embedded objects.
             allow_multithreading: Whether to allow the document to be used in different threads.
         """
         super().__init__(
