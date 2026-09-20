@@ -318,6 +318,7 @@ def test_observe():
 
     def callback(event):
         nonlocal fragment
+        assert list(fragment.children) == [fragment.children[0], fragment.children[1]]
         with pytest.raises(RuntimeError) as excinfo:
             fragment.children.append("text")
         assert (
@@ -380,3 +381,60 @@ def test_xml_in_map():
     with pytest.raises(TypeError):
         map["testel"] = XmlElement("a")
     assert len(map) == 1
+
+
+@pytest.fixture(params=[False, True], ids=["fragment", "element"])
+def xml_parent(request):
+    doc = Doc()
+    root = XmlFragment()
+    doc["root"] = root
+    if request.param:
+        parent = XmlElement("div")
+        root.children.append(parent)
+        return parent
+    return root
+
+
+def test_children_iteration_empty(xml_parent):
+    assert list(xml_parent.children) == []
+
+
+def test_children_iteration_mixed_and_nested(xml_parent):
+    text = XmlText("before")
+    nested_text = XmlText("inside")
+    element = XmlElement("p", contents=[nested_text])
+    trailing_text = XmlText("after")
+    expected = [text, element, trailing_text]
+    for child in expected:
+        xml_parent.children.append(child)
+
+    assert list(xml_parent.children) == expected
+    assert list(element.children) == [nested_text]
+
+
+def test_children_iteration_skips_deleted_nodes(xml_parent):
+    children = [XmlText(str(index)) for index in range(5)]
+    for child in children:
+        xml_parent.children.append(child)
+    del xml_parent.children[4]
+    del xml_parent.children[2]
+    del xml_parent.children[0]
+
+    assert list(xml_parent.children) == [children[1], children[3]]
+
+
+def test_children_iteration_snapshots_membership(xml_parent):
+    empty_iterator = iter(xml_parent.children)
+    first = XmlText("first")
+    second = XmlElement("p")
+    xml_parent.children.append(first)
+    xml_parent.children.append(second)
+    iterator = iter(xml_parent.children)
+
+    del xml_parent.children[0]
+    third = XmlText("third")
+    xml_parent.children.append(third)
+
+    assert list(empty_iterator) == []
+    assert list(iterator) == [first, second]
+    assert list(xml_parent.children) == [second, third]
