@@ -1,5 +1,9 @@
 # Version history
 
+## 0.14.6
+
+- Improve XML children iteration performances.
+
 ## 0.14.5
 
 - Support undo manager origins.
