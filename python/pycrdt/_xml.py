@@ -495,8 +495,11 @@ class XmlChildrenView:
         Returns:
             An iterable over child nodes.
         """
-        with self.inner.doc.transaction():
-            children = [self[i] for i in range(len(self))]
+        with self.inner.doc.transaction() as txn:
+            children = [
+                _integrated_to_wrapper(self.inner.doc, child)
+                for child in self.inner.integrated.children(txn._txn)
+            ]
         return iter(children)
 
     @overload
