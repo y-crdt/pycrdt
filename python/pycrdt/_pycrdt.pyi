@@ -162,6 +162,10 @@ class Text:
         """Subscribes a callback to be called with the shared text change event.
         Returns a subscription that can be used to unsubscribe."""
 
+    def observe_deep(self, callback: Callable[[list[TextEvent]], None]) -> Subscription:
+        """Subscribes a callback to be called with text and nested change events.
+        Returns a subscription that can be used to unsubscribe."""
+
     def unobserve(self, subscription: Subscription) -> None:
         """Unsubscribes previously subscribed event callback identified by given
         `subscription`."""
@@ -184,11 +188,11 @@ class Array:
     def to_json(self, txn: Transaction) -> str:
         """Returns a JSON representation of the current array."""
 
-    def observe(self, callback: Callable[[TextEvent], None]) -> Subscription:
+    def observe(self, callback: Callable[[ArrayEvent], None]) -> Subscription:
         """Subscribes a callback to be called with the array change event.
         Returns a subscription that can be used to unsubscribe."""
 
-    def observe_deep(self, callback: Callable[[TextEvent], None]) -> Subscription:
+    def observe_deep(self, callback: Callable[[list[ArrayEvent]], None]) -> Subscription:
         """Subscribes a callback to be called with the array change event
         and its nested elements.
         Returns a subscription that can be used to unsubscribe."""
@@ -215,11 +219,11 @@ class Map:
     def to_json(self, txn: Transaction) -> str:
         """Returns a JSON representation of the current map."""
 
-    def observe(self, callback: Callable[[TextEvent], None]) -> Subscription:
+    def observe(self, callback: Callable[[MapEvent], None]) -> Subscription:
         """Subscribes a callback to be called with the map change event.
         Returns a subscription that can be used to unsubscribe."""
 
-    def observe_deep(self, callback: Callable[[TextEvent], None]) -> Subscription:
+    def observe_deep(self, callback: Callable[[list[MapEvent]], None]) -> Subscription:
         """Subscribes a callback to be called with the map change event
         and its nested elements.
         Returns a subscription that can be used to unsubscribe."""
@@ -260,7 +264,7 @@ class XmlFragment:
         """Subscribes a callback to be called with the XML change event.
         Returns a subscription that can be used to unsubscribe."""
 
-    def observe_deep(self, callback: Callable[[XmlEvent], None]) -> Subscription:
+    def observe_deep(self, callback: Callable[[list[XmlEvent]], None]) -> Subscription:
         """Subscribes a callback to be called with the XML change event
         and its nested elements.
         Returns a subscription that can be used to unsubscribe."""
@@ -309,7 +313,7 @@ class XmlElement:
         """Subscribes a callback to be called with the XML change event.
         Returns a subscription that can be used to unsubscribe."""
 
-    def observe_deep(self, callback: Callable[[XmlEvent], None]) -> Subscription:
+    def observe_deep(self, callback: Callable[[list[XmlEvent]], None]) -> Subscription:
         """Subscribes a callback to be called with the XML change event
         and its nested elements.
         Returns a subscription that can be used to unsubscribe."""
@@ -358,7 +362,7 @@ class XmlText:
         """Subscribes a callback to be called with the XML change event.
         Returns a subscription that can be used to unsubscribe."""
 
-    def observe_deep(self, callback: Callable[[XmlEvent], None]) -> Subscription:
+    def observe_deep(self, callback: Callable[[list[XmlEvent]], None]) -> Subscription:
         """Subscribes a callback to be called with the XML change event
         and its nested elements.
         Returns a subscription that can be used to unsubscribe."""
