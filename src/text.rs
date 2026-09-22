@@ -15,7 +15,7 @@ use yrs::types::map::MapPrelim;
 use yrs::types::text::{TextEvent as _TextEvent, TextPrelim, YChange};
 use crate::transaction::Transaction;
 use crate::subscription::Subscription;
-use crate::type_conversions::{py_to_any, py_to_attrs, ToPython};
+use crate::type_conversions::{py_to_attrs, py_to_supported_any, ToPython};
 use crate::array::Array;
 use crate::map::Map;
 use crate::sticky_index::StickyIndex;
@@ -59,7 +59,7 @@ impl Text {
 
     #[pyo3(signature = (txn, index, embed, attrs=None))]
     fn insert_embed(&self, txn: &mut Transaction, index: u32, embed: Bound<'_, PyAny>, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<()> {
-        let embed = py_to_any(&embed);
+        let embed = py_to_supported_any(&embed)?;
         let mut _t = txn.transaction();
         let mut t = _t.as_mut().unwrap().as_mut();
         if let Some(attrs) = attrs {
