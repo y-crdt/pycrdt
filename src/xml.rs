@@ -77,6 +77,12 @@ macro_rules! impl_xml_methods {
                     self.$finner.get(t, index).unwrap().into_py(py)
                 }
 
+                fn children<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> Vec<Bound<'py, PyAny>> {
+                    let _t = txn.transaction();
+                    let t = _t.as_ref().unwrap();
+                    self.$finner.children(t.as_ref()).map(|node| node.into_py(py)).collect()
+                }
+
                 fn remove_range(&self, txn: &mut Transaction, index: u32, len: u32) {
                     let mut _t = txn.transaction();
                     let mut t = _t.as_mut().unwrap().as_mut();

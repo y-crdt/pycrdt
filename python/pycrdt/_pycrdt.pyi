@@ -244,6 +244,9 @@ class XmlFragment:
     def get(self, txn: Transaction, index: int) -> XmlFragment | XmlElement | XmlText | None:
         """Gets a child item by index, or `None` if the index is out of bounds."""
 
+    def children(self, txn: Transaction) -> list[XmlFragment | XmlElement | XmlText]:
+        """Gets the child nodes in document order."""
+
     def remove_range(self, txn: Transaction, index: int, len: int) -> None:
         """Removes a range of children."""
 
@@ -274,6 +277,9 @@ class XmlElement:
 
     def get(self, txn: Transaction, index: int) -> XmlFragment | XmlElement | XmlText | None:
         """Gets a child item by index, or `None` if the index is out of bounds."""
+
+    def children(self, txn: Transaction) -> list[XmlFragment | XmlElement | XmlText]:
+        """Gets the child nodes in document order."""
 
     def remove_range(self, txn: Transaction, index: int, len: int) -> None:
         """Removes a range of children."""
