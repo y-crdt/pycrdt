@@ -4,6 +4,7 @@ use pyo3::types::{PyDict, PyIterator, PyList, PyString, PyTuple};
 use yrs::{
     Assoc,
     GetString,
+    DeepObservable,
     IndexedSequence,
     Observable,
     TextRef,
@@ -15,7 +16,7 @@ use yrs::types::map::MapPrelim;
 use yrs::types::text::{TextEvent as _TextEvent, TextPrelim, YChange};
 use crate::transaction::Transaction;
 use crate::subscription::Subscription;
-use crate::type_conversions::{py_to_any, py_to_attrs, ToPython};
+use crate::type_conversions::{events_into_py, py_to_any, py_to_attrs, ToPython};
 use crate::array::Array;
 use crate::map::Map;
 use crate::sticky_index::StickyIndex;
@@ -181,20 +182,42 @@ impl Text {
     }
 
     fn observe(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
-        let sub = self.text.observe(move |txn, e| {
+        let target = self.text.clone();
+        let (sub, callback) = Subscription::new(f, move |key| {
+            let _ = target.unobserve(key);
+        });
+        self.text.observe(callback.key, move |txn, e| {
             Python::attach(|py| {
+                let Some(f) = callback.get(py) else {
+                    return;
+                };
                 let e = TextEvent::new(e, txn);
                 if let Err(err) = f.call1(py, (e,)) {
                     err.restore(py)
                 }
             });
         });
-        let s: Py<Subscription> = Py::new(py, Subscription::from(sub))?;
+        let s: Py<Subscription> = Py::new(py, sub)?;
         Ok(s)
     }
 
     pub fn observe_deep(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
-        self.observe(py, f)
+        let target = self.text.clone();
+        let (sub, callback) = Subscription::new(f, move |key| {
+            let _ = target.unobserve_deep(key);
+        });
+        self.text.observe_deep(callback.key, move |txn, events| {
+            Python::attach(|py| {
+                let Some(f) = callback.get(py) else {
+                    return;
+                };
+                let events = events_into_py(py, txn, events);
+                if let Err(err) = f.call1(py, (events,)) {
+                    err.restore(py)
+                }
+            });
+        });
+        Py::new(py, sub)
     }
 }
 
