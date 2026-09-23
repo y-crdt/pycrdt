@@ -306,6 +306,7 @@ def observe_callback(
 ):
     with doc._read_transaction(event.transaction) as txn:
         _event = event_types[type(event)](event, doc)
+        del event
         _event.transaction = txn
         params = (_event, txn)
         try:
@@ -325,6 +326,7 @@ def observe_deep_callback(
             _event = event_types[type(event)](event, doc)
             _event.transaction = txn
             events[idx] = _event
+            del event
         params = (events, txn)
         try:
             callback(*params[:param_nb])  # type: ignore[arg-type]
