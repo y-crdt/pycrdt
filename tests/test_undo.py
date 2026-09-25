@@ -1,3 +1,6 @@
+import gc
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 from pycrdt import Array, Doc, IdSet, Map, StackItem, Text, UndoManager
 
@@ -28,6 +31,29 @@ def undo_redo(data, undo_manager, val0, val1, val3):
     assert undo_manager.can_undo()
     undo_manager.clear()
     assert not undo_manager.can_undo()
+
+
+def test_undo_manager_across_threads():
+    def create_manager():
+        doc = Doc()
+        doc["text"] = text = Text()
+        manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+        text += "Hello"
+        return manager, doc
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        manager, doc = executor.submit(create_manager).result()
+
+    assert manager.undo()
+    assert str(doc["text"]) == ""
+    assert manager.redo()
+    assert str(doc["text"]) == "Hello"
+
+    # Collect a cycle on a different thread from the manager's creation thread.
+    cycle = [manager]
+    cycle.append(cycle)
+    del manager, cycle
+    gc.collect()
 
 
 def test_text_undo():
