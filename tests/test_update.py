@@ -53,3 +53,51 @@ def test_update_transaction():
         doc1.apply_update(update1)
 
     assert str(doc1.get("test", type=Text)) == "Hello World!"
+
+
+def test_squash_updates_ok():
+    # create updates from a single doc
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    text += "Hello"
+    updates = [doc.get_update()]
+    state = doc.get_state()
+    text += ", World!"
+    updates.append(doc.get_update(state))
+
+    # apply updates to another doc
+    doc = Doc()
+    for update in updates:
+        doc.apply_update(update)
+    text = doc.get("text", type=Text)
+    assert str(text) == "Hello, World!"
+
+    # check that updates are squashed
+    update = doc.get_update()
+    assert b"Hello, World" in update
+
+
+def test_squash_updates_ko():
+    # create updates from different docs
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    text += "Hello"
+    updates = [doc.get_update()]
+
+    doc = Doc()
+    doc.apply_update(updates[0])
+    state = doc.get_state()
+    text = doc.get("text", type=Text)
+    text += ", World!"
+    updates.append(doc.get_update(state))
+
+    # apply updates to another doc
+    doc = Doc()
+    for update in updates:
+        doc.apply_update(update)
+    text = doc.get("text", type=Text)
+    assert str(text) == "Hello, World!"
+
+    # check that updates are squashed
+    update = doc.get_update()
+    assert b"Hello, World!" in update
