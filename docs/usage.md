@@ -327,6 +327,52 @@ print(str(text))
 
 Undoing a change doesn't remove the change from the document's history, but applies a change that is the opposite of the previous change.
 
+## Encoding values
+
+Values can be encoded to and from the binary format used by [lib0](https://github.com/dmonad/lib0),
+the "any" format that Y implementations use to exchange arbitrary values over the wire. The API
+mirrors the standard library's `json` module:
+
+```py
+from pycrdt import decode_any, encode_any
+
+data: bytes = encode_any({"name": "Alice", "scores": [1, 2, 3]})
+value = decode_any(data)
+```
+
+The supported types are the JSON ones plus `bytes`: `None`, `bool`, `int`, `float`, `str`, `bytes`,
+`list`, `tuple`, and `dict` with `str` keys. Containers can be nested. Like `json.dumps()`,
+`encode_any()` raises a `TypeError` for a value it cannot encode, and an `OverflowError` for an
+`int` that doesn't fit in 64 bits.
+
+Decoding is not the exact inverse of encoding, since the format has fewer types than Python:
+
+| Encoded from | Decoded back as |
+|--------------|-----------------|
+| `int` with an absolute value up to 2<sup>53</sup>-1 | `float` |
+| `int` beyond that | `int` |
+| `bytes` | `bytearray` |
+| `tuple` | `list` |
+
+Integers follow JavaScript number semantics, because that is what the format encodes: a small `int`
+is written as a floating-point number, so `decode_any(encode_any(1))` is `1.0`. A JavaScript
+`undefined` decodes as `None`, like `null`.
+
+An encoded value is self-delimiting, so it can be embedded in a larger message stream using
+[Encoder][pycrdt.Encoder] and [Decoder][pycrdt.Decoder]:
+
+```py
+from pycrdt import Decoder, Encoder
+
+encoder = Encoder()
+encoder.write_var_uint(0)
+encoder.write_any({"name": "Alice"})
+
+decoder = Decoder(encoder.to_bytes())
+message_type = decoder.read_var_uint()
+value = decoder.read_any()
+```
+
 ## Type annotations
 
 `Array`, `Map` and `Doc` can be type-annotated for static type analysis. For instance, here is how to declare a `Doc` where all root types are `Array`s of `int`s:

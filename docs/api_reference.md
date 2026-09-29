@@ -42,6 +42,8 @@
       - create_awareness_message
       - create_sync_message
       - create_update_message
+      - decode_any
+      - encode_any
       - handle_sync_message
       - get_state
       - get_update

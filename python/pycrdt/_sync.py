@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import Iterator
+from typing import Any, Iterator
 
+from ._any import encode_any
 from ._doc import Doc
+from ._pycrdt import decode_any as _decode_any
 
 
 class YMessageType(IntEnum):
@@ -152,6 +154,16 @@ class Encoder:
         self.stream.append(write_var_uint(len(text)))
         self.stream.append(text.encode())
 
+    def write_any(self, value: Any) -> None:
+        """
+        Encodes a value using the lib0 "any" binary format. The encoded value is self-delimiting,
+        so unlike [write_var_string][pycrdt.Encoder.write_var_string] it is not length-prefixed.
+
+        Args:
+            value: The value to encode, see [encode_any][pycrdt.encode_any].
+        """
+        self.stream.append(encode_any(value))
+
     def to_bytes(self) -> bytes:
         """
         Returns:
@@ -238,6 +250,19 @@ class Decoder:
         if message is None:
             return ""
         return message.decode("utf-8")
+
+    def read_any(self) -> Any:
+        """
+        Reads a value in the lib0 "any" binary format from the byte stream, ready to read the
+        next message if any.
+
+        Returns:
+            The decoded value, see [decode_any][pycrdt.decode_any].
+        """
+        value, i1 = _decode_any(self.stream, self.i0)
+        self.length -= i1 - self.i0
+        self.i0 = i1
+        return value
 
 
 def read_message(stream: bytes) -> bytes:

@@ -149,6 +149,18 @@ def test_formatting():
     ]
 
 
+def test_insert_embed_unsupported_type():
+    """An embed with no representation must raise, not be silently stored as None."""
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    text += "ab"
+    for value in (object(), 2**64):
+        with pytest.raises(TypeError) as excinfo:
+            text.insert_embed(1, value)
+        assert str(excinfo.value) == "Type not supported"
+    assert text.diff() == [("ab", None)]
+
+
 def test_insert_embed_shared_types():
     doc = Doc()
     doc["text"] = text = Text("XY")
