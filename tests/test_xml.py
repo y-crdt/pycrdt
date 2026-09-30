@@ -438,3 +438,22 @@ def test_children_iteration_snapshots_membership(xml_parent):
     assert list(empty_iterator) == []
     assert list(iterator) == [first, second]
     assert list(xml_parent.children) == [second, third]
+
+
+@pytest.mark.parametrize("node_type", [XmlText, XmlElement])
+def test_deleted_child_identity(xml_parent, node_type):
+    node = node_type("content")
+    xml_parent.children.append(node)
+    alias = xml_parent.children[0]
+    original_hash = hash(node)
+    assert alias == node
+    assert hash(alias) == original_hash
+
+    del xml_parent.children[0]
+    for index in range(20):
+        xml_parent.children.append(XmlText(str(index)))
+
+    assert alias == node
+    assert hash(node) == original_hash
+    assert hash(alias) == original_hash
+    assert node != xml_parent.children[0]
