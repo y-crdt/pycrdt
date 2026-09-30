@@ -143,24 +143,33 @@ macro_rules! impl_xml_methods {
             $($extra)*
         }
 
+        impl PartialEq for $typ {
+            fn eq(&self, other: &Self) -> bool {
+                self.id == other.id
+            }
+        }
+
+        impl Eq for $typ {}
+
         impl std::hash::Hash for $typ {
             fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-                let branch: &yrs::branch::Branch = self.$inner.as_ref();
-                branch.id().hash(state)
+                self.id.hash(state)
             }
         }
     };
 }
 
 #[pyclass(eq, frozen, hash)]
-#[derive(PartialEq, Eq)]
 pub struct XmlFragment {
     pub fragment: XmlFragmentRef,
+    // Keep identity available after Yrs garbage collects a deleted branch.
+    id: yrs::branch::BranchID,
 }
 
 impl From<XmlFragmentRef> for XmlFragment {
     fn from(value: XmlFragmentRef) -> Self {
-        XmlFragment { fragment: value }
+        let branch: &yrs::branch::Branch = value.as_ref();
+        XmlFragment { id: branch.id(), fragment: value }
     }
 }
 
@@ -205,14 +214,16 @@ impl_xml_methods!(XmlFragment[fragment, fragment: fragment] {
 });
 
 #[pyclass(eq, frozen, hash)]
-#[derive(PartialEq, Eq)]
 pub struct XmlElement {
     pub element: XmlElementRef,
+    // Keep identity available after Yrs garbage collects a deleted branch.
+    id: yrs::branch::BranchID,
 }
 
 impl From<XmlElementRef> for XmlElement {
     fn from(value: XmlElementRef) -> Self {
-        XmlElement { element: value }
+        let branch: &yrs::branch::Branch = value.as_ref();
+        XmlElement { id: branch.id(), element: value }
     }
 }
 
@@ -261,14 +272,16 @@ impl_xml_methods!(XmlElement[element, fragment: element, xml: element] {
 });
 
 #[pyclass(eq, frozen, hash)]
-#[derive(PartialEq, Eq)]
 pub struct XmlText {
     pub text: XmlTextRef,
+    // Keep identity available after Yrs garbage collects a deleted branch.
+    id: yrs::branch::BranchID,
 }
 
 impl From<XmlTextRef> for XmlText {
     fn from(value: XmlTextRef) -> Self {
-        XmlText { text: value }
+        let branch: &yrs::branch::Branch = value.as_ref();
+        XmlText { id: branch.id(), text: value }
     }
 }
 
