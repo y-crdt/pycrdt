@@ -1,5 +1,9 @@
 # Version history
 
+## 0.14.7
+
+- Bump `yrs` to v0.28.0.
+
 ## 0.14.6
 
 - Improve XML children iteration performances.
