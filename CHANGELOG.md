@@ -1,8 +1,9 @@
 # Version history
 
-## 0.14.7
+## 0.14.8
 
 - Bump `yrs` to v0.28.0.
+- Cache node IDs to fix deleted XML children.
 
 ## 0.14.6
 
