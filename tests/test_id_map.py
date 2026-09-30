@@ -18,6 +18,9 @@ JSON_VALUES = [
     42,
     -7,
     2**53,  # large int (above the JS safe-integer range)
+    -(2**53),
+    2**53 + 1,  # cannot be represented exactly as a float
+    {"large": [2**53, -(2**53), 2**53 + 1]},
     3.14,
     "alice",
     "",

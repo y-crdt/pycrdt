@@ -4,7 +4,7 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::types::{PyAny, PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyIterator, PyList, PyInt, PyString, PyTuple};
 use serde_json::Value;
 use yrs::types::{Attrs, Change, EntryChange, Delta, Events, Path, PathSegment};
-use yrs::{Any, Out, TransactionMut, XmlOut};
+use yrs::{Any, Number, Out, TransactionMut, XmlOut};
 use std::collections::{VecDeque, HashMap};
 use std::sync::Arc;
 use crate::text::{Text, TextEvent};
@@ -191,8 +191,14 @@ impl ToPython for Any {
         match self {
             Any::Null | Any::Undefined => py.None().into_bound(py),
             Any::Bool(v) => PyBool::new(py, v).into_bound_py_any(py).unwrap(),
-            Any::Number(v) => PyFloat::new(py, v).into_bound_py_any(py).unwrap(),
-            Any::BigInt(v) => v.into_pyobject(py).unwrap().into_bound_py_any(py).unwrap(),
+            Any::Number(Number::Float(v)) => PyFloat::new(py, v).into_bound_py_any(py).unwrap(),
+            Any::Number(Number::Int(v)) => {
+                if (Number::I64_MIN_SAFE_INTEGER..=Number::I64_MAX_SAFE_INTEGER).contains(&v) {
+                    PyFloat::new(py, v as f64).into_bound_py_any(py).unwrap()
+                } else {
+                    v.into_pyobject(py).unwrap().into_bound_py_any(py).unwrap()
+                }
+            },
             Any::String(v) => v.into_pyobject(py).unwrap().into_bound_py_any(py).unwrap(),
             Any::Buffer(v) => PyByteArray::new(py, v.as_ref()).into_bound_py_any(py).unwrap(),
             Any::Array(v) => {
@@ -228,16 +234,15 @@ pub fn py_to_any<'py>(value: &Bound<'py, PyAny>) -> Any {
         let v: bool = value.extract().unwrap();
         Any::Bool(v)
     } else if value.is_instance_of::<PyInt>() {
-        const MAX_JS_NUMBER: i64 = 2_i64.pow(53) - 1;
         let v: i64 = value.extract().unwrap();
-        if v.abs() > MAX_JS_NUMBER {
-            Any::BigInt(v)
+        if !(Number::I64_MIN_SAFE_INTEGER..=Number::I64_MAX_SAFE_INTEGER).contains(&v) {
+            Any::Number(Number::Int(v))
         } else {
-            Any::Number(v as f64)
+            Any::Number(Number::Float(v as f64))
         }
     } else if value.is_instance_of::<PyFloat>() {
         let v: f64 = value.extract().unwrap();
-        Any::Number(v)
+        Any::Number(Number::Float(v))
     } else if let Ok(v) = value.cast::<PyList>() {
         let mut items = Vec::new();
         for i in v.iter() {
@@ -284,8 +289,8 @@ pub(crate) fn py_to_json_any(value: &Bound<'_, PyAny>) -> PyResult<Any> {
 /// Reject `Any` values that have no JSON representation.
 fn ensure_json_compatible(any: &Any) -> PyResult<()> {
     match any {
-        Any::Null | Any::Bool(_) | Any::BigInt(_) | Any::String(_) => Ok(()),
-        Any::Number(n) if n.is_finite() => Ok(()),
+        Any::Null | Any::Bool(_) | Any::Number(Number::Int(_)) | Any::String(_) => Ok(()),
+        Any::Number(Number::Float(n)) if n.is_finite() => Ok(()),
         Any::Number(_) => Err(PyValueError::new_err(
             "NaN and infinity cannot be used as attribute values",
         )),
@@ -318,18 +323,35 @@ pub(crate) fn any_to_value(any: &Any) -> Value {
     match any {
         Any::Null | Any::Undefined | Any::Buffer(_) => Value::Null,
         Any::Bool(b) => Value::Bool(*b),
-        Any::Number(n) => serde_json::Number::from_f64(*n)
-            .map(Value::Number)
-            .unwrap_or(Value::Null),
-        Any::BigInt(i) => Value::Number((*i).into()),
+        Any::Number(Number::Int(i))
+            if !(Number::I64_MIN_SAFE_INTEGER..=Number::I64_MAX_SAFE_INTEGER).contains(i) =>
+        {
+            Value::Number((*i).into())
+        },
+        // Yrs may encode exactly representable large integers as floats. Keep their
+        // canonical JSON identical after decoding, including in nested attributes.
+        Any::Number(Number::Float(f))
+            if f.fract() == 0.0
+                && (*f < Number::F64_MIN_SAFE_INTEGER || *f > Number::F64_MAX_SAFE_INTEGER)
+                && *f >= i64::MIN as f64
+                && *f < -(i64::MIN as f64) =>
+        {
+            Value::Number((*f as i64).into())
+        },
+        Any::Number(n) => serde_json::Number::from_f64(match n {
+            Number::Int(i) => *i as f64,
+            Number::Float(f) => *f,
+        })
+        .map(Value::Number)
+        .unwrap_or(Value::Null),
         Any::String(s) => Value::String(s.to_string()),
         Any::Array(items) => Value::Array(items.iter().map(any_to_value).collect()),
         Any::Map(map) => Value::Object(map.iter().map(|(k, v)| (k.clone(), any_to_value(v))).collect()),
     }
 }
 
-/// Parse a [`serde_json::Value`] into an [`Any`], applying the same JS-number normalization as the
-/// rest of pycrdt (small integers become `Any::Number`).
+/// Parse a [`serde_json::Value`] into an [`Any`]. Python number normalization is
+/// applied by [`ToPython`] when the value is read.
 pub(crate) fn value_to_any(value: &Value) -> Any {
     Any::from_json(&value.to_string()).expect("serde_json::Value renders to valid JSON for Any")
 }

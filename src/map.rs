@@ -151,30 +151,42 @@ impl Map {
     }
 
     pub fn observe(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
-        let sub = self.map
-            .observe(move |txn, e| {
-                Python::attach(|py| {
-                    let e = MapEvent::new(e, txn);
-                    if let Err(err) = f.call1(py, (e,)) {
-                        err.restore(py)
-                    }
-                })
-            });
-        let s: Py<Subscription> = Py::new(py, Subscription::from(sub))?;
+        let target = self.map.clone();
+        let (sub, callback) = Subscription::new(f, move |key| {
+            let _ = target.unobserve(key);
+        });
+        self.map.observe(callback.key, move |txn, e| {
+            Python::attach(|py| {
+                let Some(f) = callback.get(py) else {
+                    return;
+                };
+                let e = MapEvent::new(e, txn);
+                if let Err(err) = f.call1(py, (e,)) {
+                    err.restore(py)
+                }
+            })
+        });
+        let s: Py<Subscription> = Py::new(py, sub)?;
         Ok(s)
     }
 
     pub fn observe_deep<'py>(&mut self, py: Python<'py>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
-        let sub = self.map
-            .observe_deep(move |txn, events| {
-                Python::attach(|py| {
-                    let events = events_into_py(py, txn, events);
-                    if let Err(err) = f.call1(py, (events,)) {
-                        err.restore(py)
-                    }
-                })
-            });
-        let s: Py<Subscription> = Py::new(py, Subscription::from(sub))?;
+        let target = self.map.clone();
+        let (sub, callback) = Subscription::new(f, move |key| {
+            let _ = target.unobserve_deep(key);
+        });
+        self.map.observe_deep(callback.key, move |txn, events| {
+            Python::attach(|py| {
+                let Some(f) = callback.get(py) else {
+                    return;
+                };
+                let events = events_into_py(py, txn, events);
+                if let Err(err) = f.call1(py, (events,)) {
+                    err.restore(py)
+                }
+            })
+        });
+        let s: Py<Subscription> = Py::new(py, sub)?;
         Ok(s)
     }
 }
