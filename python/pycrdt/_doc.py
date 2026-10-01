@@ -56,6 +56,7 @@ class Doc(BaseDoc, Generic[T]):
         client_id: int | None = None,
         skip_gc: bool | None = None,
         guid: str | None = None,
+        offset_kind: Literal["utf8", "utf16"] | None = None,
         doc: _Doc | None = None,
         Model=None,
         allow_multithreading: bool = False,
@@ -67,12 +68,24 @@ class Doc(BaseDoc, Generic[T]):
             skip_gc: Whether to skip garbage collection on deleted collections
                 on transaction commit.
             guid: An optional globally unique identifier for the document.
+            offset_kind: How yrs counts text positions internally. ``"utf8"``
+                (the yrs default) uses byte offsets; ``"utf16"`` uses UTF-16
+                code unit offsets, matching the index semantics of JS yjs.
+                ``None`` (default) selects the yrs default of ``"utf8"``.
+                The setting doesn't affect the update wire format, but it
+                matters when raw yrs offsets are shared with yjs peers (e.g.
+                sticky indices, event deltas). It applies to this document
+                only: a subdocument carries the offset kind chosen by the
+                peer that created it. Regardless of this setting, the public
+                ``Text`` API counts each Python character and embedded object
+                as one position; ``str()`` omits embedded objects.
             allow_multithreading: Whether to allow the document to be used in different threads.
         """
         super().__init__(
             client_id=client_id,
             skip_gc=skip_gc,
             guid=guid,
+            offset_kind=offset_kind,
             doc=doc,
             Model=Model,
             allow_multithreading=allow_multithreading,
@@ -95,6 +108,15 @@ class Doc(BaseDoc, Generic[T]):
     def client_id(self) -> int:
         """The document client ID."""
         return self._doc.client_id()
+
+    @property
+    def offset_kind(self) -> Literal["utf8", "utf16"]:
+        """The text offset kind used internally by yrs.
+
+        Returns ``"utf8"`` or ``"utf16"``. See [Doc.__init__][pycrdt.Doc.__init__]
+        for the meaning.
+        """
+        return self._doc.offset_kind
 
     def transaction(self, origin: Any = None) -> Transaction:
         """
