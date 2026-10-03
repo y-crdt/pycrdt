@@ -129,6 +129,7 @@ class Provider:
         async with self._doc.events() as events:
             async for event in events:
                 message = create_update_message(event.update)
+                del event
                 await self._channel.send(message)
 
     async def __aenter__(self) -> Provider:
