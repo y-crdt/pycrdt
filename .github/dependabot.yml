@@ -11,6 +11,8 @@ updates:
   - krassowski
 - package-ecosystem: cargo
   directory: "/"
+  # Cargo.lock is not tracked, so update requirements even for compatible releases.
+  versioning-strategy: increase
   schedule:
     interval: daily
     time: "04:00"
