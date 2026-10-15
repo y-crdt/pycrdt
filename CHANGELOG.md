@@ -1,5 +1,10 @@
 # Version history
 
+## 0.14.9
+
+- Update dependencies.
+- Drop Python 3.10 and add Python 3.15.
+
 ## 0.14.8
 
 - Bump `yrs` to v0.28.0.
