@@ -28,10 +28,10 @@ jobs:
       - name: Build wheels - universal2
         uses: PyO3/maturin-action@v1
         with:
-          args: --release --target universal2-apple-darwin --out dist -i 3.10 3.11 3.12 3.13 3.14 pypy3.11
+          args: --release --target universal2-apple-darwin --out dist -i 3.11 3.12 3.13 3.14 3.15 pypy3.11
       - name: Test built wheel - universal2
         run: |
-          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32" "exceptiongroup; python_version<'3.11'"
+          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32"
           pip install pycrdt --no-deps --no-index --find-links dist --force-reinstall
           pytest --ignore tests/test_types.py
       - name: Upload wheels
@@ -47,9 +47,9 @@ jobs:
       matrix:
         platform:
           - target: x64
-            interpreter: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+            interpreter: ["3.11", "3.12", "3.13", "3.14", "3.15"]
           - target: x86
-            interpreter: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+            interpreter: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -57,6 +57,7 @@ jobs:
           python-version: |
             ${{ join(matrix.platform.interpreter, '
             ') }}
+          allow-prereleases: true
           architecture: ${{ matrix.platform.target }}
       - uses: dtolnay/rust-toolchain@stable
       - name: Build wheels
@@ -66,7 +67,7 @@ jobs:
           args: --release --out dist -i ${{ join(matrix.platform.interpreter, ' ') }}
       - name: Test built wheel
         run: |
-          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32" "exceptiongroup; python_version<'3.11'"
+          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32"
           pip install pycrdt --no-deps --no-index --find-links dist --force-reinstall
           pytest --ignore tests/test_types.py
       - name: Upload wheels
@@ -98,11 +99,11 @@ jobs:
           rust-toolchain: stable
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --out dist -i 3.10 3.11 3.12 3.13 3.14 pypy3.11
+          args: --release --out dist -i 3.11 3.12 3.13 3.14 3.15 pypy3.11
       - name: Test built wheel
         if: matrix.target == 'x86_64'
         run: |
-          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32" "exceptiongroup; python_version<'3.11'"
+          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32"
           pip install pycrdt --no-deps --no-index --find-links dist --force-reinstall
           pytest --ignore tests/test_types.py
       - name: Upload wheels
@@ -127,20 +128,20 @@ jobs:
           rust-toolchain: stable
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --out dist -i 3.10 3.11 3.12 3.13 3.14 pypy3.11
+          args: --release --out dist -i 3.11 3.12 3.13 3.14 3.15 pypy3.11
 
       - uses: uraimo/run-on-arch-action@v3.2.1
         name: Test built wheel
         with:
           arch: ${{ matrix.target }}
-          distro: ubuntu22.04
+          distro: ubuntu24.04
           githubToken: ${{ github.token }}
           install: |
             apt-get update
             apt-get install -y --no-install-recommends python3 python3-pip
-            pip3 install -U pip pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32" "exceptiongroup; python_version<'3.11'"
+            pip3 install --break-system-packages -U pip pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32"
           run: |
-            pip3 install pycrdt --no-deps --no-index --find-links dist/ --force-reinstall
+            pip3 install --break-system-packages pycrdt --no-deps --no-index --find-links dist/ --force-reinstall
             pytest --ignore tests/test_types.py
 
       - name: Upload wheels
@@ -168,7 +169,7 @@ jobs:
           rust-toolchain: stable
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
-          args: --release --out dist -i 3.10 3.11 3.12 3.13 3.14
+          args: --release --out dist -i 3.11 3.12 3.13 3.14 3.15
       - name: Test built wheel
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
@@ -204,7 +205,7 @@ jobs:
           rust-toolchain: stable
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
-          args: --release --out dist -i 3.10 3.11 3.12 3.13 3.14
+          args: --release --out dist -i 3.11 3.12 3.13 3.14 3.15
 
       - uses: uraimo/run-on-arch-action@v3.2.1
         name: Test built wheel
