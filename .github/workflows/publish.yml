@@ -139,7 +139,7 @@ jobs:
           install: |
             apt-get update
             apt-get install -y --no-install-recommends python3 python3-pip
-            pip3 install --break-system-packages -U pip pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32"
+            pip3 install --break-system-packages -U pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32"
           run: |
             pip3 install --break-system-packages pycrdt --no-deps --no-index --find-links dist/ --force-reinstall
             pytest --ignore tests/test_types.py
