@@ -13,6 +13,9 @@ defaults:
     shell: bash
 
 jobs:
+  abi3:
+    uses: ./.github/workflows/abi3.yml
+
   test:
     name: ${{ matrix.os }} python-${{ matrix.python-version }}
     strategy:
