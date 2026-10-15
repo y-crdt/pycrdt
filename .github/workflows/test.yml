@@ -13,21 +13,39 @@ defaults:
     shell: bash
 
 jobs:
-  test:
-    name: ${{ matrix.os }} python-${{ matrix.python-version }}
+  abi3:
+    uses: ./.github/workflows/abi3.yml
+
+  types:
+    name: Types Python ${{ matrix.python }}
+    needs: abi3
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu, macos, windows]
-        rust-version: [stable]
-        python-version:
-          - '3.11'
-          - '3.12'
-          - '3.13'
-          - '3.14'
-          - '3.15'
+        python: ['3.11', '3.12', '3.13', '3.14', '3.15']
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-python@v7
+      with:
+        python-version: ${{ matrix.python }}
+        allow-prereleases: true
+    - uses: actions/download-artifact@v8
+      with:
+        name: wheels-abi3-ubuntu
+        path: dist
+    - name: Install wheel and type-check dependencies
+      run: |
+        python -m pip install "pip>=25.1"
+        python -m pip install --group types dist/*-cp311-abi3-*.whl
+    - name: Check types
+      run: |
+        mypy python
+        python -m pytest -v tests/test_types.py
 
-    runs-on: ${{ matrix.os }}-latest
+  test:
+    name: Source install and coverage
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
@@ -36,7 +54,7 @@ jobs:
     - name: Set up python
       uses: actions/setup-python@v7
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: '3.15'
         allow-prereleases: true
 
     - name: Ensure pip >= v25.1
@@ -46,7 +64,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         profile: minimal
-        toolchain: ${{ matrix.rust-version }}
+        toolchain: stable
         override: true
 
     - name: Cache rust
@@ -55,20 +73,10 @@ jobs:
     - name: Build and install pycrdt
       run: pip install -e .
 
-    - name: Check types
-      run: |
-        pip install --group types -e .
-        mypy python
-
     - name: Install test dependencies
-      run: pip install --group test -e .
-
-    - name: Run tests
-      if: ${{ !((matrix.python-version == '3.14') && (matrix.os == 'ubuntu')) }}
-      run: pytest --color=yes -v tests
+      run: pip install --group test --group types -e .
 
     - name: Run code coverage
-      if: ${{ (matrix.python-version == '3.14') && (matrix.os == 'ubuntu') }}
       run: |
         coverage run -m pytest tests
         coverage report --show-missing --fail-under=100
