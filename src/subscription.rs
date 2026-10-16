@@ -1,5 +1,4 @@
 use pyo3::prelude::*;
-use std::cell::RefCell;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -24,28 +23,32 @@ impl Callback {
     }
 }
 
-#[pyclass(unsendable)]
-pub struct Subscription(RefCell<Option<Box<dyn FnOnce()>>>);
+#[pyclass]
+pub struct Subscription {
+    unobserve: Mutex<Option<Box<dyn FnOnce() + Send>>>,
+}
 
 impl Subscription {
-    pub fn new(f: Py<PyAny>, unobserve: impl FnOnce(u64) + 'static) -> (Self, Callback) {
+    pub fn new(f: Py<PyAny>, unobserve: impl FnOnce(u64) + Send + 'static) -> (Self, Callback) {
         let key = NEXT_KEY.fetch_add(1, Ordering::Relaxed);
         let callback = Arc::new(Mutex::new(Some(f)));
         let weak = Arc::downgrade(&callback);
-        let sub = Self(RefCell::new(Some(Box::new(move || {
-            if let Some(callback) = weak.upgrade() {
-                let f = callback.lock().unwrap().take();
-                // The target may contain non-owning Yrs references. Only use them while
-                // its observer still exists (and therefore still owns the callback state).
-                unobserve(key);
-                drop(f);
-            }
-        }))));
+        let sub = Self {
+            unobserve: Mutex::new(Some(Box::new(move || {
+                if let Some(callback) = weak.upgrade() {
+                    let f = callback.lock().unwrap().take();
+                    // The target may contain non-owning Yrs references. Only use them while
+                    // its observer still exists (and therefore still owns the callback state).
+                    unobserve(key);
+                    drop(f);
+                }
+            }))),
+        };
         (sub, Callback { key, callback })
     }
 
     fn unsubscribe(&self) {
-        let unobserve = self.0.borrow_mut().take();
+        let unobserve = self.unobserve.lock().unwrap().take();
         if let Some(unobserve) = unobserve {
             unobserve();
         }
