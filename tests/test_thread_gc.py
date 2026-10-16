@@ -52,6 +52,18 @@ def run_in_thread(function):
         raise errors[0]
 
 
+@pytest.mark.parametrize("exception_type", [RuntimeError, BaseException])
+def test_worker_exception_is_reraised(exception_type):
+    error = exception_type("worker failed")
+
+    def fail():
+        raise error
+
+    with pytest.raises(exception_type, match="worker failed") as exc:
+        run_in_thread(fail)
+    assert exc.value is error
+
+
 def make_object(kind):
     doc = Doc()
     text = doc.get("text", type=Text)
