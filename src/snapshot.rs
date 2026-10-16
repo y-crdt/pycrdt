@@ -7,7 +7,7 @@ use yrs::Transact;
 use yrs::updates::encoder::Encode;
 use yrs::updates::decoder::Decode;
 
-#[pyclass(unsendable)]
+#[pyclass]
 pub struct Snapshot {
     pub snapshot: _Snapshot,
 }

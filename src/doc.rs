@@ -1,3 +1,4 @@
+use crate::thread_affinity::{CallbackPtr, CallbackRef, CallbackScope, CallbackLifetime, ThreadAffinity};
 use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -119,34 +120,53 @@ impl Doc {
         self.doc.client_id().get()
     }
 
-    fn get_or_insert_text(&mut self, py: Python<'_>, txn: &mut Transaction, name: &str) -> PyResult<Py<Text>> {
-        let mut _t = txn.transaction();
+    fn get_or_insert_text(
+        &mut self,
+        py: Python<'_>,
+        txn: &mut Transaction,
+        name: &str,
+    ) -> PyResult<Py<Text>> {
+        let mut _t = txn.transaction()?;
         let t = _t.as_mut().unwrap().as_mut();
         let text = t.get_or_insert_text(name);
         let pytext: Py<Text> = Py::new(py, Text::from(text))?;
         Ok(pytext)
     }
 
-    fn get_or_insert_array(&mut self, py: Python<'_>, txn: &mut Transaction, name: &str) -> PyResult<Py<Array>> {
-        let mut _t = txn.transaction();
+    fn get_or_insert_array(
+        &mut self,
+        py: Python<'_>,
+        txn: &mut Transaction,
+        name: &str,
+    ) -> PyResult<Py<Array>> {
+        let mut _t = txn.transaction()?;
         let t = _t.as_mut().unwrap().as_mut();
         let shared = t.get_or_insert_array(name);
-        let pyshared: Py<Array > = Py::new(py, Array::from(shared))?;
+        let pyshared: Py<Array> = Py::new(py, Array::from(shared))?;
         Ok(pyshared)
     }
 
-    fn get_or_insert_map(&mut self, py: Python<'_>, txn: &mut Transaction, name: &str) -> PyResult<Py<Map>> {
-        let mut _t = txn.transaction();
+    fn get_or_insert_map(
+        &mut self,
+        py: Python<'_>,
+        txn: &mut Transaction,
+        name: &str,
+    ) -> PyResult<Py<Map>> {
+        let mut _t = txn.transaction()?;
         let t = _t.as_mut().unwrap().as_mut();
         let shared = t.get_or_insert_map(name);
         let pyshared: Py<Map> = Py::new(py, Map::from(shared))?;
         Ok(pyshared)
     }
 
-    fn get_or_insert_xml_fragment(&mut self, txn: &mut Transaction, name: &str) -> XmlFragment {
-        let mut _t = txn.transaction();
+    fn get_or_insert_xml_fragment(
+        &mut self,
+        txn: &mut Transaction,
+        name: &str,
+    ) -> PyResult<XmlFragment> {
+        let mut _t = txn.transaction()?;
         let t = _t.as_mut().unwrap().as_mut();
-        t.get_or_insert_xml_fragment(name).into()
+        Ok(t.get_or_insert_xml_fragment(name).into())
     }
 
     fn create_transaction(&self, py: Python<'_>) -> PyResult<Py<Transaction>> {
@@ -165,18 +185,20 @@ impl Doc {
         Err(PyRuntimeError::new_err("Already in a transaction"))
     }
 
-    fn get_state(&self, txn: &Transaction) -> Py<PyAny> {
-        let mut _t = txn.transaction();
+    fn get_state(&self, txn: &Transaction) -> PyResult<Py<PyAny>> {
+        let mut _t = txn.transaction()?;
         let t = _t.as_mut().unwrap().as_mut();
         let state = t.state_vector().encode_v1();
-        Python::attach(|py| PyBytes::new(py, &state).into())
+        Ok(Python::attach(|py| PyBytes::new(py, &state).into()))
     }
 
     fn get_update(&self, txn: &Transaction, state: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
-        let mut _t = txn.transaction();
+        let mut _t = txn.transaction()?;
         let t = _t.as_mut().unwrap().as_mut();
         let state: &[u8] = state.extract()?;
-        let Ok(state_vector) = StateVector::decode_v1(&state) else { return Err(PyValueError::new_err("Cannot decode state")) };
+        let Ok(state_vector) = StateVector::decode_v1(&state) else {
+            return Err(PyValueError::new_err("Cannot decode state"));
+        };
         let update = t.encode_diff_v1(&state_vector);
         let bytes: Py<PyAny> = Python::attach(|py| PyBytes::new(py, &update).into());
         Ok(bytes)
@@ -185,21 +207,21 @@ impl Doc {
     fn apply_update(&mut self, txn: &mut Transaction, update: &Bound<'_, PyBytes>) -> PyResult<()> {
         let u = Update::decode_v1(update.as_bytes())
             .map_err(|e| PyValueError::new_err(format!("Cannot decode update: {}", e)))?;
-        let mut _t = txn.transaction();
+        let mut _t = txn.transaction()?;
         let t = _t.as_mut().unwrap().as_mut();
         t.apply_update(u)
             .map_err(|e| PyRuntimeError::new_err(format!("Cannot apply update: {}", e)))
     }
 
-    fn roots(&self, py: Python<'_>, txn: &mut Transaction) -> Py<PyAny> {
-        let mut t0 = txn.transaction();
+    fn roots(&self, py: Python<'_>, txn: &mut Transaction) -> PyResult<Py<PyAny>> {
+        let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
         let result = PyDict::new(py);
         for (k, v) in t.root_refs() {
             result.set_item(k, v.into_py(py)).unwrap();
         }
-        result.into()
+        Ok(result.into())
     }
 
     pub fn observe(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
@@ -216,7 +238,8 @@ impl Doc {
                             txn.unobserve_transaction_cleanup(callback.key);
                             return;
                         };
-                        let event = TransactionEvent::new(py, event, txn);
+                        let scope = CallbackScope::new();
+                        let event = TransactionEvent::new(py, event, txn, scope.lifetime());
                         if let Err(err) = f.call1(py, (event,)) {
                             err.restore(py)
                         }
@@ -252,10 +275,11 @@ impl Doc {
     }
 }
 
-#[pyclass(unsendable)]
+#[pyclass]
 pub struct TransactionEvent {
-    event: *const TransactionCleanupEvent,
-    txn: *const TransactionMut<'static>,
+    event: CallbackPtr<TransactionCleanupEvent>,
+    txn: CallbackPtr<TransactionMut<'static>>,
+    thread: ThreadAffinity,
     before_state: Option<Py<PyBytes>>,
     after_state: Option<Py<PyBytes>>,
     delete_set: Option<Py<PyBytes>>,
@@ -264,27 +288,35 @@ pub struct TransactionEvent {
 }
 
 impl TransactionEvent {
-    fn new(py: Python<'_>, event: &TransactionCleanupEvent, txn: &TransactionMut) -> Self {
+    fn new(
+        py: Python<'_>,
+        event: &TransactionCleanupEvent,
+        txn: &TransactionMut,
+        lifetime: CallbackLifetime,
+    ) -> Self {
         let event = event as *const TransactionCleanupEvent;
         let txn = unsafe { std::mem::transmute::<&TransactionMut, &TransactionMut<'static>>(txn) };
         let mut transaction_event = TransactionEvent {
-            event,
-            txn,
+            event: unsafe { CallbackPtr::new(event, lifetime.clone()) },
+            txn: unsafe { CallbackPtr::new(txn, lifetime) },
+            thread: ThreadAffinity::new(),
             before_state: None,
             after_state: None,
             delete_set: None,
             update: None,
             transaction: None,
         };
-        transaction_event.update(py);
+        transaction_event
+            .update(py)
+            .expect("New observer scope is valid");
         transaction_event
     }
 
-    fn event(&self) -> &TransactionCleanupEvent {
-        unsafe { self.event.as_ref().unwrap() }
+    fn event(&self) -> PyResult<CallbackRef<'_, TransactionCleanupEvent>> {
+        self.event.borrow()
     }
-    fn txn(&self) -> &TransactionMut<'_> {
-        unsafe { self.txn.as_ref().unwrap() }
+    fn txn(&self) -> PyResult<CallbackRef<'_, TransactionMut<'static>>> {
+        self.txn.borrow()
     }
 }
 
@@ -292,65 +324,71 @@ impl TransactionEvent {
 impl TransactionEvent {
     #[getter]
     pub fn transaction<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        self.thread.check();
+        let _lease = self.txn.borrow()?;
         if let Some(transaction) = &self.transaction {
             Ok(transaction.clone_ref(py).into_bound(py))
         } else {
-            let transaction = Transaction::from(self.txn()).into_bound_py_any(py)?;
+            let transaction = Transaction::borrowed(self.txn.clone()).into_bound_py_any(py)?;
             self.transaction = Some(transaction.clone().unbind());
             Ok(transaction)
         }
     }
 
     #[getter]
-    pub fn before_state<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyBytes> {
-        if let Some(before_state) = &self.before_state {
+    pub fn before_state<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        self.thread.check();
+        Ok(if let Some(before_state) = &self.before_state {
             before_state.clone_ref(py).into_bound(py)
         } else {
-            let before_state = self.event().before_state.encode_v1();
+            let before_state = self.event()?.before_state.encode_v1();
             let before_state = PyBytes::new(py, &before_state);
             self.before_state = Some(before_state.clone().unbind());
             before_state
-        }
+        })
     }
 
     #[getter]
-    pub fn after_state<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyBytes> {
-        if let Some(after_state) = &self.after_state {
+    pub fn after_state<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        self.thread.check();
+        Ok(if let Some(after_state) = &self.after_state {
             after_state.clone_ref(py).into_bound(py)
         } else {
-            let after_state = self.event().after_state.encode_v1();
+            let after_state = self.event()?.after_state.encode_v1();
             let after_state = PyBytes::new(py, &after_state);
             self.after_state = Some(after_state.clone().unbind());
             after_state
-        }
+        })
     }
 
     #[getter]
-    pub fn delete_set<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyBytes> {
-        if let Some(delete_set) = &self.delete_set {
+    pub fn delete_set<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        self.thread.check();
+        Ok(if let Some(delete_set) = &self.delete_set {
             delete_set.clone_ref(py).into_bound(py)
         } else {
-            let delete_set = self.event().delete_set.encode_v1();
+            let delete_set = self.event()?.delete_set.encode_v1();
             let delete_set = PyBytes::new(py, &delete_set);
             self.delete_set = Some(delete_set.clone().unbind());
             delete_set
-        }
+        })
     }
 
     #[getter]
-    pub fn update<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyBytes> {
-        if let Some(update) = &self.update {
+    pub fn update<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        self.thread.check();
+        Ok(if let Some(update) = &self.update {
             update.clone_ref(py).into_bound(py)
         } else {
-            let update = self.txn().encode_update_v1();
+            let update = &*self.txn()?.encode_update_v1();
             let update = PyBytes::new(py, &update);
             self.update = Some(update.clone().unbind());
             update
-        }
+        })
     }
 }
 
-#[pyclass(unsendable)]
+#[pyclass]
 pub struct SubdocsEvent {
     added: Py<PyAny>,
     removed: Py<PyAny>,

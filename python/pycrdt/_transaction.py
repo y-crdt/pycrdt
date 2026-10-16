@@ -168,6 +168,7 @@ class NewTransaction(Transaction):
 class ReadTransaction(Transaction):
     """
     A read-only transaction that cannot be used to mutate a document.
+    It is only usable during the observer callback that created it.
     """
 
 

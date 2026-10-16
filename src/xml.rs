@@ -1,3 +1,4 @@
+use crate::thread_affinity::{CallbackPtr, CallbackScope, CallbackLifetime, ThreadAffinity};
 use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
 use pyo3::types::{PyBool, PyDict, PyIterator, PyList, PyString, PyTuple};
@@ -55,88 +56,142 @@ macro_rules! impl_xml_methods {
                 }
             }
 
-            fn get_string(&self, txn: &mut Transaction) -> String {
-                let mut t0 = txn.transaction();
+            fn get_string(&self, txn: &mut Transaction) -> PyResult<String> {
+                let mut t0 = txn.transaction()?;
                 let t1 = t0.as_mut().unwrap();
                 let t = t1.as_ref();
-                self.$inner.get_string(t)
+                Ok(self.$inner.get_string(t))
             }
 
-            fn len(&self, txn: &mut Transaction)  -> u32 {
-                let mut t0 = txn.transaction();
+            fn len(&self, txn: &mut Transaction) -> PyResult<u32> {
+                let mut t0 = txn.transaction()?;
                 let t1 = t0.as_mut().unwrap();
                 let t = t1.as_ref();
-                self.$inner.len(t)
+                Ok(self.$inner.len(t))
             }
 
             $(
-                fn get<'py>(&self, py: Python<'py>, txn: &mut Transaction, index: u32) -> Bound<'py, PyAny> {
-                    let mut t0 = txn.transaction();
+                fn get<'py>(
+                    &self,
+                    py: Python<'py>,
+                    txn: &mut Transaction,
+                    index: u32,
+                ) -> PyResult<Bound<'py, PyAny>> {
+                    let mut t0 = txn.transaction()?;
                     let t1 = t0.as_mut().unwrap();
                     let t = t1.as_ref();
-                    self.$finner.get(t, index).unwrap().into_py(py)
+                    Ok(self.$finner.get(t, index).unwrap().into_py(py))
                 }
 
-                fn children<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> Vec<Bound<'py, PyAny>> {
-                    let _t = txn.transaction();
+                fn children<'py>(
+                    &self,
+                    py: Python<'py>,
+                    txn: &mut Transaction,
+                ) -> PyResult<Vec<Bound<'py, PyAny>>> {
+                    let _t = txn.transaction()?;
                     let t = _t.as_ref().unwrap();
-                    self.$finner.children(t.as_ref()).map(|node| node.into_py(py)).collect()
+                    Ok(self
+                        .$finner
+                        .children(t.as_ref())
+                        .map(|node| node.into_py(py))
+                        .collect())
                 }
 
-                fn remove_range(&self, txn: &mut Transaction, index: u32, len: u32) {
-                    let mut _t = txn.transaction();
+                fn remove_range(&self, txn: &mut Transaction, index: u32, len: u32) -> PyResult<()> {
+                    let mut _t = txn.transaction()?;
                     let mut t = _t.as_mut().unwrap().as_mut();
                     self.$finner.remove_range(&mut t, index, len);
+                    Ok(())
                 }
 
-                fn insert_str(&self, txn: &mut Transaction, index: u32, text: &str) -> XmlText {
-                    let mut _t = txn.transaction();
+                fn insert_str(&self, txn: &mut Transaction, index: u32, text: &str) -> PyResult<XmlText> {
+                    let mut _t = txn.transaction()?;
                     let mut t = _t.as_mut().unwrap().as_mut();
-                    self.$finner.insert(&mut t, index, XmlTextPrelim::new(text)).into()
+                    Ok(self
+                        .$finner
+                        .insert(&mut t, index, XmlTextPrelim::new(text))
+                        .into())
                 }
 
-                fn insert_element_prelim(&self, txn: &mut Transaction, index: u32, tag: &str) -> XmlElement {
-                    let mut _t = txn.transaction();
+                fn insert_element_prelim(
+                    &self,
+                    txn: &mut Transaction,
+                    index: u32,
+                    tag: &str,
+                ) -> PyResult<XmlElement> {
+                    let mut _t = txn.transaction()?;
                     let mut t = _t.as_mut().unwrap().as_mut();
-                    self.$finner.insert(&mut t, index, XmlElementPrelim::empty(tag)).into()
+                    Ok(self
+                        .$finner
+                        .insert(&mut t, index, XmlElementPrelim::empty(tag))
+                        .into())
                 }
             )?
 
             $(
-                fn attributes<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> Vec<(String, Bound<'py, PyAny>)> {
-                    let mut t0 = txn.transaction();
+                fn attributes<'py>(
+                    &self,
+                    py: Python<'py>,
+                    txn: &mut Transaction,
+                ) -> PyResult<Vec<(String, Bound<'py, PyAny>)>> {
+                    let mut t0 = txn.transaction()?;
                     let t1 = t0.as_mut().unwrap();
                     let t = t1.as_ref();
-                    self.$xinner
+                    Ok(self
+                        .$xinner
                         .attributes(t)
                         .map(|(k, v)| (String::from(k), v.into_py(py)))
-                        .collect()
+                        .collect())
                 }
 
-                fn attribute<'py>(&self, py: Python<'py>, txn: &mut Transaction, name: &str) -> Option<Bound<'py, PyAny>> {
-                    let mut t0 = txn.transaction();
+                fn attribute<'py>(
+                    &self,
+                    py: Python<'py>,
+                    txn: &mut Transaction,
+                    name: &str,
+                ) -> PyResult<Option<Bound<'py, PyAny>>> {
+                    let mut t0 = txn.transaction()?;
                     let t1 = t0.as_mut().unwrap();
                     let t = t1.as_ref();
-                    Some(self.$xinner.get_attribute(t, name)?.into_py(py))
+                    Ok(self
+                        .$xinner
+                        .get_attribute(t, name)
+                        .map(|value| value.into_py(py)))
                 }
 
-                fn insert_attribute(&self, txn: &mut Transaction, name: &str, value: Bound<'_, PyAny>) {
-                    let mut _t = txn.transaction();
+                fn insert_attribute(
+                    &self,
+                    txn: &mut Transaction,
+                    name: &str,
+                    value: Bound<'_, PyAny>,
+                ) -> PyResult<()> {
+                    let mut _t = txn.transaction()?;
                     let mut t = _t.as_mut().unwrap().as_mut();
-                    self.$xinner.insert_attribute(&mut t, name, py_to_any(&value));
+                    self.$xinner
+                        .insert_attribute(&mut t, name, py_to_any(&value));
+                    Ok(())
                 }
 
-                fn remove_attribute(&self, txn: &mut Transaction, name: &str) {
-                    let mut _t = txn.transaction();
+                fn remove_attribute(&self, txn: &mut Transaction, name: &str) -> PyResult<()> {
+                    let mut _t = txn.transaction()?;
                     let mut t = _t.as_mut().unwrap().as_mut();
                     self.$xinner.remove_attribute(&mut t, &name);
+                    Ok(())
                 }
 
-                fn siblings<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> Vec<Bound<'py, PyAny>> {
-                    let mut t0 = txn.transaction();
+                fn siblings<'py>(
+                    &self,
+                    py: Python<'py>,
+                    txn: &mut Transaction,
+                ) -> PyResult<Vec<Bound<'py, PyAny>>> {
+                    let mut t0 = txn.transaction()?;
                     let t1 = t0.as_mut().unwrap();
                     let t = t1.as_ref();
-                    self.$xinner.siblings(t).map(|node| node.into_py(py)).collect()
+                    Ok(self
+                        .$xinner
+                        .siblings(t)
+                        .map(|node| node.into_py(py))
+                        .collect())
                 }
             )?
 
@@ -184,7 +239,8 @@ impl_xml_methods!(XmlFragment[fragment, fragment: fragment] {
                 let Some(f) = callback.get(py) else {
                     return;
                 };
-                let e = unsafe { XmlEvent::from_xml_event(e, txn, py) };
+                let scope = CallbackScope::new();
+                let e = unsafe { XmlEvent::from_xml_event(e, txn, py, scope.lifetime()) };
                 if let Err(err) = f.call1(py, (e,)) {
                     err.restore(py)
                 }
@@ -203,7 +259,8 @@ impl_xml_methods!(XmlFragment[fragment, fragment: fragment] {
                 let Some(f) = callback.get(py) else {
                     return;
                 };
-                let events = events_into_py(py, txn, events);
+                let scope = CallbackScope::new();
+                let events = events_into_py(py, txn, events, scope.lifetime());
                 if let Err(err) = f.call1(py, (events,)) {
                     err.restore(py);
                 }
@@ -242,7 +299,8 @@ impl_xml_methods!(XmlElement[element, fragment: element, xml: element] {
                 let Some(f) = callback.get(py) else {
                     return;
                 };
-                let e = unsafe { XmlEvent::from_xml_event(e, txn, py) };
+                let scope = CallbackScope::new();
+                let e = unsafe { XmlEvent::from_xml_event(e, txn, py, scope.lifetime()) };
                 if let Err(err) = f.call1(py, (e,)) {
                     err.restore(py)
                 }
@@ -261,7 +319,8 @@ impl_xml_methods!(XmlElement[element, fragment: element, xml: element] {
                 let Some(f) = callback.get(py) else {
                     return;
                 };
-                let events = events_into_py(py, txn, events);
+                let scope = CallbackScope::new();
+                let events = events_into_py(py, txn, events, scope.lifetime());
                 if let Err(err) = f.call1(py, (events,)) {
                     err.restore(py);
                 }
@@ -288,7 +347,7 @@ impl From<XmlTextRef> for XmlText {
 impl_xml_methods!(XmlText[text, xml: text] {
     #[pyo3(signature = (txn, index, text, attrs=None))]
     fn insert(&self, txn: &mut Transaction, index: u32, text: &str, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<()> {
-        let mut _t = txn.transaction();
+        let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         if let Some(attrs) = attrs {
             let attrs = py_to_attrs(attrs)?;
@@ -302,7 +361,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
     #[pyo3(signature = (txn, index, embed, attrs=None))]
     fn insert_embed<'py>(&self, txn: &mut Transaction, index: u32, embed: Bound<'py, PyAny>, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<()> {
         let embed = py_to_any(&embed);
-        let mut _t = txn.transaction();
+        let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         if let Some(attrs) = attrs {
             let attrs = py_to_attrs(attrs)?;
@@ -315,7 +374,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
 
     #[pyo3(signature = (txn, index, attrs=None))]
     fn insert_array_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Array> {
-        let mut _t = txn.transaction();
+        let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated;
         if let Some(attrs) = attrs {
@@ -330,7 +389,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
 
     #[pyo3(signature = (txn, index, attrs=None))]
     fn insert_map_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Map> {
-        let mut _t = txn.transaction();
+        let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated;
         if let Some(attrs) = attrs {
@@ -345,7 +404,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
 
     #[pyo3(signature = (txn, index, attrs=None))]
     fn insert_text_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Text> {
-        let mut _t = txn.transaction();
+        let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated;
         if let Some(attrs) = attrs {
@@ -360,7 +419,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
 
     #[pyo3(signature = (txn, index, attrs=None))]
     fn insert_xmltext_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<XmlText> {
-        let mut _t = txn.transaction();
+        let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated;
         if let Some(attrs) = attrs {
@@ -375,7 +434,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
 
     #[pyo3(signature = (txn, index, tag, attrs=None))]
     fn insert_xmlelement_prelim<'py>(&self, txn: &mut Transaction, index: u32, tag: &str, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<XmlElement> {
-        let mut _t = txn.transaction();
+        let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated;
         if let Some(attrs) = attrs {
@@ -388,49 +447,47 @@ impl_xml_methods!(XmlText[text, xml: text] {
         Ok(shared)
     }
 
-    fn remove_range(&self, txn: &mut Transaction, index: u32, len: u32) {
-        let mut _t = txn.transaction();
+    fn remove_range(&self, txn: &mut Transaction, index: u32, len: u32) -> PyResult<()> {
+        let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         self.text.remove_range(&mut t, index, len);
+        Ok(())
     }
 
     fn format(&self, txn: &mut Transaction, index: u32, len: u32, attrs: Bound<'_, PyIterator>) -> PyResult<()> {
         let attrs = py_to_attrs(attrs)?;
-        let mut _t = txn.transaction();
+        let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         self.text.format(&mut t, index, len, attrs);
         Ok(())
     }
 
-    fn diff<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> Bound<'py, PyList> {
-        let mut t0 = txn.transaction();
+    fn diff<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> PyResult<Bound<'py, PyList>> {
+        let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
 
-        let iter = self.text.diff(t, YChange::identity)
+        let iter = self
+            .text
+            .diff(t, YChange::identity)
             .into_iter()
             .map(|diff| {
-                let attrs = diff.attributes.map(|attrs| {
-                    let pyattrs = PyDict::new(py);
-                    for (name, value) in attrs.into_iter() {
-                        pyattrs.set_item(
-                            PyString::intern(py, &*name),
-                            value.into_py(py),
-                        ).unwrap();
-                    }
-                    pyattrs.into_any()
-                }).unwrap_or_else(|| py.None().into_bound(py));
+                let attrs = diff
+                    .attributes
+                    .map(|attrs| {
+                        let pyattrs = PyDict::new(py);
+                        for (name, value) in attrs.into_iter() {
+                            pyattrs
+                                .set_item(PyString::intern(py, &*name), value.into_py(py))
+                                .unwrap();
+                        }
+                        pyattrs.into_any()
+                    })
+                    .unwrap_or_else(|| py.None().into_bound(py));
 
-                PyTuple::new(py, [
-                    diff.insert.into_py(py),
-                    attrs,
-                ]).unwrap()
+                PyTuple::new(py, [diff.insert.into_py(py), attrs]).unwrap()
             });
-
-        PyList::new(
-            py,
-            iter
-        ).unwrap()
+        Ok(PyList::new(py, iter).unwrap())
     }
 
     fn observe(&self, f: Py<PyAny>) -> Subscription {
@@ -443,7 +500,8 @@ impl_xml_methods!(XmlText[text, xml: text] {
                 let Some(f) = callback.get(py) else {
                     return;
                 };
-                let e = unsafe { XmlEvent::from_xml_text_event(e, txn, py) };
+                let scope = CallbackScope::new();
+                let e = unsafe { XmlEvent::from_xml_text_event(e, txn, py, scope.lifetime()) };
                 if let Err(err) = f.call1(py, (e,)) {
                     err.restore(py)
                 }
@@ -462,7 +520,8 @@ impl_xml_methods!(XmlText[text, xml: text] {
                 let Some(f) = callback.get(py) else {
                     return;
                 };
-                let events = events_into_py(py, txn, events);
+                let scope = CallbackScope::new();
+                let events = events_into_py(py, txn, events, scope.lifetime());
                 if let Err(err) = f.call1(py, (events,)) {
                     err.restore(py)
                 }
@@ -474,61 +533,79 @@ impl_xml_methods!(XmlText[text, xml: text] {
 
 
 
-#[pyclass(unsendable)]
+#[pyclass]
 pub struct XmlEvent {
-    txn: *const TransactionMut<'static>,
+    txn: CallbackPtr<TransactionMut<'static>>,
+    thread: ThreadAffinity,
     transaction: Option<Py<Transaction>>,
-    #[pyo3(get)]
     children_changed: Py<PyAny>,
-    #[pyo3(get)]
     target: Py<PyAny>,
-    #[pyo3(get)]
     path: Py<PyAny>,
-    #[pyo3(get)]
     delta: Py<PyAny>,
-    #[pyo3(get)]
     keys: Py<PyAny>,
 }
 
 impl XmlEvent {
-    pub unsafe fn from_xml_event<'py>(event: &_XmlEvent, txn: &TransactionMut, py: Python<'py>) -> Self {
+    pub unsafe fn from_xml_event<'py>(
+        event: &_XmlEvent,
+        txn: &TransactionMut,
+        py: Python<'py>,
+        lifetime: CallbackLifetime,
+    ) -> Self {
         Self {
-            txn: unsafe { std::mem::transmute::<&TransactionMut, &TransactionMut<'static>>(txn) },
+            txn: unsafe {
+                CallbackPtr::new(
+                    std::mem::transmute::<&TransactionMut, &TransactionMut<'static>>(txn),
+                    lifetime,
+                )
+            },
+            thread: ThreadAffinity::new(),
             transaction: None,
-            children_changed: PyBool::new(py, event.children_changed()).into_py_any(py).unwrap(),
+            children_changed: PyBool::new(py, event.children_changed())
+                .into_py_any(py)
+                .unwrap(),
             target: event.target().clone().into_py(py).unbind(),
             path: event.path().clone().into_py(py).unbind(),
-            delta: PyList::new(
-                py,
-                event.delta(txn).into_iter().map(|d| d.into_py(py)),
-            )
-            .unwrap().into(),
+            delta: PyList::new(py, event.delta(txn).into_iter().map(|d| d.into_py(py)))
+                .unwrap()
+                .into(),
             keys: {
                 let dict = PyDict::new(py);
                 for (key, value) in event.keys(txn).iter() {
-                    dict.set_item(&**key, EntryChangeWrapper(value))
-                        .unwrap();
+                    dict.set_item(&**key, EntryChangeWrapper(value)).unwrap();
                 }
                 dict.into()
             },
         }
     }
 
-    pub unsafe fn from_xml_text_event(event: &_XmlTextEvent, txn: &TransactionMut, py: Python<'_>) -> Self {
+    pub unsafe fn from_xml_text_event(
+        event: &_XmlTextEvent,
+        txn: &TransactionMut,
+        py: Python<'_>,
+        lifetime: CallbackLifetime,
+    ) -> Self {
         Self {
-            txn: unsafe { std::mem::transmute::<&TransactionMut, &TransactionMut<'static>>(txn) },
+            txn: unsafe {
+                CallbackPtr::new(
+                    std::mem::transmute::<&TransactionMut, &TransactionMut<'static>>(txn),
+                    lifetime,
+                )
+            },
+            thread: ThreadAffinity::new(),
             transaction: None,
             target: XmlOut::Text(event.target().clone()).into_py(py).unbind(),
             path: event.path().clone().into_py(py).unbind(),
             delta: PyList::new(
                 py,
                 event.delta(txn).into_iter().map(|d| d.clone().into_py(py)),
-            ).unwrap().into(),
+            )
+            .unwrap()
+            .into(),
             keys: {
                 let dict = PyDict::new(py);
                 for (key, value) in event.keys(txn).iter() {
-                    dict.set_item(&**key, EntryChangeWrapper(value))
-                        .unwrap();
+                    dict.set_item(&**key, EntryChangeWrapper(value)).unwrap();
                 }
                 dict.into()
             },
@@ -540,13 +617,52 @@ impl XmlEvent {
 #[pymethods]
 impl XmlEvent {
     #[getter]
-    fn transaction(&mut self, py: Python<'_>) -> Py<Transaction> {
-        self.transaction
-            .get_or_insert_with(|| Transaction::from(unsafe { &*self.txn }).into_pyobject(py).unwrap().unbind())
-            .clone_ref(py)
+    fn children_changed(&self, py: Python<'_>) -> Py<PyAny> {
+        self.thread.check();
+        self.children_changed.clone_ref(py)
+    }
+
+    #[getter]
+    fn target(&self, py: Python<'_>) -> Py<PyAny> {
+        self.thread.check();
+        self.target.clone_ref(py)
+    }
+
+    #[getter]
+    fn path(&self, py: Python<'_>) -> Py<PyAny> {
+        self.thread.check();
+        self.path.clone_ref(py)
+    }
+
+    #[getter]
+    fn delta(&self, py: Python<'_>) -> Py<PyAny> {
+        self.thread.check();
+        self.delta.clone_ref(py)
+    }
+
+    #[getter]
+    fn keys(&self, py: Python<'_>) -> Py<PyAny> {
+        self.thread.check();
+        self.keys.clone_ref(py)
+    }
+
+    #[getter]
+    fn transaction(&mut self, py: Python<'_>) -> PyResult<Py<Transaction>> {
+        self.thread.check();
+        let _lease = self.txn.borrow()?;
+        Ok(self
+            .transaction
+            .get_or_insert_with(|| {
+                Transaction::borrowed(self.txn.clone())
+                    .into_pyobject(py)
+                    .unwrap()
+                    .unbind()
+            })
+            .clone_ref(py))
     }
 
     fn __repr__(&mut self) -> String {
+        self.thread.check();
         format!(
             "XmlEvent(children_changed={}, target={}, path={}, delta={}, keys={})",
             self.children_changed, self.target, self.path, self.delta, self.keys,

@@ -8,6 +8,7 @@ mod text;
 mod array;
 mod map;
 mod transaction;
+mod thread_affinity;
 mod sticky_index;
 mod subscription;
 mod type_conversions;
