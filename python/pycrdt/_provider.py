@@ -77,8 +77,12 @@ class Provider:
         The provider should preferably be used with an async context manager:
         ```py
         async with provider:
+            await provider.synced.wait()
             ...
         ```
+        The `synced` event is set when initial synchronization with the remote
+        peer is complete. Later changes continue to synchronize in the background.
+
         However, a lower-level API can also be used:
         ```py
         task = asyncio.create_task(provider.start())
@@ -96,6 +100,7 @@ class Provider:
         self._channel = channel
         self.log = log or getLogger(__name__)
         self.started = Event()
+        self.synced = Event()
         self._start_lock = Lock()
         self._task_group: TaskGroup | None = None
 
@@ -117,6 +122,8 @@ class Provider:
                     self._channel.path,
                 )
                 reply = handle_sync_message(message[1:], self._doc)
+                if message[1] == YSyncMessageType.SYNC_STEP2:
+                    self.synced.set()
                 if reply is not None:
                     self.log.debug(
                         "Sending %s message to endpoint: %s",
