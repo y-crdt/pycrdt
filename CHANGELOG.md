@@ -1,5 +1,11 @@
 # Version history
 
+## 0.14.10
+
+- Fix cross-thread cleanup and invalidate borrowed callback views.
+- Drain pending provider updates on normal context exit.
+- Add `Provider.synced` event for initial synchronization.
+
 ## 0.14.9
 
 - Update dependencies.
