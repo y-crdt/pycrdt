@@ -35,7 +35,7 @@ jobs:
           args: --release --target universal2-apple-darwin --out dist -i pypy3.11
       - name: Test built wheel - universal2
         run: |
-          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32"
+          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.14.0,<5" "trio>=0.25.1,<0.32"
           pip install pycrdt --no-deps --no-index --find-links dist --force-reinstall
           pytest --ignore tests/test_types.py
       - name: Upload wheels
@@ -67,7 +67,7 @@ jobs:
           args: --release --features pyo3/abi3-py311 --out dist -i 3.11
       - name: Test built wheel
         run: |
-          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32"
+          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.14.0,<5" "trio>=0.25.1,<0.32"
           pip install pycrdt --no-deps --no-index --find-links dist --force-reinstall
           pytest --ignore tests/test_types.py
       - name: Upload wheels
@@ -110,7 +110,7 @@ jobs:
       - name: Test built wheel
         if: matrix.target == 'x86_64'
         run: |
-          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32"
+          pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.14.0,<5" "trio>=0.25.1,<0.32"
           pip install pycrdt --no-deps --no-index --find-links dist --force-reinstall
           pytest --ignore tests/test_types.py
       - name: Upload wheels
@@ -153,7 +153,7 @@ jobs:
           install: |
             apt-get update
             apt-get install -y --no-install-recommends python3 python3-pip
-            pip3 install --break-system-packages -U pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32"
+            pip3 install --break-system-packages -U pytest "pydantic>=2.5.2,<3" "anyio>=4.14.0,<5" "trio>=0.25.1,<0.32"
           run: |
             pip3 install --break-system-packages pycrdt --no-deps --no-index --find-links dist/ --force-reinstall
             pytest --ignore tests/test_types.py
@@ -189,7 +189,7 @@ jobs:
         run: |
           docker run --rm -v "$(pwd):/workspace" -w /workspace alpine:latest sh -c "
             apk add --no-cache python3 py3-pip &&
-            pip3 install --break-system-packages -U pip pytest 'pydantic>=2.5.2,<3' 'anyio>=4.4.0,<5' 'trio>=0.25.1,<0.32' &&
+            pip3 install --break-system-packages -U pip pytest 'pydantic>=2.5.2,<3' 'anyio>=4.14.0,<5' 'trio>=0.25.1,<0.32' &&
             pip3 install --break-system-packages pycrdt --no-deps --no-index --find-links dist/ --force-reinstall &&
             pytest --ignore tests/test_types.py
           "
@@ -229,7 +229,7 @@ jobs:
           githubToken: ${{ github.token }}
           install: |
             apk add --no-cache python3 py3-pip
-            pip3 install --break-system-packages -U pip pytest "pydantic>=2.5.2,<3" "anyio>=4.4.0,<5" "trio>=0.25.1,<0.32"
+            pip3 install --break-system-packages -U pip pytest "pydantic>=2.5.2,<3" "anyio>=4.14.0,<5" "trio>=0.25.1,<0.32"
           run: |
             pip3 install --break-system-packages pycrdt --no-deps --no-index --find-links dist/ --force-reinstall
             pytest --ignore tests/test_types.py

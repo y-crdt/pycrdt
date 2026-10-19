@@ -9,6 +9,7 @@ from anyio import (
     TASK_STATUS_IGNORED,
     Event,
     Lock,
+    TaskHandle,
     create_task_group,
 )
 from anyio.abc import TaskGroup, TaskStatus
@@ -111,18 +112,9 @@ class Provider:
         self._start_lock = Lock()
         self._task_group: TaskGroup | None = None
         self._events: UnsubscribableStream[TransactionEvent] | None = None
-        self._updates_sent = Event()
+        self._updates_task: TaskHandle[None] | None = None
 
     async def _run(self):
-        sync_message = create_sync_message(self._doc)
-        self.log.debug(
-            "Sending %s message to endpoint: %s",
-            YSyncMessageType.SYNC_STEP1.name,
-            self._channel.path,
-        )
-        await self._channel.send(sync_message)
-        assert self._task_group is not None
-        self._task_group.start_soon(self._send_updates)
         async for message in self._channel:
             if message[0] == YMessageType.SYNC:
                 self.log.debug(
@@ -141,13 +133,22 @@ class Provider:
                     )
                     await self._channel.send(reply)
 
-    async def _send_updates(self):
+    async def _send_updates(self) -> None:
         assert self._events is not None
         async with self._events as events:
-            async for event in events:
-                message = create_update_message(event.update)
-                await self._channel.send(message)
-        self._updates_sent.set()
+            try:
+                sync_message = create_sync_message(self._doc)
+                self.log.debug(
+                    "Sending %s message to endpoint: %s",
+                    YSyncMessageType.SYNC_STEP1.name,
+                    self._channel.path,
+                )
+                await self._channel.send(sync_message)
+                async for event in events:
+                    message = create_update_message(event.update)
+                    await self._channel.send(message)
+            finally:
+                events.unsubscribe()
 
     async def __aenter__(self) -> Provider:
         async with AsyncExitStack() as exit_stack:
@@ -163,7 +164,8 @@ class Provider:
             try:
                 assert self._events is not None
                 self._events.unsubscribe()
-                await self._updates_sent.wait()
+                assert self._updates_task is not None
+                await self._updates_task
             except BaseException:
                 await self.stop()
                 await self._exit_stack.__aexit__(*exc_info())
@@ -193,7 +195,7 @@ class Provider:
         async with self._start_lock:
             async with self._get_or_create_task_group() as self._task_group:
                 self._events = self._doc.events()
-                self._updates_sent = Event()
+                self._updates_task = self._task_group.start_soon(self._send_updates)
                 task_status.started()
                 self.started.set()
                 self._task_group.start_soon(self._run)

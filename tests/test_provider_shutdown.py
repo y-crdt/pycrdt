@@ -6,18 +6,19 @@ pytestmark = pytest.mark.anyio
 
 
 class SlowChannel(Channel):
-    def __init__(self, fail=False):
+    def __init__(self, fail=False, block_initial=False):
         self.send_started = Event()
         self.allow_send = Event()
         self.messages = []
         self.fail = fail
+        self.block_initial = block_initial
 
     @property
     def path(self):
         return "test"
 
     async def send(self, message):
-        if message[1] == YSyncMessageType.SYNC_UPDATE:
+        if self.block_initial or message[1] == YSyncMessageType.SYNC_UPDATE:
             self.send_started.set()
             await self.allow_send.wait()
             if self.fail:
@@ -95,12 +96,32 @@ async def test_cancellation_during_drain():
     assert not channel.allow_send.is_set()
 
 
-async def test_send_failure_propagates():
+@pytest.mark.parametrize("block_initial", [False, True])
+async def test_send_failure_propagates(block_initial):
     doc = Doc({"text": Text()})
-    channel = SlowChannel(fail=True)
+    channel = SlowChannel(fail=True, block_initial=block_initial)
     channel.allow_send.set()
     with pytest.raises(ExceptionGroup) as error:
         with fail_after(3):
             async with Provider(doc, channel):
                 doc["text"] += "A"
     assert error.value.subgroup(OSError) is not None
+
+
+async def test_exit_waits_for_initial_send():
+    channel = SlowChannel(block_initial=True)
+    exited = Event()
+
+    async def run():
+        async with Provider(Doc(), channel):
+            pass
+        exited.set()
+
+    with fail_after(3):
+        async with create_task_group() as tasks:
+            tasks.start_soon(run)
+            await channel.send_started.wait()
+            assert not exited.is_set()
+            channel.allow_send.set()
+            await exited.wait()
+    assert len(channel.messages) == 1
