@@ -13,6 +13,7 @@
       - Channel
       - Decoder
       - Doc
+      - UnsubscribableStream
       - Encoder
       - Map
       - MapEvent

@@ -25,6 +25,7 @@ from ._pycrdt import TransactionEvent as TransactionEvent
 from ._snapshot import Snapshot as Snapshot
 from ._sticky_index import Assoc as Assoc
 from ._sticky_index import StickyIndex as StickyIndex
+from ._stream import UnsubscribableStream as UnsubscribableStream
 from ._sync import Decoder as Decoder
 from ._sync import Encoder as Encoder
 from ._sync import YMessageType as YMessageType
