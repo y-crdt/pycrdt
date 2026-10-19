@@ -18,14 +18,15 @@ from typing import (
     overload,
 )
 
-from anyio import BrokenResourceError, create_memory_object_stream
-from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
+from anyio import BrokenResourceError, ClosedResourceError, create_memory_object_stream
+from anyio.streams.memory import MemoryObjectSendStream
 
 from ._base import BaseDoc, BaseType, Typed, base_types, forbid_read_transaction
 from ._pycrdt import Doc as _Doc
 from ._pycrdt import SubdocsEvent, Subscription, TransactionEvent
 from ._pycrdt import Transaction as _Transaction
 from ._snapshot import Snapshot
+from ._stream import UnsubscribableStream, _with_unsubscribe
 from ._transaction import NewTransaction, ReadTransaction, Transaction
 
 T = TypeVar("T", bound=BaseType)
@@ -384,7 +385,7 @@ class Doc(BaseDoc, Generic[T]):
         subdocs: Literal[False] = False,
         max_buffer_size: float = float("inf"),
         async_transactions: bool = False,
-    ) -> MemoryObjectReceiveStream[TransactionEvent]: ...
+    ) -> UnsubscribableStream[TransactionEvent]: ...
 
     @overload
     def events(
@@ -392,7 +393,7 @@ class Doc(BaseDoc, Generic[T]):
         subdocs: Literal[True] = True,
         max_buffer_size: float = float("inf"),
         async_transactions: bool = False,
-    ) -> MemoryObjectReceiveStream[list[SubdocsEvent]]: ...
+    ) -> UnsubscribableStream[list[SubdocsEvent]]: ...
 
     def events(
         self,
@@ -414,6 +415,9 @@ class Doc(BaseDoc, Generic[T]):
                     update: bytes = event.update
                     ...
         ```
+
+        Call `events.unsubscribe()` to stop collecting events and drain the buffer
+        before iteration ends. Closing the receiving stream discards pending events.
 
         Args:
             subdocs: Whether to iterate over the [SubdocsEvent][pycrdt.SubdocsEvent] events
@@ -438,7 +442,17 @@ class Doc(BaseDoc, Generic[T]):
             Union[TransactionEvent, SubdocsEvent]
         ](max_buffer_size=max_buffer_size)
         self._send_streams[subdocs].add(send_stream)
-        return receive_stream
+        return _with_unsubscribe(
+            receive_stream, partial(self._unsubscribe_events, subdocs, send_stream)
+        )
+
+    def _unsubscribe_events(self, subdocs, send_stream):
+        send_streams = self._send_streams[subdocs]
+        if send_stream in send_streams:
+            send_streams.remove(send_stream)
+            send_stream.close()
+            if not send_streams:
+                self.unobserve(self._event_subscription.pop(subdocs))
 
     def _send_event(self, subdocs: bool, event: TransactionEvent | SubdocsEvent):
         to_remove: list[MemoryObjectSendStream[TransactionEvent | SubdocsEvent]] = []
@@ -449,24 +463,18 @@ class Doc(BaseDoc, Generic[T]):
             except BrokenResourceError:
                 to_remove.append(send_stream)
         for send_stream in to_remove:
-            send_stream.close()
-            send_streams.remove(send_stream)
-        if not send_streams:
-            self.unobserve(self._event_subscription[subdocs])
+            self._unsubscribe_events(subdocs, send_stream)
 
     async def _async_send_event(self, subdocs: bool, event: TransactionEvent | SubdocsEvent):
         to_remove: list[MemoryObjectSendStream[TransactionEvent | SubdocsEvent]] = []
         send_streams = self._send_streams[subdocs]
-        for send_stream in send_streams:
+        for send_stream in tuple(send_streams):
             try:
                 await send_stream.send(event)
-            except BrokenResourceError:
+            except (BrokenResourceError, ClosedResourceError):
                 to_remove.append(send_stream)
         for send_stream in to_remove:
-            send_stream.close()
-            send_streams.remove(send_stream)
-        if not send_streams:
-            self.unobserve(self._event_subscription[subdocs])
+            self._unsubscribe_events(subdocs, send_stream)
 
 
 class TypedDoc(Typed):

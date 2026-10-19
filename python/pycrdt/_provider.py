@@ -2,17 +2,21 @@ from __future__ import annotations
 
 from contextlib import AsyncExitStack, asynccontextmanager
 from logging import Logger, getLogger
+from sys import exc_info
 from typing import AsyncIterator, Protocol
 
 from anyio import (
     TASK_STATUS_IGNORED,
     Event,
     Lock,
+    TaskHandle,
     create_task_group,
 )
 from anyio.abc import TaskGroup, TaskStatus
 
 from ._doc import Doc
+from ._pycrdt import TransactionEvent
+from ._stream import UnsubscribableStream
 from ._sync import (
     YMessageType,
     YSyncMessageType,
@@ -83,6 +87,10 @@ class Provider:
         The `synced` event is set when initial synchronization with the remote
         peer is complete. Later changes continue to synchronize in the background.
 
+        On normal context exit, queued updates finish sending through the channel
+        before the provider stops. Exceptions and cancellation stop it immediately.
+        Channel sends do not confirm receipt or persistence by the remote peer.
+
         However, a lower-level API can also be used:
         ```py
         task = asyncio.create_task(provider.start())
@@ -103,17 +111,10 @@ class Provider:
         self.synced = Event()
         self._start_lock = Lock()
         self._task_group: TaskGroup | None = None
+        self._events: UnsubscribableStream[TransactionEvent] | None = None
+        self._updates_task: TaskHandle[None] | None = None
 
     async def _run(self):
-        sync_message = create_sync_message(self._doc)
-        self.log.debug(
-            "Sending %s message to endpoint: %s",
-            YSyncMessageType.SYNC_STEP1.name,
-            self._channel.path,
-        )
-        await self._channel.send(sync_message)
-        assert self._task_group is not None
-        self._task_group.start_soon(self._send_updates)
         async for message in self._channel:
             if message[0] == YMessageType.SYNC:
                 self.log.debug(
@@ -132,11 +133,22 @@ class Provider:
                     )
                     await self._channel.send(reply)
 
-    async def _send_updates(self):
-        async with self._doc.events() as events:
-            async for event in events:
-                message = create_update_message(event.update)
-                await self._channel.send(message)
+    async def _send_updates(self) -> None:
+        assert self._events is not None
+        async with self._events as events:
+            try:
+                sync_message = create_sync_message(self._doc)
+                self.log.debug(
+                    "Sending %s message to endpoint: %s",
+                    YSyncMessageType.SYNC_STEP1.name,
+                    self._channel.path,
+                )
+                await self._channel.send(sync_message)
+                async for event in events:
+                    message = create_update_message(event.update)
+                    await self._channel.send(message)
+            finally:
+                events.unsubscribe()
 
     async def __aenter__(self) -> Provider:
         async with AsyncExitStack() as exit_stack:
@@ -148,6 +160,16 @@ class Provider:
         return self
 
     async def __aexit__(self, exc_type, exc_value, exc_tb):
+        if exc_type is None:
+            try:
+                assert self._events is not None
+                self._events.unsubscribe()
+                assert self._updates_task is not None
+                await self._updates_task
+            except BaseException:
+                await self.stop()
+                await self._exit_stack.__aexit__(*exc_info())
+                raise
         await self.stop()
         return await self._exit_stack.__aexit__(exc_type, exc_value, exc_tb)
 
@@ -172,12 +194,17 @@ class Provider:
         """
         async with self._start_lock:
             async with self._get_or_create_task_group() as self._task_group:
+                self._events = self._doc.events()
+                self._updates_task = self._task_group.start_soon(self._send_updates)
                 task_status.started()
                 self.started.set()
                 self._task_group.start_soon(self._run)
 
     async def stop(self) -> None:
-        """Stop the provider."""
+        """Stop the provider immediately, discarding pending updates."""
         assert self._task_group is not None
+        assert self._events is not None
+        self._events.unsubscribe()
+        self._events.close()
         self._task_group.cancel_scope.cancel()
         self._task_group = None
