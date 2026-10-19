@@ -11,5 +11,5 @@ crate-type = ["cdylib"]
 futures-task = "0.3.34"
 serde = "1.0.229"
 serde_json = "1.0.154"
-yrs = "0.28.0"
+yrs = { version = "0.28.0", features = ["sync"] }
 pyo3 = "0.30.1"

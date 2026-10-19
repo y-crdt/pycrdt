@@ -83,7 +83,7 @@ impl Clock for PythonClock {
     }
 }
 
-#[pyclass(unsendable)]
+#[pyclass]
 pub struct UndoManager {
     undo_manager: _UndoManager<PyMeta>,
 }

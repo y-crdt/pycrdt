@@ -1,3 +1,4 @@
+use crate::thread_affinity::CallbackLifetime;
 use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyTypeError, PyValueError};
@@ -356,16 +357,44 @@ pub(crate) fn value_to_any(value: &Value) -> Any {
     Any::from_json(&value.to_string()).expect("serde_json::Value renders to valid JSON for Any")
 }
 
-pub(crate) fn events_into_py<'py>(py: Python<'py>, txn: &TransactionMut, events: &Events) -> Bound<'py, PyList> {
+pub(crate) fn events_into_py<'py>(
+    py: Python<'py>,
+    txn: &TransactionMut,
+    events: &Events,
+    lifetime: CallbackLifetime,
+) -> Bound<'py, PyList> {
     let py_events = events.iter().map(|event| match event {
-        yrs::types::Event::Text(e_txt) => Py::new(py, TextEvent::new(e_txt, txn)).unwrap().into_bound_py_any(py).unwrap(),
-        yrs::types::Event::Array(e_arr) => Py::new(py, ArrayEvent::new(e_arr, txn)).unwrap().into_bound_py_any(py).unwrap(),
-        yrs::types::Event::Map(e_map) => Py::new(py, MapEvent::new(e_map, txn)).unwrap().into_bound_py_any(py).unwrap(),
+        yrs::types::Event::Text(e_txt) => Py::new(py, TextEvent::new(e_txt, txn, lifetime.clone()))
+            .unwrap()
+            .into_bound_py_any(py)
+            .unwrap(),
+        yrs::types::Event::Array(e_arr) => {
+            Py::new(py, ArrayEvent::new(e_arr, txn, lifetime.clone()))
+                .unwrap()
+                .into_bound_py_any(py)
+                .unwrap()
+        }
+        yrs::types::Event::Map(e_map) => Py::new(py, MapEvent::new(e_map, txn, lifetime.clone()))
+            .unwrap()
+            .into_bound_py_any(py)
+            .unwrap(),
         yrs::types::Event::XmlFragment(e_xml) => unsafe {
-            Py::new(py, XmlEvent::from_xml_event(e_xml, txn, py)).unwrap().into_bound_py_any(py).unwrap()
+            Py::new(
+                py,
+                XmlEvent::from_xml_event(e_xml, txn, py, lifetime.clone()),
+            )
+            .unwrap()
+            .into_bound_py_any(py)
+            .unwrap()
         },
         yrs::types::Event::XmlText(e_xml) => unsafe {
-            Py::new(py, XmlEvent::from_xml_text_event(e_xml, txn, py)).unwrap().into_bound_py_any(py).unwrap()
+            Py::new(
+                py,
+                XmlEvent::from_xml_text_event(e_xml, txn, py, lifetime.clone()),
+            )
+            .unwrap()
+            .into_bound_py_any(py)
+            .unwrap()
         },
     });
     PyList::new(py, py_events).unwrap()
