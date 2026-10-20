@@ -327,6 +327,32 @@ print(str(text))
 
 Undoing a change doesn't remove the change from the document's history, but applies a change that is the opposite of the previous change.
 
+## Text indices and Unicode
+
+`Text` indices count each Python character (code point) and each embedded object as one position:
+
+```py
+from pycrdt import Doc, Text
+
+doc = Doc()
+doc["text"] = text = Text("A📊B")
+text.insert(2, "X")  # character index, even though 📊 is 4 UTF-8 bytes
+print(str(text))
+# prints: "A📊XB"
+```
+
+Internally, yrs counts text positions in the units selected by the document's `offset_kind`, and pycrdt converts character indices to those units. The default is `"utf8"` (byte offsets, the yrs default). Passing `offset_kind="utf16"` makes yrs count in UTF-16 code units, which matches the index semantics of JS [yjs](https://github.com/yjs/yjs) (JavaScript strings are UTF-16). The setting doesn't affect the update wire format — documents with different offset kinds stay in sync — but it matters when raw yrs offsets are shared with yjs peers, for instance through sticky indices or event deltas. The conversion helpers [get_utf8_index][pycrdt.get_utf8_index] and [get_utf16_index][pycrdt.get_utf16_index] are available for code that needs to do the same conversion.
+
+Embeds count toward `len(text)`, indexing, iteration, membership, and mutation
+positions. Indexed reads and iteration use U+FFFC for embeds; `diff()` returns their
+values, while `str()` and `to_py()` omit them. Use `len(text)`, not `len(str(text))`,
+to insert at the end. The string conversion helpers do not account for embeds.
+
+Yrs' delta API cannot distinguish nonempty string-valued embeds from text runs.
+Character-indexed operations on documents containing them raise `ValueError` before
+editing. Use a structured embed such as `{"value": "label"}` instead. `str()`,
+`diff()`, `+=`, and `clear()` still work on those documents.
+
 ## Type annotations
 
 `Array`, `Map` and `Doc` can be type-annotated for static type analysis. For instance, here is how to declare a `Doc` where all root types are `Array`s of `int`s:
