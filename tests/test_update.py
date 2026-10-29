@@ -53,3 +53,27 @@ def test_update_transaction():
         doc1.apply_update(update1)
 
     assert str(doc1.get("test", type=Text)) == "Hello World!"
+
+
+def test_whole_numbers_encode_as_lib0_integers():
+    # lib0 Any tags: 125 integer (varint), 124 float32, 123 float64. Yjs writes every
+    # whole number up to 31 bits as an integer, whether it was written as 3 or 3.0.
+    doc = Doc(client_id=1)
+    map0 = doc.get("map", type=Map)
+    map0["int"] = 3
+    map0["whole"] = 14.0
+    map0["half"] = 0.5
+    map0["wide"] = 2**31
+    update = doc.get_update()
+    assert b"\x03int\x01\x7d\x03" in update
+    assert b"\x05whole\x01\x7d\x0e" in update
+    assert b"\x04half\x01\x7c" in update
+    assert b"\x04wide\x01\x7c" in update
+    remote = Doc()
+    remote.apply_update(update)
+    assert remote.get("map", type=Map).to_py() == {
+        "int": 3.0,
+        "whole": 14.0,
+        "half": 0.5,
+        "wide": 2147483648.0,
+    }

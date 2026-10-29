@@ -236,14 +236,12 @@ pub fn py_to_any<'py>(value: &Bound<'py, PyAny>) -> Any {
         Any::Bool(v)
     } else if value.is_instance_of::<PyInt>() {
         let v: i64 = value.extract().unwrap();
-        if !(Number::I64_MIN_SAFE_INTEGER..=Number::I64_MAX_SAFE_INTEGER).contains(&v) {
-            Any::Number(Number::Int(v))
-        } else {
-            Any::Number(Number::Float(v as f64))
-        }
+        Any::Number(Number::Int(v))
     } else if value.is_instance_of::<PyFloat>() {
+        // Yjs has one number type: a whole number is an integer to lib0 however it was
+        // written, and yrs encodes `Number::Int` the way lib0 does (a varint up to 31 bits).
         let v: f64 = value.extract().unwrap();
-        Any::Number(Number::Float(v))
+        Any::Number(Number::try_i64(v))
     } else if let Ok(v) = value.cast::<PyList>() {
         let mut items = Vec::new();
         for i in v.iter() {
