@@ -1,8 +1,15 @@
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 import pytest
-from pycrdt import Doc, Map, get_state, get_update, merge_updates
+from pycrdt import Doc, Map, _pycrdt
+
+pytestmark = pytest.mark.skipif(
+    hasattr(sys, "_is_gil_enabled") and not sys._is_gil_enabled(),
+    reason="These tests verify GIL release and require the GIL to be enabled",
+)
 
 
 @pytest.fixture(scope="module")
@@ -15,76 +22,91 @@ def update() -> bytes:
     return doc.get_update()
 
 
-def apply_update(update: bytes, doc: Doc) -> None:
-    Doc().apply_update(update)
+def probe_during_call(call, probe=lambda: None):
+    # Start the worker before changing the switch interval, then park it behind
+    # a locked gate. Unlike thread.start(), releasing this gate does not release
+    # the GIL. With periodic switching disabled, the worker can observe active
+    # only if the native call itself releases the GIL.
+    gate = threading.Lock()
+    gate.acquire()
+    ready = threading.Event()
+    active = False
+
+    def worker():
+        ready.set()
+        with gate:
+            observed = active
+            if observed:
+                probe()
+            return observed
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(worker)
+        assert ready.wait(timeout=10), "Probe worker failed to start"
+        interval = sys.getswitchinterval()
+        sys.setswitchinterval(60)
+        try:
+            active = True
+            gate.release()
+            call()
+        finally:
+            active = False
+            sys.setswitchinterval(interval)
+        # Propagate worker exceptions into the test, rather than losing them in
+        # an unhandled-thread warning. Waiting happens after active is cleared.
+        assert future.result(timeout=10), "Worker did not run during the native call"
 
 
-def get_doc_update(update: bytes, doc: Doc) -> None:
-    doc.get_update()
-
-
-def merge(update: bytes, doc: Doc) -> None:
-    merge_updates(update, update)
-
-
-def get_update_state(update: bytes, doc: Doc) -> None:
-    get_state(update)
-
-
-def diff_update(update: bytes, doc: Doc) -> None:
-    get_update(update, b"\x00")
-
-
-@pytest.mark.parametrize(
-    "call", [apply_update, get_doc_update, merge, get_update_state, diff_update]
-)
-def test_releases_gil(update, call):
-    # With a switch interval far longer than the test, a thread waiting for the GIL
-    # only gets it when the holding thread releases it: the main thread can run
-    # while the worker is busy only if the call released the GIL.
+@pytest.mark.parametrize("operation", ["apply", "encode", "merge", "state", "diff"])
+def test_releases_gil(update, operation):
     doc = Doc()
     doc.apply_update(update)
-    calls = 0
-    calls_seen = []
-
-    def worker():
-        nonlocal calls
-        for _ in range(10):
-            call(update, doc)
-            calls += 1
-
-    interval = sys.getswitchinterval()
-    sys.setswitchinterval(60)
-    try:
-        thread = threading.Thread(target=worker)
-        thread.start()
-        calls_seen.append(calls)
-        thread.join()
-    finally:
-        sys.setswitchinterval(interval)
-    assert calls == 10
-    assert calls_seen[0] < 10
+    with doc.transaction() as txn:
+        # Call the bindings directly so Python transaction setup, commit,
+        # callbacks and document destruction cannot satisfy the GIL assertion.
+        calls = {
+            "apply": partial(doc._doc.apply_update, txn._txn, update),
+            "encode": partial(doc._doc.get_update, txn._txn, b"\x00"),
+            "merge": partial(_pycrdt.merge_updates, (update, update)),
+            "state": partial(_pycrdt.get_state, update),
+            "diff": partial(_pycrdt.get_update, update, b"\x00"),
+        }
+        probe_during_call(calls[operation])
 
 
-def test_read_doc_while_applying_update(update):
+@pytest.mark.parametrize("operation", ["apply", "encode"])
+def test_concurrent_transaction_access(update, operation):
     doc = Doc()
-    applied = threading.Event()
-
-    def worker():
+    if operation == "encode":
         doc.apply_update(update)
-        applied.set()
+    expected_metadata = doc.client_id, doc.guid
 
-    interval = sys.getswitchinterval()
-    sys.setswitchinterval(60)
-    try:
-        thread = threading.Thread(target=worker)
-        thread.start()
-        # The worker holds the document while the update is applied.
-        client_id = doc.client_id
-        guid = doc.guid
-        thread.join()
-    finally:
-        sys.setswitchinterval(interval)
-    assert applied.is_set()
-    assert client_id == doc.client_id
-    assert guid == doc.guid
+    with doc.transaction() as txn:
+        raw_txn = txn._txn
+
+        def probe():
+            assert (doc.client_id, doc.guid) == expected_metadata
+            # apply_update holds a mutable PyO3 borrow of the transaction;
+            # get_update instead rejects access through its transaction mutex.
+            message = "Already mutably borrowed|Transaction already borrowed"
+            with pytest.raises(RuntimeError, match=message):
+                raw_txn.origin()
+            with pytest.raises(RuntimeError, match="Already in a transaction"):
+                doc._doc.create_transaction()
+
+        if operation == "apply":
+            call = partial(doc._doc.apply_update, raw_txn, update)
+        else:
+            call = partial(doc._doc.get_update, raw_txn, b"\x00")
+        probe_during_call(call, probe)
+        assert raw_txn.origin() is None
+
+    # Failed concurrent access must leave the transaction and store usable.
+    map0 = doc.get("map", type=Map)
+    assert len(map0) == 100_000
+    assert map0["99999"] == 99999
+    map0["after"] = "ok"
+    assert map0["after"] == "ok"
+    restored = Doc()
+    restored.apply_update(doc.get_update())
+    assert restored.get("map", type=Map)["after"] == "ok"
