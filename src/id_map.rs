@@ -108,7 +108,7 @@ impl ContentAttribute {
 /// Returned by [`IdMap.attributions`][crate::id_map::IdMap::attributions] and
 /// [`IdMap.entries`][crate::id_map::IdMap::entries]. Ranges produced by `attributions` that fall
 /// outside any attributed region carry an empty `attributes` list.
-#[pyclass(skip_from_py_object)]
+#[pyclass]
 #[derive(Clone)]
 pub struct AttrRange {
     /// Inclusive start clock of the range.
