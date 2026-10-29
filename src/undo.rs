@@ -21,7 +21,7 @@ use crate::array::Array;
 use crate::map::Map;
 use crate::xml::XmlFragment;
 
-#[pyclass(skip_from_py_object)]
+#[pyclass]
 #[derive(Clone)]
 pub struct IdSet {
     id_set: _IdSet,
