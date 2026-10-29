@@ -1,3 +1,6 @@
+import math
+
+import pytest
 from pycrdt import Doc, Map, Text, get_state, get_update, merge_updates
 
 
@@ -77,3 +80,65 @@ def test_whole_numbers_encode_as_lib0_integers():
         "half": 0.5,
         "wide": 2147483648.0,
     }
+
+
+@pytest.mark.parametrize(
+    "value, tag, local_type, remote_type",
+    [
+        (3, 125, float, float),
+        (-3, 125, float, float),
+        (14.0, 125, float, float),
+        (-14.0, 125, float, float),
+        (0.5, 124, float, float),
+        (-0.5, 124, float, float),
+        (2**31 - 1, 125, float, float),
+        (-(2**31 - 1), 125, float, float),
+        (2**31, 124, float, float),
+        (-(2**31), 124, float, float),
+        (float(2**31 - 1), 125, float, float),
+        (float(-(2**31)), 124, float, float),
+        (2**53 - 1, 123, float, float),
+        (-(2**53 - 1), 123, float, float),
+        (2**53, 124, int, float),
+        (-(2**53), 124, int, float),
+        (2**53 + 1, 122, int, int),
+        (-(2**53 + 1), 122, int, int),
+        (float(2**53 - 1), 123, float, float),
+        (float(-(2**53 - 1)), 123, float, float),
+        (float(2**53), 124, float, float),
+        (float(-(2**53)), 124, float, float),
+    ],
+)
+def test_number_encoding_boundaries(value, tag, local_type, remote_type):
+    doc = Doc(client_id=1)
+    map0 = doc.get("map", type=Map)
+    map0["value"] = value
+    local = map0["value"]
+    assert local == value
+    assert type(local) is local_type
+
+    update = doc.get_update()
+    # The key is followed by a one-element Any payload and its lib0 type tag:
+    # 125 integer, 124 float32, 123 float64, 122 bigint.
+    assert b"\x05value\x01" + bytes([tag]) in update
+    remote = Doc()
+    remote.apply_update(update)
+    result = remote.get("map", type=Map)["value"]
+    assert result == value
+    assert type(result) is remote_type
+
+
+@pytest.mark.parametrize("value, tag", [(0.0, 125), (-0.0, 124)])
+def test_signed_zero_roundtrip(value, tag):
+    doc = Doc(client_id=1)
+    map0 = doc.get("map", type=Map)
+    map0["value"] = value
+    update = doc.get_update()
+    assert b"\x05value\x01" + bytes([tag]) in update
+    remote = Doc()
+    remote.apply_update(update)
+    for map_ in (map0, remote.get("map", type=Map)):
+        result = map_["value"]
+        assert type(result) is float
+        assert result == 0.0
+        assert math.copysign(1.0, result) == math.copysign(1.0, value)
