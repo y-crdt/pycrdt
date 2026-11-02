@@ -6,3 +6,6 @@
 CRDTs based on [Yrs](https://github.com/y-crdt/y-crdt/tree/main/yrs).
 
 Documentation is available [here](https://y-crdt.github.io/pycrdt).
+
+Prebuilt wheels are published for 64-bit platforms. On 32-bit platforms, installation
+requires building from source with a Rust toolchain and a C compiler.

@@ -51,7 +51,6 @@ jobs:
       matrix:
         platform:
           - target: x64
-          - target: x86
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -80,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [x86_64, i686]
+        target: [x86_64]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -88,7 +87,6 @@ jobs:
           python-version: "3.11"
           architecture: x64
       - name: Build sdist
-        if: ${{ matrix.target == 'x86_64' }}
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
@@ -98,19 +96,16 @@ jobs:
         with:
           rust-toolchain: stable
           target: ${{ matrix.target }}
-          # Use AlmaLinux 8 for i686 instead of the CentOS 7 vault.
-          manylinux: ${{ matrix.target == 'i686' && '2_28' || 'auto' }}
+          manylinux: auto
           args: --release --features pyo3/abi3-py311 --out dist -i 3.11
       - name: Build PyPy wheel
         uses: PyO3/maturin-action@v1
         with:
           rust-toolchain: stable
           target: ${{ matrix.target }}
-          # Use AlmaLinux 8 for i686 instead of the CentOS 7 vault.
-          manylinux: ${{ matrix.target == 'i686' && '2_28' || 'auto' }}
+          manylinux: auto
           args: --release --out dist -i pypy3.11
       - name: Test built wheel
-        if: matrix.target == 'x86_64'
         run: |
           pip install pytest "pydantic>=2.5.2,<3" "anyio>=4.14.0,<5" "trio>=0.25.1,<0.32"
           pip install pycrdt --no-deps --no-index --find-links dist --force-reinstall
@@ -125,7 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [aarch64, armv7, s390x, ppc64le]
+        target: [aarch64, s390x, ppc64le]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -172,7 +167,6 @@ jobs:
       matrix:
         target:
           - x86_64-unknown-linux-musl
-          - i686-unknown-linux-musl
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -187,7 +181,6 @@ jobs:
           manylinux: musllinux_1_2
           args: --release --features pyo3/abi3-py311 --out dist -i 3.11
       - name: Test built wheel
-        if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
           docker run --rm -v "$(pwd):/workspace" -w /workspace alpine:latest sh -c "
             apk add --no-cache python3 py3-pip &&
@@ -208,8 +201,6 @@ jobs:
         platform:
           - target: aarch64-unknown-linux-musl
             arch: aarch64
-          - target: armv7-unknown-linux-musleabihf
-            arch: armv7
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7

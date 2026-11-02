@@ -1,5 +1,10 @@
 # Version history
 
+## Unreleased
+
+- Stop publishing 32-bit wheels for Linux x86 (glibc and musl), Linux ARMv7
+  (glibc and musl), and Windows x86. Source distributions remain available.
+
 ## 0.14.12
 
 - Fix update stream closure during provider shutdown.
