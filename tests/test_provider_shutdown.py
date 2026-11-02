@@ -1,5 +1,12 @@
 import pytest
-from anyio import Event, create_task_group, fail_after, sleep_forever
+from anyio import (
+    ClosedResourceError,
+    Event,
+    create_task_group,
+    fail_after,
+    sleep_forever,
+    wait_all_tasks_blocked,
+)
 from pycrdt import Channel, Doc, Provider, Text, YSyncMessageType, handle_sync_message
 
 pytestmark = pytest.mark.anyio
@@ -125,3 +132,18 @@ async def test_exit_waits_for_initial_send():
             channel.allow_send.set()
             await exited.wait()
     assert len(channel.messages) == 1
+
+
+async def test_stop_closes_update_stream():
+    provider = Provider(Doc(), SlowChannel())
+    with fail_after(3):
+        async with create_task_group() as tasks:
+            await tasks.start(provider.start)
+            # Stop while the sender is waiting for the next document update.
+            await wait_all_tasks_blocked()
+            events = provider._events
+            assert events is not None
+            await provider.stop()
+        # The sender closes its stream while unwinding cancellation.
+        with pytest.raises(ClosedResourceError):
+            await events.receive()

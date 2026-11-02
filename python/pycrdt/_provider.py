@@ -205,6 +205,5 @@ class Provider:
         assert self._task_group is not None
         assert self._events is not None
         self._events.unsubscribe()
-        self._events.close()
         self._task_group.cancel_scope.cancel()
         self._task_group = None
