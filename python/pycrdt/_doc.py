@@ -470,7 +470,9 @@ class Doc(BaseDoc, Generic[T]):
         send_streams = self._send_streams[subdocs]
         for send_stream in tuple(send_streams):
             try:
-                await send_stream.send(event)
+                # Keep in-flight sends alive when unsubscribe closes the original stream.
+                async with send_stream.clone() as stream:
+                    await stream.send(event)
             except (BrokenResourceError, ClosedResourceError):
                 to_remove.append(send_stream)
         for send_stream in to_remove:
