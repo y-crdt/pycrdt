@@ -98,14 +98,16 @@ jobs:
         with:
           rust-toolchain: stable
           target: ${{ matrix.target }}
-          manylinux: auto
+          # Use AlmaLinux 8 for i686 instead of the CentOS 7 vault.
+          manylinux: ${{ matrix.target == 'i686' && '2_28' || 'auto' }}
           args: --release --features pyo3/abi3-py311 --out dist -i 3.11
       - name: Build PyPy wheel
         uses: PyO3/maturin-action@v1
         with:
           rust-toolchain: stable
           target: ${{ matrix.target }}
-          manylinux: auto
+          # Use AlmaLinux 8 for i686 instead of the CentOS 7 vault.
+          manylinux: ${{ matrix.target == 'i686' && '2_28' || 'auto' }}
           args: --release --out dist -i pypy3.11
       - name: Test built wheel
         if: matrix.target == 'x86_64'
