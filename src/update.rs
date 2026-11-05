@@ -5,7 +5,7 @@ use yrs::{diff_updates_v1, encode_state_vector_from_update_v1, merge_updates_v1}
 
 #[pyfunction]
 pub fn merge_updates<'py>(py: Python<'py>, updates: &Bound<'_, PyTuple>) -> PyResult<Bound<'py, PyBytes>> {
-    let updates: Vec<Vec<u8>> = updates.extract().unwrap();
+    let updates: Vec<Vec<u8>> = updates.extract()?;
     let Ok(update) = merge_updates_v1(&updates) else {
         return Err(PyValueError::new_err("Cannot merge updates"));
     };

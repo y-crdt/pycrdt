@@ -1,3 +1,4 @@
+import pytest
 from pycrdt import Doc, Map, Text, get_state, get_update, merge_updates
 
 
@@ -53,3 +54,12 @@ def test_update_transaction():
         doc1.apply_update(update1)
 
     assert str(doc1.get("test", type=Text)) == "Hello World!"
+
+
+def test_merge_updates_invalid():
+    with pytest.raises(TypeError):
+        merge_updates("not an update")  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError) as excinfo:
+        merge_updates(b"\xff")
+    assert str(excinfo.value) == "Cannot merge updates"
