@@ -131,6 +131,22 @@ def test_to_py():
     assert map_.to_py() == {"key0": "val0", "key1": [0, {"foo": "bar"}]}
 
 
+@pytest.mark.parametrize("method", ["keys", "values", "items"])
+def test_partial_iteration(method: str):
+    doc = Doc()
+    doc["map0"] = map0 = Map({"key0": "val0", "key1": "val1"})
+    events = []
+    sub = doc.observe(partial(callback, events))  # noqa: F841
+
+    iterator = iter(getattr(map0, method)())
+    next(iterator)
+    # the iteration doesn't hold a transaction, so the change is committed right away
+    map0["key2"] = "val2"
+
+    assert len(events) == 1
+    assert len(list(iterator)) == 1
+
+
 def test_prelim():
     map0 = Map({"0": 1})
     assert map0.to_py() == {"0": 1}
