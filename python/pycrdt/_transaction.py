@@ -75,12 +75,16 @@ class Transaction:
             assert self._txn is not None
             try:
                 if not isinstance(self, ReadTransaction):
-                    self._txn.commit()
-                    origin_hash = self._txn.origin()
-                    if origin_hash is not None:
-                        del self._doc._origins[origin_hash]
-                    if self._doc._allow_multithreading:
-                        self._doc._txn_lock.release()
+                    try:
+                        self._txn.commit()
+                    finally:
+                        # release the transaction even if an observer callback raised
+                        # an exception that is not caught (e.g. KeyboardInterrupt)
+                        origin_hash = self._txn.origin()
+                        if origin_hash is not None:
+                            del self._doc._origins[origin_hash]
+                        if self._doc._allow_multithreading:
+                            self._doc._txn_lock.release()
                     if self._doc._exceptions:
                         exceptions = tuple(self._doc._exceptions)
                         self._doc._exceptions.clear()
@@ -103,13 +107,29 @@ class Transaction:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool | None:
-        self.__exit__(exc_type, exc_val, exc_tb)
+        try:
+            self.__exit__(exc_type, exc_val, exc_tb)
+        except BaseException:
+            if self._leases == 0:
+                # exit the task group even if exiting the transaction failed,
+                # e.g. because of observer callback errors
+                await self._exit_task_group(exc_type, exc_val, exc_tb)
+            raise
         if self._leases == 0:
-            assert self._doc._task_group is not None
-            res = await self._doc._task_group.__aexit__(exc_type, exc_val, exc_tb)
-            self._doc._task_group = None
-            return res
+            return await self._exit_task_group(exc_type, exc_val, exc_tb)
         return None
+
+    async def _exit_task_group(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
+        assert self._doc._task_group is not None
+        try:
+            return await self._doc._task_group.__aexit__(exc_type, exc_val, exc_tb)
+        finally:
+            self._doc._task_group = None
 
     @property
     def origin(self) -> Any:
@@ -159,10 +179,11 @@ class NewTransaction(Transaction):
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool | None:
-        res = await super().__aexit__(exc_type, exc_val, exc_tb)
-        if not self._doc._allow_multithreading:
-            self._doc._txn_async_lock.release()
-        return res
+        try:
+            return await super().__aexit__(exc_type, exc_val, exc_tb)
+        finally:
+            if not self._doc._allow_multithreading:
+                self._doc._txn_async_lock.release()
 
 
 class ReadTransaction(Transaction):

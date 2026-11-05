@@ -368,3 +368,94 @@ async def test_concurrent_async_transactions():
     async with create_task_group() as tg:
         await tg.start(create_async_transaction, 0.2)
         await tg.start(create_async_transaction, 0.1)
+
+
+class Interrupt(BaseException):
+    pass
+
+
+def raise_once(exception, raised, event):
+    if not raised:
+        raised.append(None)
+        raise exception
+
+
+def test_new_transaction_after_commit_error_multithreading():
+    doc = Doc(allow_multithreading=True)
+    map0 = doc.get("map0", type=Map)
+    sub = doc.observe(partial(raise_once, Interrupt(), []))  # noqa: F841
+
+    with pytest.raises(Interrupt):
+        with doc.transaction():
+            map0["key0"] = "val0"
+
+    with doc.new_transaction(timeout=1):
+        map0["key1"] = "val1"
+    assert map0.to_py() == {"key0": "val0", "key1": "val1"}
+
+
+@pytest.mark.parametrize("anyio_backend", ["asyncio", "trio"])
+async def test_new_async_transaction_after_observer_error(anyio_backend):
+    doc = Doc()
+    map0 = doc.get("map0", type=Map)
+    sub = doc.observe(partial(raise_once, ValueError("error"), []))  # noqa: F841
+
+    with pytest.RaisesGroup(ValueError, match="Observer callback error"):
+        async with doc.new_transaction():
+            map0["key0"] = "val0"
+
+    async def create_new_async_transaction():
+        async with doc.new_transaction():
+            map0["key1"] = "val1"
+
+    with fail_after(1):
+        async with create_task_group() as tg:
+            tg.start_soon(create_new_async_transaction)
+    assert map0.to_py() == {"key0": "val0", "key1": "val1"}
+
+
+@pytest.mark.parametrize("anyio_backend", ["asyncio", "trio"])
+async def test_new_async_transaction_after_async_observer_error(anyio_backend):
+    doc = Doc()
+    map0 = doc.get("map0", type=Map)
+    raised = []
+
+    async def callback(event):
+        raise_once(ValueError("error"), raised, event)
+
+    sub = doc.observe(callback)  # noqa: F841
+
+    with pytest.RaisesGroup(ValueError):
+        async with doc.new_transaction():
+            map0["key0"] = "val0"
+
+    with fail_after(1):
+        async with doc.new_transaction():
+            map0["key1"] = "val1"
+    assert map0.to_py() == {"key0": "val0", "key1": "val1"}
+
+
+@pytest.mark.parametrize("anyio_backend", ["asyncio", "trio"])
+async def test_async_transaction_after_observer_error(anyio_backend):
+    doc = Doc()
+    map0 = doc.get("map0", type=Map)
+    sub0 = doc.observe(partial(raise_once, ValueError("error"), []))  # noqa: F841
+
+    async def create_failing_async_transaction():
+        with pytest.RaisesGroup(ValueError, match="Observer callback error"):
+            async with doc.transaction():
+                map0["key0"] = "val0"
+
+    # the transaction's task group must be exited before the task that created it
+    async with create_task_group() as tg:
+        tg.start_soon(create_failing_async_transaction)
+
+    events = []
+
+    async def callback(event):
+        events.append(event)
+
+    sub1 = doc.observe(callback)  # noqa: F841
+    async with doc.transaction():
+        map0["key1"] = "val1"
+    assert len(events) == 1
