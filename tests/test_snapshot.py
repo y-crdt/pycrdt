@@ -65,3 +65,38 @@ def test_doc_from_snapshot():
     with doc.transaction():
         text = doc["test"]
     assert str(text) == "new old"
+
+
+def test_snapshot_in_transaction():
+    doc = Doc(skip_gc=True)
+    text = doc.get("test", type=Text)
+    with doc.transaction():
+        text += "old"
+        snapshot = Snapshot.from_doc(doc)
+        doc_restored = Doc.from_snapshot(snapshot, doc)
+        text += " new"
+    assert str(doc_restored.get("test", type=Text)) == "old"
+    assert str(text) == "old new"
+
+
+def test_snapshot_in_observer_callback():
+    doc = Doc(skip_gc=True)
+    text = doc.get("test", type=Text)
+    restored = []
+
+    def callback(event):
+        snapshot = Snapshot.from_doc(doc)
+        restored.append(str(Doc.from_snapshot(snapshot, doc).get("test", type=Text)))
+
+    sub = text.observe(callback)  # noqa: F841
+    text += "hello"
+    assert restored == ["hello"]
+
+
+def test_doc_from_snapshot_without_skip_gc():
+    doc = Doc()
+    doc["test"] = Text("hello")
+    snapshot = Snapshot.from_doc(doc)
+    with pytest.raises(ValueError) as excinfo:
+        Doc.from_snapshot(snapshot, doc)
+    assert str(excinfo.value) == "Restoring a snapshot requires a document with skip_gc=True"

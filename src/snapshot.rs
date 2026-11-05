@@ -1,9 +1,8 @@
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use yrs::{Snapshot as _Snapshot, ReadTxn};
-use crate::doc::Doc;
+use crate::transaction::Transaction;
 use pyo3::types::PyType;
-use yrs::Transact;
 use yrs::updates::encoder::Encode;
 use yrs::updates::decoder::Decode;
 
@@ -20,12 +19,14 @@ impl Snapshot {
 
 #[pymethods]
 impl Snapshot {
-    /// Construct a snapshot from a Doc
+    /// Construct a snapshot from a Doc, using its given transaction
     #[classmethod]
-    pub fn from_doc(_cls: &Bound<'_, PyType>, doc: &mut Doc) -> Self {
-        let txn = doc.doc.transact();
-        let snapshot = txn.snapshot();
-        Snapshot { snapshot }
+    pub fn from_doc(_cls: &Bound<'_, PyType>, txn: &Transaction) -> PyResult<Self> {
+        let mut t0 = txn.transaction()?;
+        let t1 = t0.as_mut().unwrap();
+        let t = t1.as_ref();
+        let snapshot = t.snapshot();
+        Ok(Snapshot { snapshot })
     }
 
     /// Encode the snapshot to bytes

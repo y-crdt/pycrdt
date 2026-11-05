@@ -28,7 +28,9 @@ class Snapshot:
         Returns:
             The snapshot of the document's current state.
         """
-        snap = _Snapshot.from_doc(doc._doc)
+        with doc.transaction() as txn:
+            assert txn._txn is not None
+            snap = _Snapshot.from_doc(txn._txn)
         return cls(snap)
 
     @classmethod

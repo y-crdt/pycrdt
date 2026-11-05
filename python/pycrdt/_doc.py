@@ -216,8 +216,12 @@ class Doc(BaseDoc, Generic[T]):
             doc: The original Doc to use for options/state.
         Returns:
             A new Doc instance restored to the snapshot state.
+        Raises:
+            ValueError: The original Doc was not created with `skip_gc=True`.
         """
-        new_doc = _Doc.from_snapshot(snapshot._snapshot, doc._doc)
+        with doc.transaction() as txn:
+            assert txn._txn is not None
+            new_doc = _Doc.from_snapshot(snapshot._snapshot, doc._doc, txn._txn)
         return Doc(doc=new_doc)
 
     def __setitem__(self, key: str, value: T) -> None:

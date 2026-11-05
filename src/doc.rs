@@ -29,7 +29,16 @@ impl Doc {
         Doc { doc }
     }
     /// Internal: create a new Doc from a Snapshot and an original Doc
-    pub fn _from_snapshot_impl(original: &Self, snapshot: &crate::snapshot::Snapshot) -> Self {
+    pub fn _from_snapshot_impl(
+        original: &Self,
+        snapshot: &crate::snapshot::Snapshot,
+        txn: &Transaction,
+    ) -> PyResult<Self> {
+        // Read the original doc through the given transaction, which may be the ongoing one:
+        // acquiring a new transaction would block forever in that case
+        let mut t0 = txn.transaction()?;
+        let t1 = t0.as_mut().unwrap();
+        let txn_orig = t1.as_ref();
         // Create a new Doc with the same options as the original
         let mut options = yrs::Options::default();
         options.client_id = original.doc.client_id();
@@ -41,10 +50,14 @@ impl Doc {
         let new_doc = yrs::Doc::with_options(options);
         // Encode the update from the snapshot
         let mut encoder = yrs::updates::encoder::EncoderV1::new();
-        {
-            let txn = original.doc.transact();
-            txn.encode_state_from_snapshot(&snapshot.snapshot, &mut encoder).unwrap();
-        }
+        txn_orig
+            .encode_state_from_snapshot(&snapshot.snapshot, &mut encoder)
+            .map_err(|err| match err {
+                yrs::error::Error::Gc => PyValueError::new_err(
+                    "Restoring a snapshot requires a document with skip_gc=True",
+                ),
+                err => PyRuntimeError::new_err(format!("Cannot restore snapshot: {}", err)),
+            })?;
         let update = yrs::Update::decode_v1(&encoder.to_vec()).unwrap();
         {
             let mut txn = new_doc.transact_mut();
@@ -52,7 +65,6 @@ impl Doc {
         }
         // Ensure root types are present in the restored doc (recreate them if needed)
         // Copy root type names and types from the original doc
-        let txn_orig = original.doc.transact();
         for (name, root) in txn_orig.root_refs() {
             match root {
                 yrs::Out::YText(_) => { let _ = new_doc.get_or_insert_text(name); },
@@ -62,8 +74,7 @@ impl Doc {
                 _ => {}, // ignore unknown types
             }
         }
-        drop(txn_orig);
-        Doc { doc: new_doc }
+        Ok(Doc { doc: new_doc })
     }
 }
 
@@ -107,8 +118,8 @@ impl Doc {
 
     #[staticmethod]
     #[pyo3(name = "from_snapshot")]
-    pub fn from_snapshot(py: Python<'_>, snapshot: PyRef<'_, crate::snapshot::Snapshot>, doc: PyRef<'_, Doc>) -> PyResult<Py<Doc>> {
-        let restored = Doc::_from_snapshot_impl(&doc, &snapshot);
+    pub fn from_snapshot(py: Python<'_>, snapshot: PyRef<'_, crate::snapshot::Snapshot>, doc: PyRef<'_, Doc>, txn: &Transaction) -> PyResult<Py<Doc>> {
+        let restored = Doc::_from_snapshot_impl(&doc, &snapshot, txn)?;
         Py::new(py, restored)
     }
 
