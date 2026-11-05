@@ -149,8 +149,7 @@ class Encoder:
         Args:
             text: The string to encode.
         """
-        self.stream.append(write_var_uint(len(text)))
-        self.stream.append(text.encode())
+        self.stream.append(write_message(text.encode()))
 
     def to_bytes(self) -> bytes:
         """

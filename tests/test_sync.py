@@ -8,7 +8,7 @@ from pycrdt import (
     create_update_message,
     handle_sync_message,
 )
-from pycrdt._sync import Decoder, write_var_uint
+from pycrdt._sync import Decoder, Encoder, write_var_uint
 
 pytestmark = pytest.mark.anyio
 
@@ -96,3 +96,13 @@ def test_decoder():
     assert list(Decoder(b"\x00").read_messages()) == [b""]
     assert Decoder(b"").read_var_string() == ""
     assert Decoder(b"\x05Hello").read_var_string() == "Hello"
+
+
+def test_encoder_var_string_non_ascii():
+    text = "héllo 🎉"
+    encoder = Encoder()
+    encoder.write_var_string(text)
+    encoded = encoder.to_bytes()
+    # the length prefix is the number of UTF-8 bytes, like lib0's writeVarString
+    assert encoded == write_var_uint(len(text.encode())) + text.encode()
+    assert Decoder(encoded).read_var_string() == text
