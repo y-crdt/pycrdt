@@ -232,6 +232,48 @@ def test_api():
     assert array.to_py() is None
 
 
+@pytest.mark.parametrize(
+    "key",
+    [
+        slice(-2, None),
+        slice(None, -1),
+        slice(-4, -1),
+        slice(2, 100),
+        slice(100, None),
+        slice(3, 1),
+        slice(None, None, -1),
+        slice(4, 0, -2),
+    ],
+    ids=repr,
+)
+def test_get_slice(key: slice):
+    ref = [0, 1, 2, 3, 4]
+    doc = Doc()
+    doc["array"] = array = Array(ref)
+
+    assert array[key] == ref[key]
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        slice(2, 100),
+        slice(5, None),
+        slice(100, None),
+        slice(3, 1),
+    ],
+    ids=repr,
+)
+def test_del_slice_out_of_range(key: slice):
+    ref = [0, 1, 2, 3, 4]
+    doc = Doc()
+    doc["array"] = array = Array(ref)
+
+    del array[key]
+    del ref[key]
+    assert array.to_py() == ref
+
+
 def test_to_py():
     doc = Doc()
     submap = Map({"foo": "bar"})

@@ -255,13 +255,15 @@ class Array(Sequence, Generic[T]):
                     raise RuntimeError("Negative start not supported")
                 else:
                     i = key.start
+                length = len(self)
                 if key.stop is None:
-                    n = len(self) - i
+                    stop = length
                 elif key.stop < 0:
                     raise RuntimeError("Negative stop not supported")
                 else:
-                    n = key.stop - i
-                self.integrated.remove_range(txn._txn, i, n)
+                    stop = min(key.stop, length)
+                if stop > i:
+                    self.integrated.remove_range(txn._txn, i, stop - i)
             else:
                 raise TypeError(
                     f"Array indices must be integers or slices, not {type(key).__name__}"
@@ -289,10 +291,7 @@ class Array(Sequence, Generic[T]):
                 key = self._check_index(key)
                 return self._maybe_as_type_or_doc(self.integrated.get(txn._txn, key))
             elif isinstance(key, slice):
-                i0 = 0 if key.start is None else key.start
-                i1 = len(self) if key.stop is None else key.stop
-                step = 1 if key.step is None else key.step
-                return [self[i] for i in range(i0, i1, step)]
+                return [self[i] for i in range(*key.indices(len(self)))]
 
     def __iter__(self) -> ArrayIterator:
         """
