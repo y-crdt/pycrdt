@@ -157,6 +157,21 @@ def test_transaction_event():
     assert str(remote_text1) == ""
 
 
+@pytest.mark.parametrize("method", ["observe", "observe_subdocs"])
+def test_observe_in_transaction(method):
+    doc = Doc()
+    events = []
+    with doc.transaction():
+        with pytest.raises(RuntimeError) as excinfo:
+            getattr(doc, method)(partial(callback, events))
+    assert str(excinfo.value) == "Cannot observe the document while a transaction is in progress"
+
+    # the document can still be observed once the transaction is over
+    sub = getattr(doc, method)(partial(callback, events))  # noqa: F841
+    doc["map"] = Map({"subdoc": Doc()})
+    assert events
+
+
 def test_client_id():
     doc0 = Doc()
     doc1 = Doc()

@@ -246,7 +246,11 @@ impl Doc {
                     })
                 }
             })
-            .unwrap();
+            .map_err(|_| {
+                PyRuntimeError::new_err(
+                    "Cannot observe the document while a transaction is in progress",
+                )
+            })?;
         let s: Py<Subscription> = Py::new(py, sub)?;
         Ok(s)
     }
@@ -269,7 +273,11 @@ impl Doc {
                     }
                 })
             })
-            .unwrap();
+            .map_err(|_| {
+                PyRuntimeError::new_err(
+                    "Cannot observe the document while a transaction is in progress",
+                )
+            })?;
         let s: Py<Subscription> = Py::new(py, sub)?;
         Ok(s)
     }
