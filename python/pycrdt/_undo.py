@@ -127,6 +127,13 @@ class UndoManager:
         """
         self._undo_manager.clear_all()
 
+    def reset(self) -> None:
+        """
+        Makes the next change a new undo step, instead of merging it with the last one
+        when it happens within `capture_timeout_millis`.
+        """
+        self._undo_manager.reset()
+
     @property
     def undo_stack(self) -> list[StackItem]:
         """The list of undoable actions."""

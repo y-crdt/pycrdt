@@ -179,6 +179,10 @@ impl UndoManager {
         self.undo_manager.clear_all();
     }
 
+    pub fn reset(&mut self) {
+        self.undo_manager.reset();
+    }
+
     pub fn undo_stack<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyList> {
         let elements = self.undo_manager.undo_stack().into_iter().map(|v| {
             StackItem::from(v.clone())

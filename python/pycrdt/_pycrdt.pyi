@@ -406,6 +406,9 @@ class UndoManager:
     def clear_all(self) -> None:
         """Clear all items stored within current undo manager."""
 
+    def reset(self) -> None:
+        """Make the next change a new undo step, instead of merging it with the last one."""
+
     def undo_stack(self) -> list[StackItem]:
         """Returns the undo manager's undo stack."""
 

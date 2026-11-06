@@ -205,6 +205,23 @@ def test_timestamp():
     assert timestamp_called == 4
 
 
+def test_reset():
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], timestamp=lambda: 1)
+    text += "a"
+    text += "b"
+
+    undo_manager.reset()
+    text += "c"
+
+    assert len(undo_manager.undo_stack) == 2
+    undo_manager.undo()
+    assert str(text) == "ab"
+    undo_manager.undo()
+    assert str(text) == ""
+
+
 def test_stack_item_serialization():
     """Test serializing and deserializing a StackItem"""
     doc = Doc()
