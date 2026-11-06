@@ -705,3 +705,30 @@ def test_expand_scope_in_transaction():
     array.append(0)
     assert undo_manager.undo()
     assert array.to_py() == []
+
+
+def test_expand_scope_to_second_doc_in_transaction():
+    doc0 = Doc()
+    doc0["text"] = text0 = Text()
+    doc1 = Doc()
+    doc1["text"] = text1 = Text()
+    undo_manager = UndoManager(scopes=[text0], capture_timeout_millis=0)
+    text0 += "first"
+
+    with doc1.transaction():
+        with pytest.raises(RuntimeError, match="Cannot acquire transaction"):
+            undo_manager.expand_scope(text1)
+
+    assert len(undo_manager.undo_stack) == 1
+    assert undo_manager.undo()
+    assert str(text0) == ""
+
+    # Failed registration must not prevent retrying once the transaction ends.
+    undo_manager.expand_scope(text1)
+    text1 += "second"
+    with doc1.transaction():
+        with pytest.raises(RuntimeError, match="Cannot acquire transaction"):
+            undo_manager.undo()
+    assert len(undo_manager.undo_stack) == 1
+    assert undo_manager.undo()
+    assert str(text1) == ""

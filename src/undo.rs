@@ -86,7 +86,6 @@ impl Clock for PythonClock {
 #[pyclass]
 pub struct UndoManager {
     undo_manager: _UndoManager<PyMeta>,
-    docs: Vec<_Doc>,
 }
 
 #[pymethods]
@@ -113,29 +112,29 @@ impl UndoManager {
             init_redo_stack,
         };
         let undo_manager = _UndoManager::with_options(options);
-        UndoManager { undo_manager, docs: Vec::new() }
+        UndoManager { undo_manager }
     }
 
     pub fn expand_scope_text(&mut self, doc: &Doc, scope: &Text) -> PyResult<()> {
-        self.track_doc(&doc.doc)?;
+        self.check_scope_doc(&doc.doc)?;
         self.undo_manager.expand_scope(&doc.doc, &scope.text);
         Ok(())
     }
 
     pub fn expand_scope_array(&mut self, doc: &Doc, scope: &Array) -> PyResult<()> {
-        self.track_doc(&doc.doc)?;
+        self.check_scope_doc(&doc.doc)?;
         self.undo_manager.expand_scope(&doc.doc, &scope.array);
         Ok(())
     }
 
     pub fn expand_scope_map(&mut self, doc: &Doc, scope: &Map) -> PyResult<()> {
-        self.track_doc(&doc.doc)?;
+        self.check_scope_doc(&doc.doc)?;
         self.undo_manager.expand_scope(&doc.doc, &scope.map);
         Ok(())
     }
 
     pub fn expand_scope_xmlfragment(&mut self, doc: &Doc, scope: &XmlFragment) -> PyResult<()> {
-        self.track_doc(&doc.doc)?;
+        self.check_scope_doc(&doc.doc)?;
         self.undo_manager.expand_scope(&doc.doc, &scope.fragment);
         Ok(())
     }
@@ -214,12 +213,11 @@ impl UndoManager {
 impl UndoManager {
     // Yrs observes a document the first time one of its shared types is added to the scope,
     // which panics if a transaction is in progress.
-    fn track_doc(&mut self, doc: &_Doc) -> PyResult<()> {
-        if !self.docs.iter().any(|d| d.guid() == doc.guid()) {
+    fn check_scope_doc(&self, doc: &_Doc) -> PyResult<()> {
+        if !self.undo_manager.docs().any(|d| d.guid() == doc.guid()) {
             if doc.try_transact_mut().is_err() {
                 return Err(PyRuntimeError::new_err("Cannot acquire transaction"));
             }
-            self.docs.push(doc.clone());
         }
         Ok(())
     }
@@ -227,7 +225,7 @@ impl UndoManager {
     // Yrs pops the stack item before acquiring a transaction, so the item would be lost
     // if the transaction could not be acquired.
     fn check_docs(&self) -> PyResult<()> {
-        for doc in &self.docs {
+        for doc in self.undo_manager.docs() {
             if doc.try_transact_mut().is_err() {
                 return Err(PyRuntimeError::new_err("Cannot acquire transaction"));
             }
