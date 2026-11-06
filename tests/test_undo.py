@@ -1,3 +1,5 @@
+import threading
+
 import pytest
 from pycrdt import Array, Doc, IdSet, Map, StackItem, Text, UndoManager
 
@@ -601,3 +603,105 @@ def test_stack_item_constructor_with_metadata():
     assert undo_manager.can_undo()
     undo_manager.undo()
     assert str(text) == ""
+
+
+@pytest.mark.parametrize("method", ["undo", "redo"])
+def test_undo_redo_in_transaction(method):
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+    text += "Hello"
+    text += ", World!"
+    if method == "redo":
+        undo_manager.undo()
+    undo_stack_len = len(undo_manager.undo_stack)
+    redo_stack_len = len(undo_manager.redo_stack)
+    value = str(text)
+
+    with doc.transaction():
+        with pytest.raises(RuntimeError) as excinfo:
+            getattr(undo_manager, method)()
+
+    assert str(excinfo.value) == "Cannot acquire transaction"
+    # the stacks are left unchanged
+    assert len(undo_manager.undo_stack) == undo_stack_len
+    assert len(undo_manager.redo_stack) == redo_stack_len
+    assert str(text) == value
+    assert getattr(undo_manager, method)()
+    assert str(text) == ("Hello" if method == "undo" else "Hello, World!")
+
+
+def test_edit_after_undo_in_transaction():
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+    text += "Hello"
+    with doc.transaction():
+        with pytest.raises(RuntimeError):
+            undo_manager.undo()
+
+    text += ", World!"
+
+    # the change is tracked as a new undo step, not as a redo step
+    assert len(undo_manager.undo_stack) == 2
+    assert len(undo_manager.redo_stack) == 0
+
+
+@pytest.mark.parametrize("method", ["undo", "redo"])
+def test_undo_redo_nothing_in_transaction(method):
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text])
+
+    with doc.transaction():
+        done = getattr(undo_manager, method)()
+
+    assert not done
+
+
+def test_undo_while_another_thread_holds_transaction():
+    doc = Doc(allow_multithreading=True)
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+    text += "Hello"
+    in_transaction = threading.Event()
+    done = threading.Event()
+
+    def hold_transaction():
+        with doc.new_transaction():
+            in_transaction.set()
+            done.wait()
+
+    thread = threading.Thread(target=hold_transaction)
+    thread.start()
+    in_transaction.wait()
+    try:
+        with pytest.raises(RuntimeError) as excinfo:
+            undo_manager.undo()
+    finally:
+        done.set()
+        thread.join()
+
+    assert str(excinfo.value) == "Cannot acquire transaction"
+    assert len(undo_manager.undo_stack) == 1
+    assert undo_manager.undo()
+    assert str(text) == ""
+
+
+def test_expand_scope_in_transaction():
+    doc = Doc()
+    doc["text"] = text = Text()
+    doc["array"] = array = Array()
+
+    with doc.transaction():
+        with pytest.raises(RuntimeError) as excinfo:
+            UndoManager(scopes=[text])
+    assert str(excinfo.value) == "Cannot acquire transaction"
+
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+    # the document is already tracked, so a shared type of the same document can be added
+    with doc.transaction():
+        undo_manager.expand_scope(array)
+    array.append(0)
+    assert undo_manager.undo()
+    assert array.to_py() == []
