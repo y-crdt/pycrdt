@@ -115,3 +115,29 @@ def test_typed_missing_key():
     assert str(excinfo.value) == '"<class \'test_typed.MyTypedMap1\'>" has no attribute "key0"'
     assert not hasattr(my_typed_doc.my_typed_map, "key0")
     assert getattr(my_typed_doc.my_typed_map, "key2", None) is None
+
+
+@pytest.mark.parametrize("key", ["key0", "key2"])
+def test_typed_missing_key_dictionary_access(key: str):
+    my_typed_doc = MyTypedDoc()
+
+    with pytest.raises(KeyError) as excinfo:
+        my_typed_doc.my_typed_map._[key]
+
+    assert excinfo.value.args == (key,)
+
+
+def test_typed_present_none():
+    class NullableMap(TypedMap):
+        value: str | None
+
+    doc = Doc({"map": Map()})
+    typed_map = NullableMap(doc["map"])
+    default = object()
+    assert getattr(typed_map, "value", default) is default
+
+    typed_map.value = None
+
+    assert hasattr(typed_map, "value")
+    assert getattr(typed_map, "value", default) is None
+    assert typed_map._["value"] is None
