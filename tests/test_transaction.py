@@ -380,37 +380,46 @@ def raise_once(exception, raised, event):
         raise exception
 
 
-def test_new_transaction_after_commit_error_multithreading():
+@pytest.mark.parametrize("origin", [None, "test-origin"])
+def test_new_transaction_after_commit_error_multithreading(origin):
     doc = Doc(allow_multithreading=True)
     map0 = doc.get("map0", type=Map)
     sub = doc.observe(partial(raise_once, Interrupt(), []))  # noqa: F841
 
     with pytest.raises(Interrupt):
-        with doc.transaction():
+        with doc.transaction(origin=origin):
             map0["key0"] = "val0"
 
-    with doc.new_transaction(timeout=1):
+    assert doc._origins == {}
+    with doc.new_transaction(origin=origin, timeout=1) as txn:
+        assert txn.origin == origin
         map0["key1"] = "val1"
+    assert doc._origins == {}
     assert map0.to_py() == {"key0": "val0", "key1": "val1"}
 
 
 @pytest.mark.parametrize("anyio_backend", ["asyncio", "trio"])
-async def test_new_async_transaction_after_observer_error(anyio_backend):
+@pytest.mark.parametrize("origin", [None, "test-origin"])
+async def test_new_async_transaction_after_observer_error(anyio_backend, origin):
     doc = Doc()
     map0 = doc.get("map0", type=Map)
     sub = doc.observe(partial(raise_once, ValueError("error"), []))  # noqa: F841
 
     with pytest.RaisesGroup(ValueError, match="Observer callback error"):
-        async with doc.new_transaction():
+        async with doc.new_transaction(origin=origin):
             map0["key0"] = "val0"
 
+    assert doc._origins == {}
+
     async def create_new_async_transaction():
-        async with doc.new_transaction():
+        async with doc.new_transaction(origin=origin) as txn:
+            assert txn.origin == origin
             map0["key1"] = "val1"
 
     with fail_after(1):
         async with create_task_group() as tg:
             tg.start_soon(create_new_async_transaction)
+    assert doc._origins == {}
     assert map0.to_py() == {"key0": "val0", "key1": "val1"}
 
 

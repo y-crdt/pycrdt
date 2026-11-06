@@ -36,7 +36,7 @@ dependencies = [
 
 [dependency-groups]
 test = [
-    "pytest >=8.3.5,<10",
+    "pytest >=8.4,<10",
     "anyio",
     "trio >=0.25.1,<0.36",
     "pydantic >=2.5.2,<3",
