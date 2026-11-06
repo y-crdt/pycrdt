@@ -104,3 +104,14 @@ def test_typed():
     }
     my_array = my_other_doc.get("my_array", type=Array[bool])
     assert my_array.to_py() == [False, True]
+
+
+def test_typed_missing_key():
+    my_typed_doc = MyTypedDoc()
+
+    with pytest.raises(AttributeError) as excinfo:
+        my_typed_doc.my_typed_map.key0
+
+    assert str(excinfo.value) == '"<class \'test_typed.MyTypedMap1\'>" has no attribute "key0"'
+    assert not hasattr(my_typed_doc.my_typed_map, "key0")
+    assert getattr(my_typed_doc.my_typed_map, "key2", None) is None
