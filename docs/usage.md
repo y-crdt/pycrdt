@@ -309,8 +309,7 @@ doc = Doc()
 text = doc.get("text", type=Text)
 text += "Hello"
 
-undo_manager = UndoManager(doc=doc)
-undo_manager.expand_scope(text)
+undo_manager = UndoManager(scopes=[text])
 
 text += ", World!"
 print(str(text))
