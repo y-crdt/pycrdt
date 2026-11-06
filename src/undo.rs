@@ -6,7 +6,7 @@ use std::sync::Arc;
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::types::{PyList, PyBytes};
-use yrs::IdSet as _IdSet;
+use yrs::{Doc as _Doc, IdSet as _IdSet, Transact};
 use yrs::undo::{
     Options,
     StackItem as _StackItem,
@@ -115,20 +115,28 @@ impl UndoManager {
         UndoManager { undo_manager }
     }
 
-    pub fn expand_scope_text(&mut self, doc: &Doc, scope: &Text) {
+    pub fn expand_scope_text(&mut self, doc: &Doc, scope: &Text) -> PyResult<()> {
+        self.check_scope_doc(&doc.doc)?;
         self.undo_manager.expand_scope(&doc.doc, &scope.text);
+        Ok(())
     }
 
-    pub fn expand_scope_array(&mut self, doc: &Doc, scope: &Array) {
+    pub fn expand_scope_array(&mut self, doc: &Doc, scope: &Array) -> PyResult<()> {
+        self.check_scope_doc(&doc.doc)?;
         self.undo_manager.expand_scope(&doc.doc, &scope.array);
+        Ok(())
     }
 
-    pub fn expand_scope_map(&mut self, doc: &Doc, scope: &Map) {
+    pub fn expand_scope_map(&mut self, doc: &Doc, scope: &Map) -> PyResult<()> {
+        self.check_scope_doc(&doc.doc)?;
         self.undo_manager.expand_scope(&doc.doc, &scope.map);
+        Ok(())
     }
 
-    pub fn expand_scope_xmlfragment(&mut self, doc: &Doc, scope: &XmlFragment) {
+    pub fn expand_scope_xmlfragment(&mut self, doc: &Doc, scope: &XmlFragment) -> PyResult<()> {
+        self.check_scope_doc(&doc.doc)?;
         self.undo_manager.expand_scope(&doc.doc, &scope.fragment);
+        Ok(())
     }
 
     pub fn origin(&self) -> i128 {
@@ -152,6 +160,9 @@ impl UndoManager {
     }
 
     pub fn undo(&mut self)  -> PyResult<bool> {
+        if self.undo_manager.can_undo() {
+            self.check_docs()?;
+        }
         let future = pin!(self.undo_manager.undo());
         let waker = noop_waker();
         let mut cx = Context::from_waker(&waker);
@@ -166,6 +177,9 @@ impl UndoManager {
     }
 
     pub fn redo(&mut self)  -> PyResult<bool> {
+        if self.undo_manager.can_redo() {
+            self.check_docs()?;
+        }
         let future = pin!(self.undo_manager.redo());
         let waker = noop_waker();
         let mut cx = Context::from_waker(&waker);
@@ -177,6 +191,10 @@ impl UndoManager {
 
     pub fn clear_all(&mut self)  -> () {
         self.undo_manager.clear_all();
+    }
+
+    pub fn reset(&mut self) {
+        self.undo_manager.reset();
     }
 
     pub fn undo_stack<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyList> {
@@ -193,6 +211,30 @@ impl UndoManager {
         });
         let res = PyList::new(py, elements);
         res.unwrap()
+    }
+}
+
+impl UndoManager {
+    // Yrs observes a document the first time one of its shared types is added to the scope,
+    // which panics if a transaction is in progress.
+    fn check_scope_doc(&self, doc: &_Doc) -> PyResult<()> {
+        if !self.undo_manager.docs().any(|d| d.guid() == doc.guid()) {
+            if doc.try_transact_mut().is_err() {
+                return Err(PyRuntimeError::new_err("Cannot acquire transaction"));
+            }
+        }
+        Ok(())
+    }
+
+    // Yrs pops the stack item before acquiring a transaction, so the item would be lost
+    // if the transaction could not be acquired.
+    fn check_docs(&self) -> PyResult<()> {
+        for doc in self.undo_manager.docs() {
+            if doc.try_transact_mut().is_err() {
+                return Err(PyRuntimeError::new_err("Cannot acquire transaction"));
+            }
+        }
+        Ok(())
     }
 }
 

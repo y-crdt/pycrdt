@@ -136,6 +136,28 @@ impl Map {
         Ok(PyList::new(py, v).unwrap())
     }
 
+    fn values<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> PyResult<Bound<'py, PyList>> {
+        let mut t0 = txn.transaction()?;
+        let t1 = t0.as_mut().unwrap();
+        let t = t1.as_ref();
+        let result = PyList::empty(py);
+        for (_k, v) in self.map.iter(t) {
+            result.append(v.into_py(py))?;
+        }
+        Ok(result)
+    }
+
+    fn items<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> PyResult<Bound<'py, PyList>> {
+        let mut t0 = txn.transaction()?;
+        let t1 = t0.as_mut().unwrap();
+        let t = t1.as_ref();
+        let result = PyList::empty(py);
+        for (k, v) in self.map.iter(t) {
+            result.append((k, v.into_py(py)))?;
+        }
+        Ok(result)
+    }
+
     fn to_json(&mut self, txn: &mut Transaction) -> PyResult<Py<PyAny>> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();

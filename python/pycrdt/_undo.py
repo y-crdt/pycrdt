@@ -41,6 +41,9 @@ class UndoManager:
             timestamp: A function that returns a timestamp as an integer number of milli-seconds.
             undo_stack: Pre-filled undo stack items.
             redo_stack: Pre-filled redo stack items.
+
+        Raises:
+            RuntimeError: A transaction is in progress on the document of a scope.
         """
         self._undo_manager = _UndoManager(
             capture_timeout_millis,
@@ -66,6 +69,10 @@ class UndoManager:
 
         Args:
             scope: The shared type to include.
+
+        Raises:
+            RuntimeError: A transaction is in progress on the document of the shared type,
+                which is not tracked yet by this undo manager.
         """
         method = getattr(self._undo_manager, f"expand_scope_{scope.type_name}")
         method(scope.doc._doc, scope._integrated)
@@ -99,6 +106,9 @@ class UndoManager:
         """
         Perform an undo operation.
 
+        Raises:
+            RuntimeError: A transaction is in progress on a tracked document.
+
         Returns:
             True if some changes were undone.
         """
@@ -115,6 +125,9 @@ class UndoManager:
         """
         Perform a redo operation.
 
+        Raises:
+            RuntimeError: A transaction is in progress on a tracked document.
+
         Returns:
             True if some changes were redone.
         """
@@ -126,6 +139,13 @@ class UndoManager:
         effectively resetting its state.
         """
         self._undo_manager.clear_all()
+
+    def reset(self) -> None:
+        """
+        Makes the next change a new undo step, instead of merging it with the last one
+        when it happens within `capture_timeout_millis`.
+        """
+        self._undo_manager.reset()
 
     @property
     def undo_stack(self) -> list[StackItem]:

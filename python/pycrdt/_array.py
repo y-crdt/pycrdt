@@ -239,7 +239,7 @@ class Array(Sequence, Generic[T]):
             key: The index of the item to remove.
 
         Raises:
-            RuntimeError: Array indices must be integers or slices.
+            TypeError: Array indices must be integers or slices.
         """
         with self.doc.transaction() as txn:
             self._forbid_read_transaction(txn)
@@ -283,6 +283,9 @@ class Array(Sequence, Generic[T]):
         assert array[1] == "bar"
         ```
 
+        Raises:
+            TypeError: Array indices must be integers or slices.
+
         Returns:
             The item at the given index.
         """
@@ -292,6 +295,10 @@ class Array(Sequence, Generic[T]):
                 return self._maybe_as_type_or_doc(self.integrated.get(txn._txn, key))
             elif isinstance(key, slice):
                 return [self[i] for i in range(*key.indices(len(self)))]
+            else:
+                raise TypeError(
+                    f"Array indices must be integers or slices, not {type(key).__name__}"
+                )
 
     def __iter__(self) -> ArrayIterator:
         """

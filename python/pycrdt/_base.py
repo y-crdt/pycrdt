@@ -388,9 +388,14 @@ class Typed:
             if key not in annotations:
                 raise AttributeError(f'"{type(self).mro()[0]}" has no attribute "{key}"')
             expected_type = annotations[key]
+            try:
+                value = self._[key]
+            except KeyError:
+                # getattr() and hasattr() expect an AttributeError
+                raise AttributeError(f'"{type(self).mro()[0]}" has no attribute "{key}"') from None
             if hasattr(expected_type, "mro") and Typed in expected_type.mro():
-                return expected_type(self._[key])
-            return self._[key]
+                return expected_type(value)
+            return value
 
         def __setattr__(self, key: str, value: Any) -> None:
             if key == "_":

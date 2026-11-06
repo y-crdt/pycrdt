@@ -302,6 +302,16 @@ def test_unsupported_value(value, exception):
     assert array.to_py() == [0]
 
 
+def test_getitem_wrong_type():
+    doc = Doc()
+    doc["array"] = array = Array([0, 1])
+
+    with pytest.raises(TypeError) as excinfo:
+        array["a"]
+
+    assert str(excinfo.value) == "Array indices must be integers or slices, not str"
+
+
 def test_to_py():
     doc = Doc()
     submap = Map({"foo": "bar"})
