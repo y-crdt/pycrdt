@@ -280,7 +280,7 @@ class Map(BaseType, Generic[T]):
             An iterable over the values of the map.
         """
         with self.doc.transaction() as txn:
-            return iter([self[k] for k in self.integrated.keys(txn._txn)])
+            return iter([self._maybe_as_type_or_doc(v) for v in self.integrated.values(txn._txn)])
 
     def items(self) -> Iterable[tuple[str, T]]:
         """
@@ -288,7 +288,9 @@ class Map(BaseType, Generic[T]):
             An iterable over the key-value pairs of the map.
         """
         with self.doc.transaction() as txn:
-            return iter([(k, self[k]) for k in self.integrated.keys(txn._txn)])
+            return iter(
+                [(k, self._maybe_as_type_or_doc(v)) for k, v in self.integrated.items(txn._txn)]
+            )
 
     def clear(self) -> None:
         """
