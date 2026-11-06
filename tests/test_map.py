@@ -147,6 +147,48 @@ def test_partial_iteration(method: str):
     assert len(list(iterator)) == 1
 
 
+@pytest.mark.parametrize("method", ["values", "items"])
+def test_iteration_shared_types_and_subdocs(method: str):
+    subdoc = Doc({"text": Text("subdoc")})
+    doc = Doc()
+    doc["map"] = map0 = Map(
+        {
+            "Text": Text("hello"),
+            "Array": Array([1]),
+            "Map": Map({"key": "value"}),
+            "Doc": subdoc,
+        }
+    )
+
+    iterator = iter(getattr(map0, method)())
+    if method == "items":
+        entries = dict(iterator)
+    else:
+        entries = {type(value).__name__: value for value in iterator}
+
+    assert set(entries) == {"Text", "Array", "Map", "Doc"}
+    for name, cls in [("Text", Text), ("Array", Array), ("Map", Map), ("Doc", Doc)]:
+        assert isinstance(entries[name], cls)
+    for name in ("Text", "Array", "Map"):
+        assert entries[name].doc is doc
+
+    assert str(entries["Text"]) == "hello"
+    assert entries["Array"].to_py() == [1]
+    assert entries["Map"].to_py() == {"key": "value"}
+    assert entries["Doc"].guid == subdoc.guid
+    assert str(entries["Doc"]["text"]) == "subdoc"
+
+    entries["Text"] += "!"
+    entries["Array"].append(2)
+    entries["Map"]["key"] = "updated"
+    subdoc_text = entries["Doc"]["text"]
+    subdoc_text += "!"
+    assert str(map0["Text"]) == "hello!"
+    assert map0["Array"].to_py() == [1, 2]
+    assert map0["Map"].to_py() == {"key": "updated"}
+    assert str(subdoc["text"]) == "subdoc!"
+
+
 def test_prelim():
     map0 = Map({"0": 1})
     assert map0.to_py() == {"0": 1}

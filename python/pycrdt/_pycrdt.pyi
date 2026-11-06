@@ -216,6 +216,12 @@ class Map:
     def get(self, txn: Transaction, key: str) -> Any:
         """Retrieves a value stored under a given `key`."""
 
+    def values(self, txn: Transaction) -> list[Any]:
+        """Returns the values of the map."""
+
+    def items(self, txn: Transaction) -> list[tuple[str, Any]]:
+        """Returns the key-value pairs of the map."""
+
     def to_json(self, txn: Transaction) -> str:
         """Returns a JSON representation of the current map."""
 
