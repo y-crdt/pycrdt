@@ -177,6 +177,45 @@ def test_insert_embed_shared_types():
     assert diff[4] == ("Y", None)
 
 
+@pytest.mark.parametrize(
+    "method,args,exception",
+    [
+        ("insert_embed", (object(),), TypeError),
+        ("insert_embed", ([object()],), TypeError),
+        ("insert_embed", ({"key": object()},), TypeError),
+        ("insert", ("c", {"bold": object()}), TypeError),
+        ("insert", ("c", {"bold": 2**63}), OverflowError),
+        ("insert_embed", ("c", {"bold": object()}), TypeError),
+    ],
+    ids=[
+        "unsupported-embed",
+        "nested-unsupported-in-list-embed",
+        "nested-unsupported-in-dict-embed",
+        "unsupported-attribute",
+        "too-large-int-attribute",
+        "unsupported-embed-attribute",
+    ],
+)
+def test_insert_unsupported_value(method, args, exception):
+    doc = Doc()
+    doc["text"] = text = Text("ab")
+
+    with pytest.raises(exception):
+        getattr(text, method)(1, *args)
+
+    assert text.diff() == [("ab", None)]
+
+
+def test_format_unsupported_value():
+    doc = Doc()
+    doc["text"] = text = Text("ab")
+
+    with pytest.raises(TypeError):
+        text.format(0, 1, {"bold": object()})
+
+    assert text.diff() == [("ab", None)]
+
+
 def test_observe():
     doc = Doc()
     doc["text"] = text = Text()

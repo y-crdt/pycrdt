@@ -4,7 +4,7 @@ use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyValueError, PyTypeError};
 use pyo3::types::{PyString, PyDict, PyList};
 use yrs::{
-    Any, DeepObservable, Doc as _Doc, Map as _Map, MapRef, Observable, TransactionMut, XmlFragmentPrelim
+    DeepObservable, Doc as _Doc, Map as _Map, MapRef, Observable, TransactionMut, XmlFragmentPrelim
 };
 use yrs::types::ToJson;
 use yrs::types::text::TextPrelim;
@@ -43,13 +43,9 @@ impl Map {
     fn insert(&self, txn: &mut Transaction, key: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
-        match py_to_any(value) {
-            Any::Undefined => Err(PyTypeError::new_err("Type not supported")),
-            v => {
-                self.map.insert(&mut t, key, v);
-                Ok(())
-            }
-        }
+        let v = py_to_any(value)?;
+        self.map.insert(&mut t, key, v);
+        Ok(())
     }
 
     fn insert_text_prelim(&self, txn: &mut Transaction, key: &str) -> PyResult<Text> {

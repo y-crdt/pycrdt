@@ -93,9 +93,14 @@ def test_content_attribute_repr():
     assert "alice" in repr(a)
 
 
-def test_content_attribute_invalid_value():
-    with pytest.raises(TypeError):
-        ContentAttribute("k", object())
+@pytest.mark.parametrize(
+    "value",
+    [object(), [object()], {1: "a"}],
+    ids=["unsupported", "nested-unsupported", "non-str-key"],
+)
+def test_content_attribute_invalid_value(value):
+    with pytest.raises(TypeError, match="attribute value must be JSON-serializable"):
+        ContentAttribute("k", value)
 
 
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])

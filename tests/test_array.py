@@ -287,6 +287,21 @@ def test_del_slice_out_of_range(key: slice, ref: list[int]):
     assert array.to_py() == ref
 
 
+@pytest.mark.parametrize(
+    "value,exception",
+    [(2**63, OverflowError), ([object()], TypeError)],
+    ids=["too-large-int", "nested-unsupported"],
+)
+def test_unsupported_value(value, exception):
+    doc = Doc()
+    doc["array"] = array = Array([0])
+
+    with pytest.raises(exception):
+        array.append(value)
+
+    assert array.to_py() == [0]
+
+
 def test_to_py():
     doc = Doc()
     submap = Map({"foo": "bar"})

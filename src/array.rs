@@ -4,7 +4,6 @@ use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyValueError, PyTypeError};
 use pyo3::types::{PyList, PyString};
 use yrs::{
-    Any,
     Array as _Array,
     ArrayRef,
     Assoc,
@@ -53,13 +52,9 @@ impl Array {
     fn insert(&self, txn: &mut Transaction, index: u32, value: &Bound<'_, PyAny>) -> PyResult<()> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
-        match py_to_any(value) {
-            Any::Undefined => Err(PyTypeError::new_err("Type not supported")),
-            v => {
-                self.array.insert(&mut t, index, v);
-                Ok(())
-            }
-        }
+        let v = py_to_any(value)?;
+        self.array.insert(&mut t, index, v);
+        Ok(())
     }
 
     fn insert_text_prelim(&self, txn: &mut Transaction, index: u32) -> PyResult<Text> {

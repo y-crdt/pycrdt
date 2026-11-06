@@ -165,10 +165,11 @@ macro_rules! impl_xml_methods {
                     name: &str,
                     value: Bound<'_, PyAny>,
                 ) -> PyResult<()> {
+                    let value = py_to_any(&value)?;
                     let mut _t = txn.transaction()?;
                     let mut t = _t.as_mut().unwrap().as_mut();
                     self.$xinner
-                        .insert_attribute(&mut t, name, py_to_any(&value));
+                        .insert_attribute(&mut t, name, value);
                     Ok(())
                 }
 
@@ -360,7 +361,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
 
     #[pyo3(signature = (txn, index, embed, attrs=None))]
     fn insert_embed<'py>(&self, txn: &mut Transaction, index: u32, embed: Bound<'py, PyAny>, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<()> {
-        let embed = py_to_any(&embed);
+        let embed = py_to_any(&embed)?;
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         if let Some(attrs) = attrs {

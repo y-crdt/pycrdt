@@ -74,7 +74,7 @@ impl Text {
         embed: Bound<'_, PyAny>,
         attrs: Option<Bound<'_, PyIterator>>,
     ) -> PyResult<()> {
-        let embed = py_to_any(&embed);
+        let embed = py_to_any(&embed)?;
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         if let Some(attrs) = attrs {

@@ -222,67 +222,73 @@ impl ToPython for Any {
     }
 }
 
-pub fn py_to_any<'py>(value: &Bound<'py, PyAny>) -> Any {
+pub fn py_to_any<'py>(value: &Bound<'py, PyAny>) -> PyResult<Any> {
     if value.is_none() {
-        Any::Null
+        Ok(Any::Null)
     } else if value.is_instance_of::<PyBytes>() {
-        let v: &[u8] = value.extract().unwrap();
-        Any::Buffer(v.into())
+        let v: &[u8] = value.extract()?;
+        Ok(Any::Buffer(v.into()))
     } else if value.is_instance_of::<PyString>() {
-        let v: &str = value.extract().unwrap();
-        Any::String(v.into())
+        let v: &str = value.extract()?;
+        Ok(Any::String(v.into()))
     } else if value.is_instance_of::<PyBool>() {
-        let v: bool = value.extract().unwrap();
-        Any::Bool(v)
+        let v: bool = value.extract()?;
+        Ok(Any::Bool(v))
     } else if value.is_instance_of::<PyInt>() {
-        let v: i64 = value.extract().unwrap();
+        let v: i64 = value.extract()?;
         if !(Number::I64_MIN_SAFE_INTEGER..=Number::I64_MAX_SAFE_INTEGER).contains(&v) {
-            Any::Number(Number::Int(v))
+            Ok(Any::Number(Number::Int(v)))
         } else {
-            Any::Number(Number::Float(v as f64))
+            Ok(Any::Number(Number::Float(v as f64)))
         }
     } else if value.is_instance_of::<PyFloat>() {
-        let v: f64 = value.extract().unwrap();
-        Any::Number(Number::Float(v))
+        let v: f64 = value.extract()?;
+        Ok(Any::Number(Number::Float(v)))
     } else if let Ok(v) = value.cast::<PyList>() {
         let mut items = Vec::new();
         for i in v.iter() {
-            let a = py_to_any(&i);
+            let a = py_to_any(&i)?;
             items.push(a);
         }
-        Any::Array(items.into())
+        Ok(Any::Array(items.into()))
     } else if let Ok(v) = value.cast::<PyTuple>() {
         let mut items = Vec::new();
         for i in v.iter() {
-            let a = py_to_any(&i);
+            let a = py_to_any(&i)?;
             items.push(a);
         }
-        Any::Array(items.into())
+        Ok(Any::Array(items.into()))
     } else if let Ok(val) = value.cast::<PyDict>() {
         let mut items: HashMap<String, Any> = HashMap::new();
         for (k, v) in val.iter() {
-            let k = k.cast::<PyString>().unwrap().to_str().unwrap().to_string();
-            let v = py_to_any(&v);
+            let k = k.cast::<PyString>()?.to_str()?.to_string();
+            let v = py_to_any(&v)?;
             items.insert(k, v);
         }
-        Any::Map(items.into())
+        Ok(Any::Map(items.into()))
     } else {
-        Any::Undefined
+        Err(PyTypeError::new_err("Type not supported"))
     }
 }
+
+const JSON_TYPE_ERROR: &str =
+    "attribute value must be JSON-serializable (None, bool, int, float, str, list, tuple, or dict)";
 
 /// Convert a Python object into a JSON-compatible [`Any`], used for `IdMap` attribute values
 /// (see [`crate::id_map`]).
 ///
 /// This reuses [`py_to_any`] for the Python->Any traversal, so attribute values follow the same
 /// JS-number semantics as every other pycrdt value (small ints become `Any::Number`), and then
-/// rejects anything with no JSON representation: `bytes` (-> `Any::Buffer`), non-finite floats
-/// (`NaN`/`inf`), and unsupported types (-> `Any::Undefined`).
-///
-/// Note: a `dict` with non-string keys panics inside `py_to_any` before this validation runs (the
-/// same as for any other pycrdt value), surfacing as a `PanicException` rather than a `TypeError`.
+/// rejects anything with no JSON representation: `bytes` (-> `Any::Buffer`) and non-finite floats
+/// (`NaN`/`inf`). Unsupported types and `dict`s with non-string keys are rejected by `py_to_any`.
 pub(crate) fn py_to_json_any(value: &Bound<'_, PyAny>) -> PyResult<Any> {
-    let any = py_to_any(value);
+    let any = py_to_any(value).map_err(|err| {
+        if err.is_instance_of::<PyTypeError>(value.py()) {
+            PyTypeError::new_err(JSON_TYPE_ERROR)
+        } else {
+            err
+        }
+    })?;
     ensure_json_compatible(&any)?;
     Ok(any)
 }
@@ -298,9 +304,7 @@ fn ensure_json_compatible(any: &Any) -> PyResult<()> {
         Any::Buffer(_) => Err(PyTypeError::new_err(
             "bytes cannot be used as a JSON attribute value",
         )),
-        Any::Undefined => Err(PyTypeError::new_err(
-            "attribute value must be JSON-serializable (None, bool, int, float, str, list, tuple, or dict)",
-        )),
+        Any::Undefined => Err(PyTypeError::new_err(JSON_TYPE_ERROR)),
         Any::Array(items) => {
             for item in items.iter() {
                 ensure_json_compatible(item)?;
@@ -406,7 +410,7 @@ pub(crate) fn py_to_attrs<'py>(
 ) -> PyResult<Attrs> {
     pyobj.map(|res| res.and_then(|item| {
         let key = item.get_item(0)?.extract::<Bound<PyString>>()?;
-        let value = item.get_item(1).map(|v| py_to_any(&v))?;
+        let value = py_to_any(&item.get_item(1)?)?;
         Ok((Arc::from(key.to_str()?), value))
     })).collect::<PyResult<Attrs>>()
 }

@@ -222,6 +222,23 @@ def test_element_with_any_attribute():
     assert len(el.attributes) == 1
 
 
+@pytest.mark.parametrize(
+    "value,exception",
+    [(object(), TypeError), ([object()], TypeError), (2**63, OverflowError)],
+    ids=["unsupported", "nested-unsupported", "too-large-int"],
+)
+def test_element_with_unsupported_attribute(value, exception):
+    doc = Doc()
+    doc["test"] = frag = XmlFragment()
+    el = XmlElement("div")
+    frag.children.append(el)
+
+    with pytest.raises(exception):
+        el.attributes["class"] = value
+
+    assert "class" not in el.attributes
+
+
 def test_element():
     doc = Doc()
 

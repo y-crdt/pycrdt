@@ -197,6 +197,39 @@ async def test_iterate_events():
     assert keys[1] == {"key1": {"action": "add", "newValue": ", World!"}}
 
 
+@pytest.mark.parametrize(
+    "value,exception",
+    [
+        (2**63, OverflowError),
+        (-(2**63) - 1, OverflowError),
+        ({1: "val"}, TypeError),
+        ("\ud800", UnicodeEncodeError),
+        ({"\ud800": "val"}, UnicodeEncodeError),
+        (object(), TypeError),
+        ([object()], TypeError),
+        ({"key": {1, 2}}, TypeError),
+    ],
+    ids=[
+        "too-large-int",
+        "too-small-int",
+        "non-str-key",
+        "surrogate-str",
+        "surrogate-key",
+        "unsupported",
+        "nested-unsupported-in-list",
+        "nested-unsupported-in-dict",
+    ],
+)
+def test_unsupported_value(value, exception):
+    doc = Doc()
+    map0 = doc.get("map0", type=Map)
+
+    with pytest.raises(exception):
+        map0["key"] = value
+
+    assert map0.to_py() == {}
+
+
 def test_tuple_handling():
     """Test that tuples in nested dictionaries are properly preserved.
 
