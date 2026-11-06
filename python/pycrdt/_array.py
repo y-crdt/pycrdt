@@ -202,8 +202,9 @@ class Array(Sequence, Generic[T]):
         with self.doc.transaction():
             if isinstance(key, int):
                 key = self._check_index(key)
-                del self[key]
+                # insert before deleting, so that the item is kept if the value cannot be inserted
                 self[key:key] = [value]
+                del self[key + 1]
             elif isinstance(key, slice):
                 if key.step is not None:
                     raise RuntimeError("Step not supported")

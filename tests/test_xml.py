@@ -239,6 +239,27 @@ def test_element_with_unsupported_attribute(value, exception):
     assert "class" not in el.attributes
 
 
+@pytest.mark.parametrize(
+    "value,attrs,exception",
+    [
+        (object(), None, TypeError),
+        ([object()], None, TypeError),
+        ("c", {"bold": object()}, TypeError),
+    ],
+    ids=["unsupported-embed", "nested-unsupported-embed", "unsupported-attribute"],
+)
+def test_text_insert_unsupported_embed(value, attrs, exception):
+    doc = Doc()
+    doc["test"] = frag = XmlFragment()
+    text = XmlText("ab")
+    frag.children.append(text)
+
+    with pytest.raises(exception):
+        text.insert_embed(1, value, attrs)
+
+    assert text.diff() == [("ab", None)]
+
+
 def test_element():
     doc = Doc()
 
