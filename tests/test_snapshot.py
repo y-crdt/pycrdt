@@ -1,3 +1,7 @@
+import subprocess
+import sys
+from textwrap import dedent
+
 import pytest
 from pycrdt import Doc, Snapshot, Text
 
@@ -68,29 +72,66 @@ def test_doc_from_snapshot():
 
 
 def test_snapshot_in_transaction():
-    doc = Doc(skip_gc=True)
-    text = doc.get("test", type=Text)
-    with doc.transaction():
-        text += "old"
-        snapshot = Snapshot.from_doc(doc)
-        doc_restored = Doc.from_snapshot(snapshot, doc)
-        text += " new"
-    assert str(doc_restored.get("test", type=Text)) == "old"
-    assert str(text) == "old new"
+    # A deadlock can hold the GIL, so enforce the timeout from another process.
+    code = dedent(
+        """
+        from pycrdt import Doc, Snapshot, Text
+
+        doc = Doc(skip_gc=True)
+        text = doc.get("test", type=Text)
+        with doc.transaction():
+            text += "old"
+            snapshot = Snapshot.from_doc(doc)
+            doc_restored = Doc.from_snapshot(snapshot, doc)
+            text += " new"
+        assert str(doc_restored.get("test", type=Text)) == "old"
+        assert str(text) == "old new"
+        """
+    )
+    subprocess.run([sys.executable, "-c", code], check=True, timeout=10)
+
+
+def test_snapshot_after_deletion_in_transaction():
+    # A deadlock can hold the GIL, so enforce the timeout from another process.
+    code = dedent(
+        """
+        from pycrdt import Doc, Snapshot, Text
+
+        doc = Doc(skip_gc=True)
+        doc["test"] = text = Text("hello world")
+        with doc.transaction():
+            del text[5:]
+            snapshot = Snapshot.from_doc(doc)
+            doc_restored = Doc.from_snapshot(snapshot, doc)
+            assert str(doc_restored.get("test", type=Text)) == "hello"
+            del text[:1]
+        assert str(doc_restored.get("test", type=Text)) == "hello"
+        assert str(text) == "ello"
+        """
+    )
+    subprocess.run([sys.executable, "-c", code], check=True, timeout=10)
 
 
 def test_snapshot_in_observer_callback():
-    doc = Doc(skip_gc=True)
-    text = doc.get("test", type=Text)
-    restored = []
+    # A deadlock can hold the GIL, so enforce the timeout from another process.
+    code = dedent(
+        """
+        from pycrdt import Doc, Snapshot, Text
 
-    def callback(event):
-        snapshot = Snapshot.from_doc(doc)
-        restored.append(str(Doc.from_snapshot(snapshot, doc).get("test", type=Text)))
+        doc = Doc(skip_gc=True)
+        text = doc.get("test", type=Text)
+        restored = []
 
-    sub = text.observe(callback)  # noqa: F841
-    text += "hello"
-    assert restored == ["hello"]
+        def callback(event):
+            snapshot = Snapshot.from_doc(doc)
+            restored.append(str(Doc.from_snapshot(snapshot, doc).get("test", type=Text)))
+
+        sub = text.observe(callback)
+        text += "hello"
+        assert restored == ["hello"]
+        """
+    )
+    subprocess.run([sys.executable, "-c", code], check=True, timeout=10)
 
 
 def test_doc_from_snapshot_without_skip_gc():
