@@ -326,6 +326,9 @@ class Doc(BaseDoc, Generic[T]):
             callback: The callback to call with the [TransactionEvent][pycrdt.TransactionEvent].
                 If the callback is async, async transactions must be used.
 
+        Raises:
+            RuntimeError: A transaction is in progress on the document.
+
         Returns:
             The subscription that can be used to [unobserve()][pycrdt.Doc.unobserve].
         """
@@ -357,6 +360,9 @@ class Doc(BaseDoc, Generic[T]):
 
         Args:
             callback: The callback to call with the [SubdocsEvent][pycrdt.SubdocsEvent].
+
+        Raises:
+            RuntimeError: A transaction is in progress on the document.
 
         Returns:
             The subscription that can be used to [unobserve()][pycrdt.Doc.unobserve].
