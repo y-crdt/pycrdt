@@ -478,6 +478,30 @@ def test_children_iteration_snapshots_membership(xml_parent):
     assert list(xml_parent.children) == [second, third]
 
 
+def test_children_delete_out_of_range(xml_parent):
+    xml_parent.children.append("a")
+    xml_parent.children.append("b")
+
+    with pytest.raises(IndexError):
+        del xml_parent.children[2]
+
+    assert [str(child) for child in xml_parent.children] == ["a", "b"]
+
+
+@pytest.mark.parametrize(
+    "key", [slice(1, 5), slice(2, None), slice(5, None), slice(5, 10), slice(2, 1)], ids=repr
+)
+def test_children_delete_slice_out_of_range(xml_parent, key):
+    ref = ["a", "b"]
+    for child in ref:
+        xml_parent.children.append(child)
+
+    del xml_parent.children[key]
+    del ref[key]
+
+    assert [str(child) for child in xml_parent.children] == ref
+
+
 @pytest.mark.parametrize("node_type", [XmlText, XmlElement])
 def test_deleted_child_identity(xml_parent, node_type):
     node = node_type("content")
