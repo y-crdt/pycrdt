@@ -25,6 +25,7 @@ class Transaction:
     _doc: Doc
     _txn: _Transaction | None
     _leases: int
+    _origin: Any
     _origin_hash: int | None
     _timeout: float
 
@@ -39,11 +40,11 @@ class Transaction:
         self._doc = doc
         self._txn = _txn
         self._leases = 0
+        self._origin = origin
         if origin is None:
             self._origin_hash = None
         else:
             self._origin_hash = hash_origin(origin)
-            doc._origins[self._origin_hash] = origin
         self._timeout = -1 if timeout is None else timeout
 
     def __enter__(self, _acquire_transaction: bool = True) -> Self:
@@ -57,6 +58,9 @@ class Transaction:
                 raise TimeoutError("Could not acquire transaction")
             if self._origin_hash is not None:
                 self._txn = self._doc._doc.create_transaction_with_origin(self._origin_hash)
+                # register the origin only while the transaction is in progress, because
+                # other transactions with the same origin may be waiting for it to finish
+                self._doc._origins[self._origin_hash] = self._origin
             else:
                 self._txn = self._doc._doc.create_transaction()
         self._doc._txn = self

@@ -257,6 +257,29 @@ async def test_new_async_transaction_concurrent():
     assert map0.to_py() == {"key0": "val0", "key1": "val1"}
 
 
+@pytest.mark.parametrize("allow_multithreading", [False, True])
+async def test_concurrent_transactions_with_same_origin(allow_multithreading):
+    doc = Doc(allow_multithreading=allow_multithreading)
+    map0 = doc.get("map0", type=Map)
+    origins = []
+
+    async def create_transaction(key):
+        async with doc.new_transaction(origin="origin0") as txn:
+            await sleep(0.1)
+            map0[key] = "val"
+            origins.append(txn.origin)
+
+    async with create_task_group() as tg:
+        tg.start_soon(create_transaction, "key0")
+        tg.start_soon(create_transaction, "key1")
+
+    assert origins == ["origin0", "origin0"]
+    assert doc._origins == {}
+    with doc.new_transaction(timeout=1):
+        map0["key2"] = "val"
+    assert map0.to_py() == {"key0": "val", "key1": "val", "key2": "val"}
+
+
 async def test_new_async_transaction_concurrent_no_multithreading():
     doc = Doc(allow_multithreading=False)
     doc["map0"] = map0 = Map()
