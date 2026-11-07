@@ -252,6 +252,9 @@ array0_subscription_id = array0.observe_deep(handle_deep_changes)
 
 Unregistering the callback is done with the same `unobserve` method.
 
+Observers remain registered until you call `unobserve(subscription)` or the document is
+garbage-collected.
+
 When working in an asynchronous environment, one can iterate over the shared data events, instead of registering a callback:
 
 ```py

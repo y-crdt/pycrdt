@@ -366,6 +366,12 @@ async def test_iterate_events():
         await done_event.wait()
         array1.append("bye.")
 
+    # Shared-type event streams detach closed receivers on the next change.
+    # Close any remaining senders before discarding the observed array.
+    for send_streams in array0._send_streams.values():
+        for send_stream in send_streams:
+            send_stream.close()
+
     assert len(deltas) == 2
     assert deltas[0] == [{"insert": ["Hello"]}]
     assert paths[0] == []

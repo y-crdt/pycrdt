@@ -23,7 +23,7 @@ class ConnectedDoc:
         )
 
     async def start(self, *, task_status: TaskStatus[None] = TASK_STATUS_IGNORED):
-        async with create_task_group() as tg:
+        async with self.send_stream, self.receive_stream, create_task_group() as tg:
             task_status.started()
             tg.start_soon(self.process_received_messages)
 
