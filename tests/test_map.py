@@ -197,6 +197,19 @@ def test_prelim():
     assert map1.to_py() is None
 
 
+def test_prelim_to_py():
+    items = {"text": Text("foo"), "array": Array([0]), "map": Map({"key": "val"})}
+    map0 = Map(items)
+
+    assert map0.to_py() == {"text": "foo", "array": [0], "map": {"key": "val"}}
+    assert isinstance(items["text"], Text)
+    doc = Doc()
+    doc["map0"] = map0
+    assert isinstance(map0["text"], Text)
+    assert isinstance(map0["array"], Array)
+    assert isinstance(map0["map"], Map)
+
+
 def test_observe():
     doc = Doc()
     doc["map0"] = map0 = Map()

@@ -324,6 +324,19 @@ def test_to_py():
     assert array.to_py() == [0, [1, {"foo": "bar"}]]
 
 
+def test_prelim_to_py():
+    items = [Text("foo"), Array([0]), Map({"key": "val"})]
+    array = Array(items)
+
+    assert array.to_py() == ["foo", [0], {"key": "val"}]
+    assert isinstance(items[0], Text)
+    doc = Doc()
+    doc["array"] = array
+    assert isinstance(array[0], Text)
+    assert isinstance(array[1], Array)
+    assert isinstance(array[2], Map)
+
+
 async def test_iterate_events():
     doc = Doc()
     array0 = doc.get("array0", type=Array)

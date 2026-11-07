@@ -114,9 +114,10 @@ class Map(BaseType, Generic[T]):
             The map recursively converted to Python objects, or `None`.
         """
         if self._integrated is None:
-            py = self._prelim
-            if py is None:
+            if self._prelim is None:
                 return None
+            # copy the preliminary items, so that their shared types are not replaced
+            py = dict(self._prelim)
         else:
             py = dict(self)
         for key, val in py.items():
