@@ -3,6 +3,7 @@ use std::pin::pin;
 use std::task::{Context, Poll};
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::types::{PyList, PyBytes};
@@ -73,12 +74,26 @@ impl IdSet {
 
 struct PythonClock {
     timestamp: Py<PyAny>,
+    // Used when the timestamp function fails, so that changes are still tracked.
+    last_timestamp: AtomicU64,
 }
 
 impl Clock for PythonClock {
     fn now(&self) -> Timestamp {
         Python::attach(|py| {
-            self.timestamp.call0(py).expect("Error getting timestamp").extract(py).expect("Could not convert timestamp to int")
+            // An observer callback may have set an exception to be raised after the commit,
+            // and Python cannot be called while it is set.
+            let pending = PyErr::take(py);
+            let timestamp = self.timestamp.bind(py).call0().and_then(|t| t.extract::<Timestamp>());
+            match timestamp {
+                Ok(timestamp) => self.last_timestamp.store(timestamp, Ordering::Relaxed),
+                // The clock is called during a commit, where the error cannot be raised.
+                Err(err) => err.write_unraisable(py, Some(self.timestamp.bind(py))),
+            }
+            if let Some(err) = pending {
+                err.restore(py);
+            }
+            self.last_timestamp.load(Ordering::Relaxed)
         })
     }
 }
@@ -107,7 +122,7 @@ impl UndoManager {
             capture_timeout_millis,
             tracked_origins: HashSet::new(),
             capture_transaction: None,
-            timestamp: Arc::new(PythonClock {timestamp}),
+            timestamp: Arc::new(PythonClock {timestamp, last_timestamp: AtomicU64::new(0)}),
             init_undo_stack,
             init_redo_stack,
         };
