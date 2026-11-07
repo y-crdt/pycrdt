@@ -15,6 +15,7 @@ use crate::map::Map;
 use crate::transaction::Transaction;
 use crate::subscription::Subscription;
 use crate::type_conversions::ToPython;
+use crate::update::detach_if_large;
 use crate::xml::XmlFragment;
 
 
@@ -123,11 +124,11 @@ impl Doc {
         Py::new(py, restored)
     }
 
-    fn guid(&mut self) -> String {
+    fn guid(&self) -> String {
         self.doc.guid().to_string()
     }
 
-    fn client_id(&mut self) -> u64 {
+    fn client_id(&self) -> u64 {
         self.doc.client_id().get()
     }
 
@@ -203,25 +204,34 @@ impl Doc {
         Ok(Python::attach(|py| PyBytes::new(py, &state).into()))
     }
 
-    fn get_update(&self, txn: &Transaction, state: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
+    fn get_update(&self, py: Python<'_>, txn: &Transaction, state: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
         let mut _t = txn.transaction()?;
         let t = _t.as_mut().unwrap().as_mut();
-        let state: &[u8] = state.extract()?;
-        let Ok(state_vector) = StateVector::decode_v1(&state) else {
-            return Err(PyValueError::new_err("Cannot decode state"));
-        };
-        let update = t.encode_diff_v1(&state_vector);
-        let bytes: Py<PyAny> = Python::attach(|py| PyBytes::new(py, &update).into());
-        Ok(bytes)
+        let state: &[u8] = state.as_bytes();
+        // Encoding is pure Rust over the transaction's store: release the GIL so
+        // other Python threads keep running while a large document is encoded.
+        // Unlike apply_update, no input size predicts the work, so every call releases.
+        // The transaction (and so the store's write lock) stays held by this thread.
+        // `move` hands the closure the `&mut` (TransactionMut is Send, not Sync).
+        let update = py
+            .detach(move || StateVector::decode_v1(state).map(|sv| t.encode_diff_v1(&sv)))
+            .map_err(|_| PyValueError::new_err("Cannot decode state"))?;
+        Ok(PyBytes::new(py, &update).into())
     }
 
-    fn apply_update(&mut self, txn: &mut Transaction, update: &Bound<'_, PyBytes>) -> PyResult<()> {
-        let u = Update::decode_v1(update.as_bytes())
-            .map_err(|e| PyValueError::new_err(format!("Cannot decode update: {}", e)))?;
+    fn apply_update(&self, py: Python<'_>, txn: &mut Transaction, update: &Bound<'_, PyBytes>) -> PyResult<()> {
+        let bytes: &[u8] = update.as_bytes();
         let mut _t = txn.transaction()?;
         let t = _t.as_mut().unwrap().as_mut();
-        t.apply_update(u)
-            .map_err(|e| PyRuntimeError::new_err(format!("Cannot apply update: {}", e)))
+        // Decoding and integrating an update is pure Rust and fires no callbacks
+        // (observers run at commit): release the GIL for it if the update is large.
+        // `bytes` borrows an immutable `bytes` object kept alive by `update`.
+        detach_if_large(py, bytes.len(), || match Update::decode_v1(bytes) {
+            Err(e) => Err(PyValueError::new_err(format!("Cannot decode update: {}", e))),
+            Ok(u) => t
+                .apply_update(u)
+                .map_err(|e| PyRuntimeError::new_err(format!("Cannot apply update: {}", e))),
+        })
     }
 
     fn roots(&self, py: Python<'_>, txn: &mut Transaction) -> PyResult<Py<PyAny>> {
