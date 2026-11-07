@@ -299,6 +299,27 @@ def test_awareness_observes():
     assert len(changes2) == 0
 
 
+def test_awareness_unobserve_in_callback():
+    ydoc = Doc()
+    awareness = Awareness(ydoc)
+    changes1 = []
+    changes2 = []
+
+    def callback1(topic, value):
+        changes1.append(topic)
+        awareness.unobserve(sub1)
+
+    def callback2(topic, value):
+        changes2.append(topic)
+
+    sub1 = awareness.observe(callback1)
+    awareness.observe(callback2)
+    awareness.set_local_state_field("new_field", "new_value")
+
+    assert changes1 == ["change"]
+    assert changes2 == ["change", "update"]
+
+
 def test_awareness_observes_local_change():
     ydoc = Doc()
     awareness = Awareness(ydoc)
