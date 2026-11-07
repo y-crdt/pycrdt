@@ -256,6 +256,25 @@ def test_get_update_exception():
     assert str(excinfo.value) == "Cannot decode state"
 
 
+def test_get_state_and_update_in_observer():
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    states = []
+    updates = []
+
+    def callback(event):
+        states.append(doc.get_state())
+        updates.append(doc.get_update())
+
+    sub = text.observe(callback)  # noqa: F841
+    text += "hello"
+
+    assert states == [doc.get_state()]
+    remote_doc = Doc()
+    remote_doc.apply_update(updates[0])
+    assert str(remote_doc.get("text", type=Text)) == "hello"
+
+
 def test_apply_update_exception():
     doc = Doc()
     with pytest.raises(ValueError) as excinfo:
