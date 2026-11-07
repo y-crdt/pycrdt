@@ -1,3 +1,4 @@
+import sys
 import threading
 
 import pytest
@@ -205,6 +206,52 @@ def test_timestamp():
     undo_manager.undo()
     assert str(text) == "a"
     assert timestamp_called == 4
+
+
+@pytest.mark.parametrize(
+    "timestamp,exception",
+    [(lambda: 1.5, TypeError), (lambda: -1, OverflowError), (lambda: 1 / 0, ZeroDivisionError)],
+    ids=["float", "negative", "raises"],
+)
+def test_timestamp_error(timestamp, exception, monkeypatch):
+    unraisable = []
+    monkeypatch.setattr(sys, "unraisablehook", unraisable.append)
+    doc = Doc()
+    doc["text"] = text = Text()
+    updates = []
+    doc.observe(lambda event: updates.append(event.update))
+    undo_manager = UndoManager(scopes=[text], timestamp=timestamp)
+
+    text += "a"
+    text += "b"
+
+    assert len(updates) == 2
+    assert len(unraisable) == 2
+    assert all(isinstance(error.exc_value, exception) for error in unraisable)
+    undo_manager.undo()
+    assert str(text) == "a"
+
+
+def test_timestamp_with_pending_exception():
+    class Interrupt(BaseException):
+        pass
+
+    def callback(event):
+        if not raised:
+            raised.append(None)
+            raise Interrupt()
+
+    raised = []
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+    sub = text.observe(callback)  # noqa: F841
+
+    with pytest.raises(Interrupt):
+        text += "a"
+    text += "b"
+
+    assert len(undo_manager.undo_stack) == 2
 
 
 def test_reset():
