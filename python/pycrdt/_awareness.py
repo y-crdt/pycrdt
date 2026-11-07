@@ -52,7 +52,8 @@ class Awareness:
         removed: list[int],
         origin: Any,
     ):
-        for callback in self._subscriptions.values():
+        # iterate over a copy, as callbacks may observe or unobserve
+        for callback in list(self._subscriptions.values()):
             callback(topic, ({"added": added, "updated": updated, "removed": removed}, origin))
 
     def _get_time(self) -> int:
