@@ -15,6 +15,7 @@ use crate::map::Map;
 use crate::transaction::Transaction;
 use crate::subscription::Subscription;
 use crate::type_conversions::ToPython;
+use crate::update::detach_if_large;
 use crate::xml::XmlFragment;
 
 
@@ -209,6 +210,7 @@ impl Doc {
         let state: &[u8] = state.as_bytes();
         // Encoding is pure Rust over the transaction's store: release the GIL so
         // other Python threads keep running while a large document is encoded.
+        // Unlike apply_update, no input size predicts the work, so every call releases.
         // The transaction (and so the store's write lock) stays held by this thread.
         // `move` hands the closure the `&mut` (TransactionMut is Send, not Sync).
         let update = py
@@ -222,9 +224,9 @@ impl Doc {
         let mut _t = txn.transaction()?;
         let t = _t.as_mut().unwrap().as_mut();
         // Decoding and integrating an update is pure Rust and fires no callbacks
-        // (observers run at commit): release the GIL for it. `bytes` borrows an
-        // immutable `bytes` object kept alive by `update`.
-        py.detach(|| match Update::decode_v1(bytes) {
+        // (observers run at commit): release the GIL for it if the update is large.
+        // `bytes` borrows an immutable `bytes` object kept alive by `update`.
+        detach_if_large(py, bytes.len(), || match Update::decode_v1(bytes) {
             Err(e) => Err(PyValueError::new_err(format!("Cannot decode update: {}", e))),
             Ok(u) => t
                 .apply_update(u)
