@@ -198,14 +198,16 @@ impl Doc {
 
     fn get_state(&self, txn: &Transaction) -> PyResult<Py<PyAny>> {
         let mut _t = txn.transaction()?;
-        let t = _t.as_mut().unwrap().as_mut();
+        let t1 = _t.as_mut().unwrap();
+        let t = t1.as_ref();
         let state = t.state_vector().encode_v1();
         Ok(Python::attach(|py| PyBytes::new(py, &state).into()))
     }
 
     fn get_update(&self, txn: &Transaction, state: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
         let mut _t = txn.transaction()?;
-        let t = _t.as_mut().unwrap().as_mut();
+        let t1 = _t.as_mut().unwrap();
+        let t = t1.as_ref();
         let state: &[u8] = state.extract()?;
         let Ok(state_vector) = StateVector::decode_v1(&state) else {
             return Err(PyValueError::new_err("Cannot decode state"));
