@@ -1,4 +1,7 @@
+import subprocess
+import sys
 from functools import partial
+from textwrap import dedent
 
 import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group, sleep
@@ -134,6 +137,36 @@ def test_doc_in_event():
     sub = array.observe(partial(callback, events))  # noqa: F841
     array.append(Doc())
     assert isinstance(events[0].delta[0]["insert"][0], Doc)
+
+
+def test_insert_doc_in_transaction():
+    # A deadlock can hold the GIL, so enforce the timeout from another process.
+    code = dedent(
+        """
+        import pytest
+        from pycrdt import Array, Doc, Map
+
+        doc = Doc()
+        array = doc.get("array", type=Array)
+        map0 = doc.get("map", type=Map)
+        subdoc = Doc()
+        message = "Cannot insert a document while a transaction is in progress on it"
+        with subdoc.transaction():
+            with pytest.raises(RuntimeError, match=message):
+                array.append(subdoc)
+            with pytest.raises(RuntimeError, match=message):
+                map0["subdoc"] = subdoc
+        with pytest.raises(RuntimeError, match=message):
+            array.append(doc)
+        with pytest.raises(RuntimeError, match=message):
+            map0["doc"] = doc
+        array.append(subdoc)
+        map0["subdoc"] = Doc()
+        assert len(array) == 1
+        assert len(map0) == 1
+        """
+    )
+    subprocess.run([sys.executable, "-c", code], check=True, timeout=10)
 
 
 def test_transaction_event():
