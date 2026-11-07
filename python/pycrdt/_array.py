@@ -352,9 +352,10 @@ class Array(Sequence, Generic[T]):
             The array recursively converted to Python objects, or `None`.
         """
         if self._integrated is None:
-            py = self._prelim
-            if py is None:
+            if self._prelim is None:
                 return None
+            # copy the preliminary items, so that their shared types are not replaced
+            py = list(self._prelim)
         else:
             py = [value for value in self]
         for idx, val in enumerate(py):
