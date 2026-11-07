@@ -465,14 +465,19 @@ class XmlChildrenView:
         """
         Args:
             key: The child index (`int`) or children `slice` to remove.
+
+        Raises:
+            IndexError: Index out of bounds.
         """
         with self.inner.doc.transaction() as txn:
             self.inner._forbid_read_transaction(txn)
             if isinstance(key, int):
+                if key >= len(self):
+                    raise IndexError(key)
                 self.inner.integrated.remove_range(txn._txn, key, 1)
             elif isinstance(key, slice):
                 start, stop = _check_slice(self, key)
-                length = stop - start
+                length = min(stop, len(self)) - start
                 if length > 0:
                     self.inner.integrated.remove_range(txn._txn, start, length)
             else:
