@@ -495,3 +495,23 @@ def test_deleted_child_identity(xml_parent, node_type):
     assert hash(node) == original_hash
     assert hash(alias) == original_hash
     assert node != xml_parent.children[0]
+
+
+@pytest.mark.parametrize(
+    "index,get_value,exception",
+    [
+        (0, lambda children: 123, TypeError),
+        (0, lambda children: children[1], ValueError),
+        (2, lambda children: "c", IndexError),
+    ],
+    ids=["unsupported", "integrated", "out-of-range"],
+)
+def test_children_replace_failure(xml_parent, index, get_value, exception):
+    xml_parent.children.append("a")
+    xml_parent.children.append("b")
+    value = get_value(xml_parent.children)
+
+    with pytest.raises(exception):
+        xml_parent.children[index] = value
+
+    assert [str(child) for child in xml_parent.children] == ["a", "b"]
