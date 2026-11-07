@@ -1,10 +1,10 @@
 use crate::thread_affinity::{CallbackPtr, CallbackRef, CallbackScope, CallbackLifetime, ThreadAffinity};
 use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
-use pyo3::exceptions::{PyValueError, PyTypeError};
+use pyo3::exceptions::{PyRuntimeError, PyValueError, PyTypeError};
 use pyo3::types::{PyString, PyDict, PyList};
 use yrs::{
-    DeepObservable, Doc as _Doc, Map as _Map, MapRef, Observable, TransactionMut, XmlFragmentPrelim
+    DeepObservable, Doc as _Doc, Map as _Map, MapRef, Observable, Transact, TransactionMut, XmlFragmentPrelim
 };
 use yrs::types::ToJson;
 use yrs::types::text::TextPrelim;
@@ -95,6 +95,13 @@ impl Map {
             .extract()
             .map_err(|_| PyTypeError::new_err("Expected Doc object"))?;
         let d2: _Doc = d1.doc;
+        // Yrs acquires a transaction on the inserted document, which blocks forever if a
+        // transaction is in progress on it, e.g. when inserting a document into itself.
+        if d2.try_transact_mut().is_err() {
+            return Err(PyRuntimeError::new_err(
+                "Cannot insert a document while a transaction is in progress on it",
+            ));
+        }
         let doc_ref = self.map.insert(&mut t, key, d2);
         doc_ref.load(t);
         Ok(())
