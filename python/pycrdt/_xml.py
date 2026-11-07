@@ -485,10 +485,16 @@ class XmlChildrenView:
         Args:
             key: The index of the child to replace.
             value: The new value at the index.
+
+        Raises:
+            IndexError: Index out of bounds.
         """
         with self.inner.doc.transaction():
-            del self[key]
+            if key >= len(self):
+                raise IndexError(key)
+            # insert before deleting, so that the child is kept if the value cannot be inserted
             self.insert(key, value)
+            del self[key + 1]
 
     def __iter__(self) -> Iterator[XmlText | XmlElement | XmlFragment]:
         """
