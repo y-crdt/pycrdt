@@ -480,7 +480,7 @@ class XmlChildrenView:
 
     def __setitem__(self, key: int, value: str | XmlText | XmlElement):
         """
-        Replaces a child. Equivalent to deleting the index and then inserting the new value.
+        Replaces the child at the given index with the new value.
 
         Args:
             key: The index of the child to replace.

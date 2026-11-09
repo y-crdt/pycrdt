@@ -515,3 +515,24 @@ def test_children_replace_failure(xml_parent, index, get_value, exception):
         xml_parent.children[index] = value
 
     assert [str(child) for child in xml_parent.children] == ["a", "b"]
+
+
+@pytest.mark.parametrize(
+    "make_value",
+    [lambda: "c", lambda: XmlText("c"), lambda: XmlElement("p", contents=[XmlText("c")])],
+    ids=["str", "text", "element"],
+)
+def test_children_replace_last(xml_parent, make_value):
+    first = xml_parent.children.append("a")
+    old_last = xml_parent.children.append("b")
+    value = make_value()
+
+    xml_parent.children[1] = value
+
+    assert len(xml_parent.children) == 2
+    assert xml_parent.children[0] == first
+    assert str(xml_parent.children[0]) == "a"
+    assert str(xml_parent.children[1]) == str(value)
+    assert xml_parent.children[1] != old_last
+    if not isinstance(value, str):
+        assert xml_parent.children[1] == value
