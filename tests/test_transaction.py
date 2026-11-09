@@ -3,7 +3,7 @@ import time
 from functools import partial
 
 import pytest
-from anyio import create_task_group, fail_after, sleep, to_thread
+from anyio import Event, create_task_group, fail_after, sleep, to_thread
 from pycrdt import Array, Doc, Map, Text, XmlFragment
 
 pytestmark = pytest.mark.anyio
@@ -262,22 +262,63 @@ async def test_concurrent_transactions_with_same_origin(allow_multithreading):
     doc = Doc(allow_multithreading=allow_multithreading)
     map0 = doc.get("map0", type=Map)
     origins = []
+    first_entered = Event()
+    second_created = Event()
 
-    async def create_transaction(key):
+    async def first_transaction():
         async with doc.new_transaction(origin="origin0") as txn:
-            await sleep(0.1)
-            map0[key] = "val"
+            first_entered.set()
+            await second_created.wait()
+            map0["key0"] = "val"
             origins.append(txn.origin)
 
-    async with create_task_group() as tg:
-        tg.start_soon(create_transaction, "key0")
-        tg.start_soon(create_transaction, "key1")
+    async def second_transaction():
+        await first_entered.wait()
+        transaction = doc.new_transaction(origin="origin0")
+        second_created.set()
+        async with transaction as txn:
+            map0["key1"] = "val"
+            origins.append(txn.origin)
+
+    with fail_after(5):
+        async with create_task_group() as tg:
+            tg.start_soon(first_transaction)
+            tg.start_soon(second_transaction)
 
     assert origins == ["origin0", "origin0"]
     assert doc._origins == {}
     with doc.new_transaction(timeout=1):
         map0["key2"] = "val"
     assert map0.to_py() == {"key0": "val", "key1": "val", "key2": "val"}
+
+
+@pytest.mark.parametrize("method", ["transaction", "new_transaction"])
+def test_unentered_transaction_does_not_register_origin(method):
+    doc = Doc()
+    origin = object()
+    transaction = getattr(doc, method)(origin=origin)
+    assert doc._origins == {}
+
+    with transaction as txn:
+        assert txn.origin is origin
+        assert doc._origins == {hash(origin): origin}
+    assert doc._origins == {}
+
+
+@pytest.mark.parametrize("waiting_origin", ["active", "waiting"])
+def test_timed_out_transaction_does_not_register_origin(waiting_origin):
+    doc = Doc(allow_multithreading=True)
+    with doc.transaction(origin="active") as active:
+        with pytest.raises(TimeoutError):
+            with doc.new_transaction(origin=waiting_origin, timeout=0):
+                pass  # pragma: no cover
+        assert active.origin == "active"
+        assert doc._origins == {hash("active"): "active"}
+
+    assert doc._origins == {}
+    with doc.new_transaction(origin=waiting_origin, timeout=1) as txn:
+        assert txn.origin == waiting_origin
+    assert doc._origins == {}
 
 
 async def test_new_async_transaction_concurrent_no_multithreading():
