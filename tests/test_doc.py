@@ -275,6 +275,31 @@ def test_get_state_and_update_in_observer():
     assert str(remote_doc.get("text", type=Text)) == "hello"
 
 
+def test_document_update_emitted_after_reading_update_in_shared_observer():
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    snapshots = []
+    updates = []
+
+    def on_text_change(event):
+        snapshots.append(doc.get_update())
+
+    def on_document_change(event):
+        updates.append(event.update)
+
+    text_sub = text.observe(on_text_change)  # noqa: F841
+    doc_sub = doc.observe(on_document_change)  # noqa: F841
+    remote_doc = Doc()
+    remote_text = remote_doc.get("text", type=Text)
+
+    for index, chunk in enumerate(["hello", " world"], start=1):
+        text += chunk
+        assert len(snapshots) == index
+        assert len(updates) == index
+        remote_doc.apply_update(updates[-1])
+        assert str(remote_text) == str(text)
+
+
 def test_apply_update_exception():
     doc = Doc()
     with pytest.raises(ValueError) as excinfo:
