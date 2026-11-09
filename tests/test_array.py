@@ -325,16 +325,23 @@ def test_to_py():
 
 
 def test_prelim_to_py():
-    items = [Text("foo"), Array([0]), Map({"key": "val"})]
+    nested_text = Text("bar")
+    nested_items = [nested_text]
+    items = [Text("foo"), Array([0]), Map({"key": Array(nested_items)})]
     array = Array(items)
 
-    assert array.to_py() == ["foo", [0], {"key": "val"}]
+    for _ in range(2):
+        assert array.to_py() == ["foo", [0], {"key": ["bar"]}]
     assert isinstance(items[0], Text)
+    assert nested_items[0] is nested_text
     doc = Doc()
     doc["array"] = array
     assert isinstance(array[0], Text)
     assert isinstance(array[1], Array)
     assert isinstance(array[2], Map)
+    assert isinstance(array[2]["key"], Array)
+    assert isinstance(array[2]["key"][0], Text)
+    assert str(array[2]["key"][0]) == "bar"
 
 
 async def test_iterate_events():
