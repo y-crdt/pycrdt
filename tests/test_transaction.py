@@ -4,7 +4,7 @@ from functools import partial
 
 import pytest
 from anyio import Event, create_task_group, fail_after, sleep, to_thread
-from pycrdt import Array, Doc, Map, Text, XmlFragment
+from pycrdt import Array, Doc, Map, ReadTransaction, Text, XmlFragment
 
 pytestmark = pytest.mark.anyio
 
@@ -136,6 +136,30 @@ def test_observe_callback_params():
     assert cb0_called
     assert cb1_called
     assert cb2_called
+
+
+@pytest.mark.parametrize("method", ["observe", "observe_deep"])
+def test_observe_callback_keyword_params(method):
+    doc = Doc()
+    doc["text"] = text = Text()
+    # observers are not called in a particular order
+    calls0 = []
+    calls1 = []
+
+    def callback0(event, *, option=None):
+        calls0.append(option)
+
+    def callback1(event, txn, **kwargs):
+        calls1.append((txn, kwargs))
+
+    sub0 = getattr(text, method)(callback0)  # noqa: F841
+    sub1 = getattr(text, method)(callback1)  # noqa: F841
+    text += "Hello"
+
+    assert calls0 == [None]
+    assert len(calls1) == 1
+    assert isinstance(calls1[0][0], ReadTransaction)
+    assert calls1[0][1] == {}
 
 
 def create_new_transaction(map0: Map, key: str, val: str) -> None:

@@ -184,7 +184,7 @@ class BaseType(ABC):
         return self._type_name
 
     def observe(self, callback: Callable[[BaseEvent], None]) -> Subscription:
-        param_nb = len(signature(callback).parameters)
+        param_nb = count_parameters(callback)
         _callback = partial(observe_callback, callback, self.doc, param_nb)
         subscription = self.integrated.observe(_callback)
         self.doc._subscriptions.append(subscription)
@@ -197,7 +197,7 @@ class BaseType(ABC):
         Args:
             callback: The callback to call with the list of events.
         """
-        param_nb = len(signature(callback).parameters)
+        param_nb = count_parameters(callback)
         _callback = partial(observe_deep_callback, callback, self.doc, param_nb)
         subscription = self.integrated.observe_deep(_callback)
         self.doc._subscriptions.append(subscription)
@@ -294,6 +294,17 @@ class Sequence(BaseType):
             an update was applied.
         """
         return StickyIndex.new(self, index, assoc)
+
+
+def count_parameters(callback: Callable[..., Any]) -> int:
+    # the event and the transaction are passed positionally
+    return len(
+        [
+            param
+            for param in signature(callback).parameters.values()
+            if param.kind not in (param.KEYWORD_ONLY, param.VAR_KEYWORD)
+        ]
+    )
 
 
 def observe_callback(
