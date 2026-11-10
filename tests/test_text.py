@@ -186,6 +186,7 @@ def test_insert_embed_shared_types():
         ("insert", ("c", {"bold": object()}), TypeError),
         ("insert", ("c", {"bold": 2**63}), OverflowError),
         ("insert_embed", ("c", {"bold": object()}), TypeError),
+        ("insert_embed", (Map({"key": object()}),), TypeError),
     ],
     ids=[
         "unsupported-embed",
@@ -194,6 +195,7 @@ def test_insert_embed_shared_types():
         "unsupported-attribute",
         "too-large-int-attribute",
         "unsupported-embed-attribute",
+        "nested-unsupported-shared-type-embed",
     ],
 )
 def test_insert_unsupported_value(method, args, exception):

@@ -30,6 +30,7 @@ use crate::id_map::{AttrRange, ContentAttribute, IdMap};
 use crate::undo::{StackItem, UndoManager, IdSet};
 use crate::update::{get_state, get_update, merge_updates};
 use crate::snapshot::Snapshot;
+use crate::type_conversions::check_value;
 
 #[pymodule]
 fn _pycrdt(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -61,5 +62,6 @@ fn _pycrdt(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(merge_updates, m)?)?;
     m.add_function(wrap_pyfunction!(decode_sticky_index, m)?)?;
     m.add_function(wrap_pyfunction!(get_sticky_index_from_json_string, m)?)?;
+    m.add_function(wrap_pyfunction!(check_value, m)?)?;
     Ok(())
 }

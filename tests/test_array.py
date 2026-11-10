@@ -4,7 +4,7 @@ from functools import partial
 import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group
 from anyio.abc import TaskStatus
-from pycrdt import Array, Assoc, Doc, Map, StickyIndex, Text
+from pycrdt import Array, Assoc, Doc, Map, StickyIndex, Text, XmlFragment
 
 pytestmark = pytest.mark.anyio
 
@@ -304,6 +304,37 @@ def test_unsupported_value(action, value, exception):
             array[0] = value
 
     assert array.to_py() == [0]
+
+
+@pytest.mark.parametrize(
+    "insert",
+    [
+        lambda array: array.extend([1, object(), 3]),
+        lambda array: array.insert(0, Array([1, object()])),
+        lambda array: array.append(Map({"key": Array([object()])})),
+        lambda array: array.append(Map({"key": 1, 2: 3})),
+        lambda array: array.append(Text(1)),
+        lambda array: array.append(XmlFragment(["text", 1])),
+    ],
+    ids=["extend", "nested-array", "nested-map", "non-str-key", "non-str-text", "xml-fragment"],
+)
+def test_unsupported_item_inserts_nothing(insert):
+    doc = Doc()
+    doc["array"] = array = Array([0])
+
+    with pytest.raises(TypeError):
+        insert(array)
+
+    assert array.to_py() == [0]
+
+
+def test_root_with_unsupported_item():
+    doc = Doc()
+
+    with pytest.raises(TypeError):
+        doc["array"] = Array([1, object()])
+
+    assert doc.get("array", type=Array).to_py() == []
 
 
 def test_getitem_wrong_type():

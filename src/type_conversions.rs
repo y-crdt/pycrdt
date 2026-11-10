@@ -271,6 +271,13 @@ pub fn py_to_any<'py>(value: &Bound<'py, PyAny>) -> PyResult<Any> {
     }
 }
 
+/// Raise the error that converting the value with [`py_to_any`] would raise, so that values
+/// can be checked before anything is inserted.
+#[pyfunction]
+pub fn check_value(value: &Bound<'_, PyAny>) -> PyResult<()> {
+    py_to_any(value).map(|_| ())
+}
+
 const JSON_TYPE_ERROR: &str =
     "attribute value must be JSON-serializable (None, bool, int, float, str, list, tuple, or dict)";
 

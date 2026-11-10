@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, cast, overload
 
-from ._base import BaseDoc, BaseEvent, BaseType, Sequence, Typed, base_types, event_types
+from ._base import (
+    BaseDoc,
+    BaseEvent,
+    BaseType,
+    Sequence,
+    Typed,
+    base_types,
+    check_value,
+    event_types,
+)
 from ._pycrdt import Array as _Array
 from ._pycrdt import ArrayEvent as _ArrayEvent
 from ._pycrdt import Subscription
@@ -50,6 +59,10 @@ class Array(Sequence, Generic[T]):
         with self.doc.transaction():
             for i, v in enumerate(value):
                 self._set(i, v)
+
+    def _check_prelim(self) -> None:
+        for value in self._prelim or []:
+            check_value(value)
 
     def _set(self, index: int, value: T) -> None:
         with self.doc.transaction() as txn:
@@ -212,6 +225,9 @@ class Array(Sequence, Generic[T]):
                     raise RuntimeError("Start and stop must be equal")
                 if key.start > len(self) or key.start < 0:
                     raise RuntimeError("Index out of range")
+                # check all the items first, so that none is inserted if one cannot be
+                for v in value:
+                    check_value(v)
                 for i, v in enumerate(value):
                     self._set(i + key.start, v)
             else:

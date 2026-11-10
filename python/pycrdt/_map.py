@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Generic,
     Iterable,
@@ -10,7 +11,16 @@ from typing import (
     overload,
 )
 
-from ._base import BaseDoc, BaseEvent, BaseType, Typed, base_types, event_types
+from ._base import (
+    BaseDoc,
+    BaseEvent,
+    BaseType,
+    Typed,
+    base_types,
+    check_str,
+    check_value,
+    event_types,
+)
 from ._pycrdt import Map as _Map
 from ._pycrdt import MapEvent as _MapEvent
 from ._pycrdt import Subscription
@@ -59,6 +69,9 @@ class Map(BaseType, Generic[T]):
         with self.doc.transaction():
             for k, v in value.items():
                 self._set(k, v)
+
+    def _check_prelim(self) -> None:
+        check_items(self._prelim or {})
 
     def _set(self, key: str, value: T) -> None:
         with self.doc.transaction() as txn:
@@ -308,6 +321,8 @@ class Map(BaseType, Generic[T]):
         Args:
             value: The `dict` from which to get the entries to update.
         """
+        # check all the entries first, so that none is set if one cannot be
+        check_items(value)
         self._init(value)
 
     def observe(self, callback: Callable[[MapEvent], None]) -> Subscription:
@@ -318,6 +333,12 @@ class Map(BaseType, Generic[T]):
             callback: The callback to call with the [MapEvent][pycrdt.MapEvent].
         """
         return super().observe(cast(Callable[[BaseEvent], None], callback))
+
+
+def check_items(items: dict[str, Any]) -> None:
+    for key, value in items.items():
+        check_str(key)
+        check_value(value)
 
 
 class TypedMap(Typed):
