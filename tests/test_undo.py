@@ -1,4 +1,3 @@
-import sys
 import threading
 
 import pytest
@@ -215,7 +214,7 @@ def test_timestamp():
 )
 def test_timestamp_error(timestamp, exception, monkeypatch):
     unraisable = []
-    monkeypatch.setattr(sys, "unraisablehook", unraisable.append)
+    monkeypatch.setattr("sys.unraisablehook", unraisable.append)
     doc = Doc()
     doc["text"] = text = Text()
     updates = []
@@ -230,6 +229,28 @@ def test_timestamp_error(timestamp, exception, monkeypatch):
     assert all(isinstance(error.exc_value, exception) for error in unraisable)
     undo_manager.undo()
     assert str(text) == "a"
+
+
+def test_timestamp_base_exception():
+    class Interrupt(BaseException):
+        pass
+
+    def timestamp():
+        if not raised:
+            raised.append(None)
+            raise Interrupt()
+        return 0
+
+    raised = []
+    doc = Doc()
+    doc["text"] = text = Text()
+    undo_manager = UndoManager(scopes=[text], timestamp=timestamp)
+
+    with pytest.raises(Interrupt):
+        text += "a"
+    text += "b"
+
+    assert len(undo_manager.undo_stack) == 2
 
 
 def test_timestamp_with_pending_exception():

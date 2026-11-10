@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use pyo3::prelude::*;
-use pyo3::exceptions::{PyRuntimeError, PyTypeError};
+use pyo3::exceptions::{PyException, PyRuntimeError, PyTypeError};
 use pyo3::types::{PyList, PyBytes};
 use yrs::{Doc as _Doc, IdSet as _IdSet, Transact};
 use yrs::undo::{
@@ -74,7 +74,8 @@ impl IdSet {
 
 struct PythonClock {
     timestamp: Py<PyAny>,
-    // Used when the timestamp function fails, so that changes are still tracked.
+    // Used when the timestamp function fails, so that changes are still tracked:
+    // they are considered to happen at the same time as the previous change.
     last_timestamp: AtomicU64,
 }
 
@@ -83,12 +84,18 @@ impl Clock for PythonClock {
         Python::attach(|py| {
             // An observer callback may have set an exception to be raised after the commit,
             // and Python cannot be called while it is set.
-            let pending = PyErr::take(py);
+            let mut pending = PyErr::take(py);
             let timestamp = self.timestamp.bind(py).call0().and_then(|t| t.extract::<Timestamp>());
             match timestamp {
                 Ok(timestamp) => self.last_timestamp.store(timestamp, Ordering::Relaxed),
                 // The clock is called during a commit, where the error cannot be raised.
-                Err(err) => err.write_unraisable(py, Some(self.timestamp.bind(py))),
+                Err(err) if err.is_instance_of::<PyException>(py) => {
+                    err.write_unraisable(py, Some(self.timestamp.bind(py)))
+                }
+                // Like for observer callbacks, raise e.g. KeyboardInterrupt after the commit.
+                Err(err) => {
+                    pending.get_or_insert(err);
+                }
             }
             if let Some(err) = pending {
                 err.restore(py);
