@@ -228,6 +228,9 @@ pub fn py_to_any<'py>(value: &Bound<'py, PyAny>) -> PyResult<Any> {
     } else if value.is_instance_of::<PyBytes>() {
         let v: &[u8] = value.extract()?;
         Ok(Any::Buffer(v.into()))
+    } else if let Ok(v) = value.cast::<PyByteArray>() {
+        // binary values are read back as bytearray
+        Ok(Any::Buffer(v.to_vec().into()))
     } else if value.is_instance_of::<PyString>() {
         let v: &str = value.extract()?;
         Ok(Any::String(v.into()))
