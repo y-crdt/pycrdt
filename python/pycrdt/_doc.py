@@ -242,8 +242,9 @@ class Doc(BaseDoc, Generic[T]):
             raise RuntimeError("Key must be of type string")
         with self.transaction() as txn:
             forbid_read_transaction(txn)
-            value._check_prelim()
             integrated = value._get_or_insert(key, self)
+            # check the whole value first, so that nothing is inserted if it cannot be
+            value._check_prelim(set())
             prelim = value._integrate(self, integrated)
             value._init(prelim)
 

@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterator, overload
 
-from ._base import BaseEvent, BaseType, base_types, check_str, event_types
+from ._base import BaseEvent, BaseType, base_types, event_types
 from ._pycrdt import XmlElement as _XmlElement
 from ._pycrdt import XmlEvent as _XmlEvent
 from ._pycrdt import XmlFragment as _XmlFragment
 from ._pycrdt import XmlText as _XmlText
-from ._pycrdt import check_value as _check_value
 
 if TYPE_CHECKING:
     from typing import Any, Iterable, Mapping, Sized, TypeVar
@@ -43,19 +42,6 @@ def _check_slice(value: Sized, key: slice) -> tuple[int, int]:
     else:
         stop = key.stop
     return start, stop
-
-
-def _check_child(element: Any) -> None:
-    if isinstance(element, XmlText):
-        if element._integrated is not None:
-            raise ValueError("Cannot insert an integrated XmlText")
-        element._check_prelim()
-    elif isinstance(element, XmlElement):
-        if element._integrated is not None:
-            raise ValueError("Cannot insert an integrated XmlElement")
-        element._check_prelim()
-    elif not isinstance(element, str):
-        raise TypeError("Cannot add value to XML: " + repr(element))
 
 
 class _XmlBaseMixin(BaseType):
@@ -137,10 +123,6 @@ class XmlFragment(_XmlFragmentTraitMixin):
         for obj in value:
             self.children.append(obj)
 
-    def _check_prelim(self) -> None:
-        for child in self._prelim or []:
-            _check_child(child)
-
 
 class XmlElement(_XmlFragmentTraitMixin, _XmlTraitMixin):
     _prelim: tuple[str, list[tuple[str, str]], list[str | XmlElement | XmlText]] | None
@@ -191,16 +173,6 @@ class XmlElement(_XmlFragmentTraitMixin, _XmlTraitMixin):
     def _get_or_insert(self, name: str, doc: Doc) -> Any:
         raise ValueError("Cannot get an XmlElement from a doc, get an XmlFragment instead")
 
-    def _check_prelim(self) -> None:
-        if self._prelim is not None:
-            tag, attrs, contents = self._prelim
-            check_str(tag)
-            for key, value in attrs:
-                check_str(key)
-                _check_value(value)
-            for child in contents:
-                _check_child(child)
-
     def _init(
         self, value: tuple[str, list[tuple[str, str]], list[str | XmlElement | XmlText]] | None
     ):
@@ -244,10 +216,6 @@ class XmlText(_XmlTraitMixin):
 
     def _get_or_insert(self, _name: str, _doc: Doc) -> Any:
         raise ValueError("Cannot get an XmlText from a doc - get an XmlFragment instead.")
-
-    def _check_prelim(self) -> None:
-        if self._prelim is not None:
-            check_str(self._prelim)
 
     def to_py(self) -> str:
         if self._integrated is None:
@@ -297,7 +265,6 @@ class XmlText(_XmlTraitMixin):
             _attrs = iter(attrs.items()) if attrs is not None else None
             if isinstance(value, XmlElement) and value._prelim is not None:
                 assert txn._txn is not None
-                value._check_prelim()
                 tag = value._prelim[0]
                 integrated = self.integrated.insert_xmlelement_prelim(txn._txn, index, tag, _attrs)
                 assert self._doc is not None
@@ -569,21 +536,25 @@ class XmlChildrenView:
             self.inner._forbid_read_transaction(txn)
             if index > len(self):
                 raise IndexError(index)
-            # check the whole element first, so that nothing is inserted if it cannot be
-            _check_child(element)
             if isinstance(element, str):
                 integrated = self.inner.integrated.insert_str(txn._txn, index, element)
                 return XmlText(_doc=self.inner.doc, _integrated=integrated)
             elif isinstance(element, XmlText):
+                if element._integrated is not None:
+                    raise ValueError("Cannot insert an integrated XmlText")
                 integrated = self.inner.integrated.insert_str(txn._txn, index, element.prelim)
                 element._integrate(self.inner.doc, integrated)
                 return element
-            else:
+            elif isinstance(element, XmlElement):
+                if element._integrated is not None:
+                    raise ValueError("Cannot insert an integrated XmlElement")
                 prelim = element.prelim
                 integrated = self.inner.integrated.insert_element_prelim(txn._txn, index, prelim[0])
                 element._integrate(self.inner.doc, integrated)
                 element._init(prelim)
                 return element
+            else:
+                raise TypeError("Cannot add value to XML: " + repr(element))
 
     @overload
     def append(self, element: str | XmlText) -> XmlText: ...

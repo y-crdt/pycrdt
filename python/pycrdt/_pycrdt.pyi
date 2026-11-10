@@ -634,3 +634,6 @@ def decode_sticky_index(data: bytes) -> StickyIndex: ...
 def get_sticky_index_from_json_string(data: str) -> StickyIndex: ...
 def check_value(value: Any) -> None:
     """Raises the error that inserting the value would raise."""
+
+def check_str(value: Any) -> None:
+    """Raises the error that using the value as a string would raise."""

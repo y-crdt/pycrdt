@@ -47,9 +47,10 @@ class Text(Sequence):
         with self.doc.transaction() as txn:
             self.integrated.insert(txn._txn, 0, value)
 
-    def _check_prelim(self) -> None:
+    def _check_prelim(self, seen: set[int]) -> bool:
         if self._prelim is not None:
             check_str(self._prelim)
+        return True
 
     def _get_or_insert(self, name: str, doc: Doc) -> _Text:
         assert doc._txn is not None

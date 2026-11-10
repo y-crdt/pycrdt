@@ -278,6 +278,12 @@ pub fn check_value(value: &Bound<'_, PyAny>) -> PyResult<()> {
     py_to_any(value).map(|_| ())
 }
 
+/// Raise the error that extracting a string, e.g. a map key, would raise.
+#[pyfunction]
+pub fn check_str(value: &Bound<'_, PyAny>) -> PyResult<()> {
+    value.extract::<&str>().map(|_| ())
+}
+
 const JSON_TYPE_ERROR: &str =
     "attribute value must be JSON-serializable (None, bool, int, float, str, list, tuple, or dict)";
 

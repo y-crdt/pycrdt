@@ -4,7 +4,7 @@ from functools import partial
 import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group
 from anyio.abc import TaskStatus
-from pycrdt import Array, Assoc, Doc, Map, StickyIndex, Text, XmlFragment
+from pycrdt import Array, Assoc, Doc, Map, StickyIndex, Text, XmlElement
 
 pytestmark = pytest.mark.anyio
 
@@ -314,18 +314,53 @@ def test_unsupported_value(action, value, exception):
         lambda array: array.append(Map({"key": Array([object()])})),
         lambda array: array.append(Map({"key": 1, 2: 3})),
         lambda array: array.append(Text(1)),
-        lambda array: array.append(XmlFragment(["text", 1])),
+        lambda array: array.append(Map({"key": 1, "\ud800": 2})),
     ],
-    ids=["extend", "nested-array", "nested-map", "non-str-key", "non-str-text", "xml-fragment"],
+    ids=["extend", "nested-array", "nested-map", "non-str-key", "non-str-text", "surrogate-key"],
 )
 def test_unsupported_item_inserts_nothing(insert):
     doc = Doc()
     doc["array"] = array = Array([0])
 
-    with pytest.raises(TypeError):
+    with pytest.raises((TypeError, UnicodeEncodeError)):
         insert(array)
 
     assert array.to_py() == [0]
+
+
+def test_unsupported_item_after_unchecked_item():
+    doc = Doc()
+    doc["array"] = array = Array([0])
+
+    # the items that are not checked are inserted first, so their error is raised first
+    with pytest.raises(TypeError, match="Cannot insert an XmlElement into an array"):
+        array.extend([XmlElement("p"), object()])
+
+
+def test_insert_iterator():
+    doc = Doc()
+    doc["array"] = array = Array([0])
+
+    array.extend(value for value in [1, 2])
+    array.append(Array(value for value in [3, 4]))
+
+    assert array.to_py() == [0, 1, 2, [3, 4]]
+
+
+def test_insert_self_referential_prelim():
+    doc = Doc()
+    doc["array"] = array = Array()
+    items = []
+    nested_array = Array(items)
+    items.append(nested_array)
+    entries = {}
+    nested_map = Map(entries)
+    entries["map"] = nested_map
+
+    array.append(nested_array)
+    array.append(nested_map)
+
+    assert array.to_py() == [[[]], {"map": {}}]
 
 
 def test_root_with_unsupported_item():

@@ -9,6 +9,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Iterable,
     Literal,
     Type,
     Union,
@@ -27,6 +28,7 @@ from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStre
 from ._pycrdt import Doc as _Doc
 from ._pycrdt import Subscription
 from ._pycrdt import Transaction as _Transaction
+from ._pycrdt import check_str as check_str
 from ._pycrdt import check_value as _check_value
 from ._sticky_index import Assoc, StickyIndex
 from ._transaction import ReadTransaction, Transaction
@@ -44,18 +46,27 @@ def forbid_read_transaction(txn: Transaction):
         raise RuntimeError("Read-only transaction cannot be used to modify document structure")
 
 
-def check_value(value: Any) -> None:
-    """Raises the error that inserting the value would raise, without inserting anything."""
+def check_values(values: Iterable[Any], seen: set[int] | None = None) -> bool:
+    """
+    Raises the error that inserting the values in this order would raise, before anything is
+    inserted. Returns False if the insertion of a value cannot be checked, in which case the
+    next values are not checked either, so that the same error is raised as when inserting them.
+    """
+    if seen is None:
+        seen = set()
+    for value in values:
+        if not check_value(value, seen):
+            return False
+    return True
+
+
+def check_value(value: Any, seen: set[int]) -> bool:
     if isinstance(value, BaseType):
-        if value._integrated is None:
-            value._check_prelim()
-    elif not isinstance(value, BaseDoc):
-        _check_value(value)
-
-
-def check_str(value: Any) -> None:
-    if not isinstance(value, str):
-        raise TypeError(f"'{type(value).__name__}' object is not an instance of 'str'")
+        return value._check_prelim(seen)
+    if isinstance(value, BaseDoc):
+        return False
+    _check_value(value)
+    return True
 
 
 class BaseDoc:
@@ -136,9 +147,9 @@ class BaseType(ABC):
     @abstractmethod
     def _init(self, value: Any | None) -> None: ...
 
-    # raises the error that integrating the preliminary value would raise
-    @abstractmethod
-    def _check_prelim(self) -> None: ...
+    def _check_prelim(self, seen: set[int]) -> bool:
+        # see check_values(), the preliminary values of these types are not checked
+        return False
 
     def _forbid_read_transaction(self, txn: Transaction):
         forbid_read_transaction(txn)
@@ -151,8 +162,6 @@ class BaseType(ABC):
         return prelim
 
     def _do_and_integrate(self, action: str, value: BaseType, txn: _Transaction, *args) -> None:
-        # check the whole value first, so that nothing is inserted if it cannot be
-        value._check_prelim()
         method = getattr(self._integrated, f"{action}_{value.type_name}_prelim")
         integrated = method(txn, *args)
         assert self._doc is not None

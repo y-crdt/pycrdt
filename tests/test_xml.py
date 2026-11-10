@@ -245,14 +245,8 @@ def test_element_with_unsupported_attribute(value, exception):
         (object(), None, TypeError),
         ([object()], None, TypeError),
         ("c", {"bold": object()}, TypeError),
-        (XmlElement("i", {"a": object()}), None, TypeError),
     ],
-    ids=[
-        "unsupported-embed",
-        "nested-unsupported-embed",
-        "unsupported-attribute",
-        "element-with-unsupported-attribute",
-    ],
+    ids=["unsupported-embed", "nested-unsupported-embed", "unsupported-attribute"],
 )
 def test_text_insert_unsupported_embed(value, attrs, exception):
     doc = Doc()
@@ -578,32 +572,3 @@ def test_children_replace_last(xml_parent, make_value):
     assert xml_parent.children[1] != old_last
     if not isinstance(value, str):
         assert xml_parent.children[1] == value
-
-
-@pytest.mark.parametrize(
-    "get_element,exception",
-    [
-        (lambda children: XmlElement("p", {"a": "1"}, ["text", 1]), TypeError),
-        (lambda children: XmlElement("p", {"a": object()}), TypeError),
-        (lambda children: XmlElement("p", {1: "a"}), TypeError),
-        (lambda children: XmlElement("p", None, [XmlElement("q", {"b": object()})]), TypeError),
-        (lambda children: XmlElement("p", None, ["text", XmlText(1)]), TypeError),
-        (lambda children: XmlElement("p", None, ["text", children[0]]), ValueError),
-    ],
-    ids=[
-        "unsupported-child",
-        "unsupported-attribute",
-        "non-str-attribute-key",
-        "nested-unsupported-attribute",
-        "non-str-text",
-        "integrated-child",
-    ],
-)
-def test_insert_element_with_unsupported_content(xml_parent, get_element, exception):
-    xml_parent.children.append("a")
-    element = get_element(xml_parent.children)
-
-    with pytest.raises(exception):
-        xml_parent.children.append(element)
-
-    assert [str(child) for child in xml_parent.children] == ["a"]

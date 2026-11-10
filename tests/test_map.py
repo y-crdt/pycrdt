@@ -310,14 +310,19 @@ def test_unsupported_value(value, exception):
 
 @pytest.mark.parametrize(
     "value",
-    [{"key1": 1, "key2": object()}, {"key1": 1, 2: 3}, {"key1": Map({"key": object()})}],
-    ids=["unsupported", "non-str-key", "nested-unsupported"],
+    [
+        {"key1": 1, "key2": object()},
+        {"key1": 1, 2: 3},
+        {"key1": 1, "\ud800": 2},
+        {"key1": Map({"key": object()})},
+    ],
+    ids=["unsupported", "non-str-key", "surrogate-key", "nested-unsupported"],
 )
 def test_update_unsupported_value(value):
     doc = Doc()
     doc["map0"] = map0 = Map({"key0": "val0"})
 
-    with pytest.raises(TypeError):
+    with pytest.raises((TypeError, UnicodeEncodeError)):
         map0.update(value)
 
     assert map0.to_py() == {"key0": "val0"}

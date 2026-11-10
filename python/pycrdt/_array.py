@@ -9,7 +9,7 @@ from ._base import (
     Sequence,
     Typed,
     base_types,
-    check_value,
+    check_values,
     event_types,
 )
 from ._pycrdt import Array as _Array
@@ -60,9 +60,16 @@ class Array(Sequence, Generic[T]):
             for i, v in enumerate(value):
                 self._set(i, v)
 
-    def _check_prelim(self) -> None:
-        for value in self._prelim or []:
-            check_value(value)
+    def _check_prelim(self, seen: set[int]) -> bool:
+        if self._prelim is None:
+            return True
+        if id(self) in seen:
+            return False
+        seen.add(id(self))
+        if not isinstance(self._prelim, list):
+            # an iterator can only be iterated over once
+            self._prelim = list(self._prelim)
+        return check_values(self._prelim, seen)
 
     def _set(self, index: int, value: T) -> None:
         with self.doc.transaction() as txn:
@@ -226,8 +233,8 @@ class Array(Sequence, Generic[T]):
                 if key.start > len(self) or key.start < 0:
                     raise RuntimeError("Index out of range")
                 # check all the items first, so that none is inserted if one cannot be
-                for v in value:
-                    check_value(v)
+                value = list(value)
+                check_values(value)
                 for i, v in enumerate(value):
                     self._set(i + key.start, v)
             else:

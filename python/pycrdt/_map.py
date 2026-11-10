@@ -19,6 +19,7 @@ from ._base import (
     base_types,
     check_str,
     check_value,
+    check_values,
     event_types,
 )
 from ._pycrdt import Map as _Map
@@ -70,8 +71,13 @@ class Map(BaseType, Generic[T]):
             for k, v in value.items():
                 self._set(k, v)
 
-    def _check_prelim(self) -> None:
-        check_items(self._prelim or {})
+    def _check_prelim(self, seen: set[int]) -> bool:
+        if self._prelim is None:
+            return True
+        if id(self) in seen:
+            return False
+        seen.add(id(self))
+        return check_items(self._prelim, seen)
 
     def _set(self, key: str, value: T) -> None:
         with self.doc.transaction() as txn:
@@ -189,6 +195,8 @@ class Map(BaseType, Generic[T]):
         if not isinstance(key, str):
             raise RuntimeError("Key must be of type string")
         with self.doc.transaction():
+            # check the whole value first, so that nothing is inserted if it cannot be
+            check_values([value])
             self._set(key, value)
 
     def __iter__(self) -> Iterable[str]:
@@ -335,10 +343,15 @@ class Map(BaseType, Generic[T]):
         return super().observe(cast(Callable[[BaseEvent], None], callback))
 
 
-def check_items(items: dict[str, Any]) -> None:
+def check_items(items: dict[str, Any], seen: set[int] | None = None) -> bool:
+    # see check_values()
+    if seen is None:
+        seen = set()
     for key, value in items.items():
         check_str(key)
-        check_value(value)
+        if not check_value(value, seen):
+            return False
+    return True
 
 
 class TypedMap(Typed):
