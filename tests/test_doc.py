@@ -150,7 +150,7 @@ def test_insert_doc_in_transaction():
         array = doc.get("array", type=Array)
         map0 = doc.get("map", type=Map)
         subdoc = Doc()
-        message = "Cannot insert a document while a transaction is in progress on it"
+        message = "Cannot insert a document that has an active transaction"
         with subdoc.transaction():
             with pytest.raises(RuntimeError, match=message):
                 array.append(subdoc)

@@ -99,7 +99,7 @@ impl Map {
         // transaction is in progress on it, e.g. when inserting a document into itself.
         if d2.try_transact_mut().is_err() {
             return Err(PyRuntimeError::new_err(
-                "Cannot insert a document while a transaction is in progress on it",
+                "Cannot insert a document that has an active transaction",
             ));
         }
         let doc_ref = self.map.insert(&mut t, key, d2);
