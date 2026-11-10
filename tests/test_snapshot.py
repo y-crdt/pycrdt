@@ -71,6 +71,25 @@ def test_doc_from_snapshot():
     assert str(text) == "new old"
 
 
+def test_edit_doc_from_snapshot():
+    doc = Doc(skip_gc=True)
+    text = doc.get("text", type=Text)
+    text += "hello"
+    snapshot = Snapshot.from_doc(doc)
+    text += " world"
+    doc_restored = Doc.from_snapshot(snapshot, doc)
+    text_restored = doc_restored.get("text", type=Text)
+    text_restored += "!!!"
+
+    update = doc.get_update()
+    doc.apply_update(doc_restored.get_update())
+    doc_restored.apply_update(update)
+
+    assert str(text) == str(text_restored)
+    assert str(text) in ("hello world!!!", "hello!!! world")
+    assert doc_restored.client_id != doc.client_id
+
+
 def test_snapshot_in_transaction():
     # A deadlock can hold the GIL, so enforce the timeout from another process.
     code = dedent(

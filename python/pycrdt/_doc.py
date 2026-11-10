@@ -215,7 +215,7 @@ class Doc(BaseDoc, Generic[T]):
             snapshot: The Snapshot to restore to.
             doc: The original Doc to use for options/state.
         Returns:
-            A new Doc instance restored to the snapshot state.
+            A new Doc instance restored to the snapshot state, with a new client ID.
         Raises:
             ValueError: The original Doc was not created with `skip_gc=True`.
         """
