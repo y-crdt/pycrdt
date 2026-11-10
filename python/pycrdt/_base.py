@@ -46,15 +46,21 @@ def forbid_read_transaction(txn: Transaction):
         raise RuntimeError("Read-only transaction cannot be used to modify document structure")
 
 
-def check_values(values: Iterable[Any], seen: set[int] | None = None) -> bool:
+def check_values(
+    values: Iterable[Any], seen: set[int] | None = None, first_is_atomic: bool = False
+) -> bool:
     """
     Raises the error that inserting the values in this order would raise, before anything is
     inserted. Returns False if the insertion of a value cannot be checked, in which case the
     next values are not checked either, so that the same error is raised as when inserting them.
+    If `first_is_atomic` is True, nothing is inserted if the first value is a primitive one
+    that cannot be inserted, so it doesn't need to be checked.
     """
     if seen is None:
         seen = set()
-    for value in values:
+    for index, value in enumerate(values):
+        if index == 0 and first_is_atomic and not isinstance(value, (BaseType, BaseDoc)):
+            continue
         if not check_value(value, seen):
             return False
     return True

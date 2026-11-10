@@ -15,6 +15,7 @@ from ._base import (
 from ._pycrdt import Array as _Array
 from ._pycrdt import ArrayEvent as _ArrayEvent
 from ._pycrdt import Subscription
+from ._transaction import ReadTransaction
 
 if TYPE_CHECKING:
     from ._doc import Doc
@@ -63,12 +64,10 @@ class Array(Sequence, Generic[T]):
     def _check_prelim(self, seen: set[int]) -> bool:
         if self._prelim is None:
             return True
-        if id(self) in seen:
+        # other iterables may not be iterated over twice in the same way
+        if id(self) in seen or not isinstance(self._prelim, (list, tuple)):
             return False
         seen.add(id(self))
-        if not isinstance(self._prelim, list):
-            # an iterator can only be iterated over once
-            self._prelim = list(self._prelim)
         return check_values(self._prelim, seen)
 
     def _set(self, index: int, value: T) -> None:
@@ -219,7 +218,7 @@ class Array(Sequence, Generic[T]):
         Raises:
             RuntimeError: Index must be of type integer.
         """
-        with self.doc.transaction():
+        with self.doc.transaction() as txn:
             if isinstance(key, int):
                 key = self._check_index(key)
                 # insert before deleting, so that the item is kept if the value cannot be inserted
@@ -232,9 +231,10 @@ class Array(Sequence, Generic[T]):
                     raise RuntimeError("Start and stop must be equal")
                 if key.start > len(self) or key.start < 0:
                     raise RuntimeError("Index out of range")
-                # check all the items first, so that none is inserted if one cannot be
-                value = list(value)
-                check_values(value)
+                # check all the items first, so that none is inserted if one cannot be,
+                # except in a read-only transaction, where nothing can be inserted
+                if isinstance(value, (list, tuple)) and not isinstance(txn, ReadTransaction):
+                    check_values(value, first_is_atomic=True)
                 for i, v in enumerate(value):
                     self._set(i + key.start, v)
             else:

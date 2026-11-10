@@ -19,12 +19,12 @@ from ._base import (
     base_types,
     check_str,
     check_value,
-    check_values,
     event_types,
 )
 from ._pycrdt import Map as _Map
 from ._pycrdt import MapEvent as _MapEvent
 from ._pycrdt import Subscription
+from ._transaction import ReadTransaction
 
 if TYPE_CHECKING:
     from ._doc import Doc
@@ -74,7 +74,7 @@ class Map(BaseType, Generic[T]):
     def _check_prelim(self, seen: set[int]) -> bool:
         if self._prelim is None:
             return True
-        if id(self) in seen:
+        if id(self) in seen or not isinstance(self._prelim, dict):
             return False
         seen.add(id(self))
         return check_items(self._prelim, seen)
@@ -194,9 +194,11 @@ class Map(BaseType, Generic[T]):
         """
         if not isinstance(key, str):
             raise RuntimeError("Key must be of type string")
-        with self.doc.transaction():
-            # check the whole value first, so that nothing is inserted if it cannot be
-            check_values([value])
+        with self.doc.transaction() as txn:
+            # check the whole value first, so that nothing is inserted if it cannot be,
+            # except in a read-only transaction, where nothing can be inserted
+            if isinstance(value, BaseType) and not isinstance(txn, ReadTransaction):
+                value._check_prelim(set())
             self._set(key, value)
 
     def __iter__(self) -> Iterable[str]:
@@ -329,9 +331,15 @@ class Map(BaseType, Generic[T]):
         Args:
             value: The `dict` from which to get the entries to update.
         """
-        # check all the entries first, so that none is set if one cannot be
-        check_items(value)
-        self._init(value)
+        if not isinstance(value, dict):
+            self._init(value)
+            return
+        with self.doc.transaction() as txn:
+            # check all the entries first, so that none is set if one cannot be,
+            # except in a read-only transaction, where nothing can be set
+            if not isinstance(txn, ReadTransaction):
+                check_items(value, first_is_atomic=True)
+            self._init(value)
 
     def observe(self, callback: Callable[[MapEvent], None]) -> Subscription:
         """
@@ -343,11 +351,15 @@ class Map(BaseType, Generic[T]):
         return super().observe(cast(Callable[[BaseEvent], None], callback))
 
 
-def check_items(items: dict[str, Any], seen: set[int] | None = None) -> bool:
+def check_items(
+    items: dict[str, Any], seen: set[int] | None = None, first_is_atomic: bool = False
+) -> bool:
     # see check_values()
     if seen is None:
         seen = set()
-    for key, value in items.items():
+    for index, (key, value) in enumerate(items.items()):
+        if index == 0 and first_is_atomic and not isinstance(value, (BaseType, BaseDoc)):
+            continue
         check_str(key)
         if not check_value(value, seen):
             return False
