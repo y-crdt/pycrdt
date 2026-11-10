@@ -203,6 +203,37 @@ def test_temporary_wrapper_subscription_survives_gc(method):
     assert calls == [True]
 
 
+@pytest.mark.parametrize("method", ["observe", "observe_text"])
+def test_temporary_subdoc_wrapper_subscription_survives_gc(method):
+    doc = Doc({"map": Map({"subdoc": Doc()})})
+    calls = []
+
+    def callback(event):
+        calls.append(True)
+
+    if method == "observe":
+        doc["map"]["subdoc"].observe(callback)
+    else:
+        doc["map"]["subdoc"].get("text", type=Text).observe(callback)
+    gc.collect()
+    gc.collect()
+    doc["map"]["subdoc"].get("text", type=Text).insert(0, "a")
+    assert calls == [True]
+
+
+def test_observed_subdoc_is_collected_with_its_document():
+    doc = Doc({"map": Map({"subdoc": Doc()})})
+    doc["map"]["subdoc"].observe(lambda event: None)
+    doc["map"]["subdoc"].get("text", type=Text).observe(lambda event: None)
+    doc_ref = weakref.ref(doc)
+    subdoc_ref = weakref.ref(doc["map"]["subdoc"])
+    del doc
+    gc.collect()
+    gc.collect()
+    assert doc_ref() is None
+    assert subdoc_ref() is None
+
+
 @pytest.mark.parametrize("method", ["observe", "observe_deep"])
 def test_bound_method_owner_survives_while_doc_is_alive(method):
     class Room:

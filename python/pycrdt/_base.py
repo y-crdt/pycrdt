@@ -55,6 +55,7 @@ class BaseDoc:
     _subscriptions: list[Subscription]
     _origins: dict[int, Any]
     _task_group: TaskGroup | None
+    _subdocs: dict[str, list[BaseDoc]]
 
     def __init__(
         self,
@@ -80,6 +81,24 @@ class BaseDoc:
         self._origins = {}
         self._allow_multithreading = allow_multithreading
         self._task_group = None
+        self._subdocs = {}
+
+    def _get_subdoc(self, doc: _Doc) -> BaseDoc:
+        # A subdocument is always accessed through the same object, so that its transactions
+        # and observers are shared, and kept alive as long as this document.
+        subdocs = self._subdocs.setdefault(doc.guid(), [])
+        for subdoc in subdocs:
+            if subdoc._doc.is_same(doc):
+                return subdoc
+        doc_type = cast(Type[BaseDoc], base_types[_Doc])
+        subdoc = doc_type(doc=doc)
+        subdocs.append(subdoc)
+        return subdoc
+
+    def _add_subdoc(self, subdoc: BaseDoc) -> None:
+        subdocs = self._subdocs.setdefault(subdoc._doc.guid(), [])
+        if not any(_subdoc._doc.is_same(subdoc._doc) for _subdoc in subdocs):
+            subdocs.append(subdoc)
 
 
 class BaseType(ABC):
@@ -142,8 +161,7 @@ class BaseType(ABC):
         for k, v in base_types.items():
             if isinstance(obj, k):
                 if issubclass(v, BaseDoc):
-                    # create a BaseDoc
-                    return v(doc=obj)
+                    return self.doc._get_subdoc(obj)
                 # create a BaseType
                 return v(_doc=self.doc, _integrated=obj)
         # that was a primitive value, just return it
@@ -361,8 +379,7 @@ def process_event(value: Any, doc: Doc) -> Any:
         val_type = type(value)
         if val_type in base_types:
             if val_type is _Doc:
-                doc_type: type[BaseDoc] = cast(Type[BaseDoc], base_types[val_type])
-                value = doc_type(doc=value)
+                value = doc._get_subdoc(value)
             else:
                 base_type = cast(Type[BaseType], base_types[val_type])
                 value = base_type(_integrated=value, _doc=doc)

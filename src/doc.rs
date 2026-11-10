@@ -131,6 +131,10 @@ impl Doc {
         self.doc.client_id().get()
     }
 
+    fn is_same(&self, other: &Doc) -> bool {
+        _Doc::ptr_eq(&self.doc, &other.doc)
+    }
+
     fn get_or_insert_text(
         &mut self,
         py: Python<'_>,

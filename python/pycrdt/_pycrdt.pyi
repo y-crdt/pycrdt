@@ -31,6 +31,9 @@ class Doc:
     def guid(self) -> str:
         """Returns the document globally unique identifier."""
 
+    def is_same(self, other: Doc) -> bool:
+        """Returns True if the other document is the same document."""
+
     def create_transaction(self) -> Transaction:
         """Create a document transaction."""
 

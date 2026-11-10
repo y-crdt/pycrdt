@@ -127,6 +127,38 @@ async def test_subdoc():
     assert aevent.loaded == []
 
 
+def test_subdoc_is_always_the_same_object():
+    doc = Doc()
+    subdoc = Doc()
+    doc["map"] = map0 = Map({"subdoc": subdoc})
+    doc["array"] = array0 = Array()
+    events = []
+    sub = array0.observe(partial(callback, events))  # noqa: F841
+    array0.append(Doc())
+
+    assert map0["subdoc"] is subdoc
+    assert list(map0.values()) == [subdoc]
+    assert events[0].delta[0]["insert"][0] is array0[0]
+    remote_doc = Doc()
+    remote_doc.apply_update(doc.get_update())
+    remote_map = remote_doc.get("map", type=Map)
+    assert remote_map["subdoc"] is remote_map["subdoc"]
+    assert remote_map["subdoc"] is not subdoc
+
+
+def test_subdoc_transaction_origin():
+    doc = Doc()
+    doc["map"] = map0 = Map({"subdoc": Doc()})
+    origins = []
+    text = map0["subdoc"].get("text", type=Text)
+    sub = text.observe(lambda event: origins.append(event.transaction.origin))  # noqa: F841
+
+    with map0["subdoc"].transaction(origin="origin0"):
+        map0["subdoc"].get("text", type=Text).insert(0, "a")
+
+    assert origins == ["origin0"]
+
+
 def test_doc_in_event():
     doc = Doc()
     doc["array"] = array = Array()

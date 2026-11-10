@@ -66,6 +66,7 @@ class Map(BaseType, Generic[T]):
             if isinstance(value, BaseDoc):
                 # subdoc
                 self.integrated.insert_doc(txn._txn, key, value._doc)
+                self.doc._add_subdoc(value)
             elif isinstance(value, BaseType):
                 # shared type
                 assert txn._txn is not None
