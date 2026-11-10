@@ -234,6 +234,24 @@ def test_observed_subdoc_is_collected_with_its_document():
     assert subdoc_ref() is None
 
 
+@pytest.mark.parametrize("remove", [False, True])
+def test_removed_subdocs_are_collected(remove):
+    doc = Doc({"map": Map()})
+    refs = []
+    for _ in range(100):
+        subdoc = Doc()
+        doc["map"]["subdoc"] = subdoc
+        if remove:
+            del doc["map"]["subdoc"]
+        refs.append(weakref.ref(subdoc))
+        del subdoc
+    gc.collect()
+
+    assert sum(ref() is not None for ref in refs) < len(refs) // 2
+    if not remove:
+        assert doc["map"]["subdoc"] is refs[-1]()
+
+
 @pytest.mark.parametrize("method", ["observe", "observe_deep"])
 def test_bound_method_owner_survives_while_doc_is_alive(method):
     class Room:

@@ -34,6 +34,9 @@ class Doc:
     def is_same(self, other: Doc) -> bool:
         """Returns True if the other document is the same document."""
 
+    def is_subdoc_of(self, parent: Doc) -> bool:
+        """Returns True if the document is a subdocument of the parent document."""
+
     def create_transaction(self) -> Transaction:
         """Create a document transaction."""
 

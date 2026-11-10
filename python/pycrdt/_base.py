@@ -56,6 +56,8 @@ class BaseDoc:
     _origins: dict[int, Any]
     _task_group: TaskGroup | None
     _subdocs: dict[str, list[BaseDoc]]
+    _subdoc_nb: int
+    _subdoc_limit: int
 
     def __init__(
         self,
@@ -82,23 +84,43 @@ class BaseDoc:
         self._allow_multithreading = allow_multithreading
         self._task_group = None
         self._subdocs = {}
+        self._subdoc_nb = 0
+        self._subdoc_limit = 16
 
     def _get_subdoc(self, doc: _Doc) -> BaseDoc:
         # A subdocument is always accessed through the same object, so that its transactions
-        # and observers are shared, and kept alive as long as this document.
-        subdocs = self._subdocs.setdefault(doc.guid(), [])
-        for subdoc in subdocs:
-            if subdoc._doc.is_same(doc):
-                return subdoc
-        doc_type = cast(Type[BaseDoc], base_types[_Doc])
-        subdoc = doc_type(doc=doc)
-        subdocs.append(subdoc)
+        # and observers are shared, and kept alive as long as it is in this document.
+        subdoc = self._find_subdoc(doc)
+        if subdoc is None:
+            doc_type = cast(Type[BaseDoc], base_types[_Doc])
+            subdoc = doc_type(doc=doc)
+            self._keep_subdoc(subdoc)
         return subdoc
 
     def _add_subdoc(self, subdoc: BaseDoc) -> None:
-        subdocs = self._subdocs.setdefault(subdoc._doc.guid(), [])
-        if not any(_subdoc._doc.is_same(subdoc._doc) for _subdoc in subdocs):
-            subdocs.append(subdoc)
+        if self._find_subdoc(subdoc._doc) is None:
+            self._keep_subdoc(subdoc)
+
+    def _find_subdoc(self, doc: _Doc) -> BaseDoc | None:
+        for subdoc in self._subdocs.get(doc.guid(), []):
+            if subdoc._doc.is_same(doc):
+                return subdoc
+        return None
+
+    def _keep_subdoc(self, subdoc: BaseDoc) -> None:
+        if self._subdoc_nb >= self._subdoc_limit:
+            # forget the subdocuments that were removed from this document,
+            # each time the number of subdocuments kept doubles
+            subdocs: dict[str, list[BaseDoc]] = {}
+            for guid, _subdocs in self._subdocs.items():
+                _subdocs = [_subdoc for _subdoc in _subdocs if _subdoc._doc.is_subdoc_of(self._doc)]
+                if _subdocs:
+                    subdocs[guid] = _subdocs
+            self._subdocs = subdocs
+            self._subdoc_nb = sum(len(_subdocs) for _subdocs in subdocs.values())
+            self._subdoc_limit = max(16, 2 * self._subdoc_nb)
+        self._subdocs.setdefault(subdoc._doc.guid(), []).append(subdoc)
+        self._subdoc_nb += 1
 
 
 class BaseType(ABC):
