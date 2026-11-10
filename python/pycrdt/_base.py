@@ -20,7 +20,7 @@ from typing import (
 )
 
 import anyio
-from anyio import BrokenResourceError, create_memory_object_stream
+from anyio import BrokenResourceError, WouldBlock, create_memory_object_stream
 from anyio.abc import TaskGroup
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 
@@ -265,17 +265,23 @@ class BaseType(ABC):
 
     def _send_event(self, deep: bool, event: BaseEvent | list[BaseEvent]):
         to_remove: list[MemoryObjectSendStream[BaseEvent | list[BaseEvent]]] = []
+        would_block: WouldBlock | None = None
         send_streams = self._send_streams[deep]
         for send_stream in send_streams:
             try:
                 send_stream.send_nowait(event)
             except BrokenResourceError:
                 to_remove.append(send_stream)
+            except WouldBlock as exc:
+                # a full buffer must not prevent sending the event to the other streams
+                would_block = exc
         for send_stream in to_remove:
             send_stream.close()
             send_streams.remove(send_stream)
         if not send_streams:
             self.unobserve(self._event_subscription[deep])
+        if would_block is not None:
+            raise would_block
 
 
 class Sequence(BaseType):
