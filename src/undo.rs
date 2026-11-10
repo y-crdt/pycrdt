@@ -189,8 +189,14 @@ impl UndoManager {
         }
     }
 
-    pub fn clear_all(&mut self)  -> () {
+    pub fn clear_all(&mut self) -> PyResult<()> {
+        // Yrs reads the documents to clear the stack items, which blocks forever
+        // if a transaction is in progress.
+        if self.undo_manager.can_undo() || self.undo_manager.can_redo() {
+            self.check_docs()?;
+        }
         self.undo_manager.clear_all();
+        Ok(())
     }
 
     pub fn reset(&mut self) {
