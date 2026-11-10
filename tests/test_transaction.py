@@ -142,22 +142,24 @@ def test_observe_callback_params():
 def test_observe_callback_keyword_params(method):
     doc = Doc()
     doc["text"] = text = Text()
-    calls = []
+    # observers are not called in a particular order
+    calls0 = []
+    calls1 = []
 
     def callback0(event, *, option=None):
-        calls.append((event, option))
+        calls0.append(option)
 
     def callback1(event, txn, **kwargs):
-        calls.append((event, txn, kwargs))
+        calls1.append((txn, kwargs))
 
     sub0 = getattr(text, method)(callback0)  # noqa: F841
     sub1 = getattr(text, method)(callback1)  # noqa: F841
     text += "Hello"
 
-    assert len(calls) == 2
-    assert calls[0][1] is None
-    assert isinstance(calls[1][1], ReadTransaction)
-    assert calls[1][2] == {}
+    assert calls0 == [None]
+    assert len(calls1) == 1
+    assert isinstance(calls1[0][0], ReadTransaction)
+    assert calls1[0][1] == {}
 
 
 def create_new_transaction(map0: Map, key: str, val: str) -> None:
