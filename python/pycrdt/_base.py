@@ -108,19 +108,30 @@ class BaseDoc:
         return None
 
     def _keep_subdoc(self, subdoc: BaseDoc) -> None:
-        if self._subdoc_nb >= self._subdoc_limit:
-            # forget the subdocuments that were removed from this document,
-            # each time the number of subdocuments kept doubles
-            subdocs: dict[str, list[BaseDoc]] = {}
-            for guid, _subdocs in self._subdocs.items():
-                _subdocs = [_subdoc for _subdoc in _subdocs if _subdoc._doc.is_subdoc_of(self._doc)]
-                if _subdocs:
-                    subdocs[guid] = _subdocs
-            self._subdocs = subdocs
-            self._subdoc_nb = sum(len(_subdocs) for _subdocs in subdocs.values())
-            self._subdoc_limit = max(16, 2 * self._subdoc_nb)
         self._subdocs.setdefault(subdoc._doc.guid(), []).append(subdoc)
         self._subdoc_nb += 1
+
+    def _forget_removed_subdocs(self) -> None:
+        # Forget the subdocuments that are not in this document anymore, each time
+        # the number of subdocuments kept doubles. Yrs destroys them, with their observers.
+        # They cannot be known while a transaction is in progress (e.g. in another thread).
+        docs = self._doc.subdocs() if self._subdoc_nb >= self._subdoc_limit else None
+        if docs is None:
+            return
+        guid_docs: dict[str, list[_Doc]] = {}
+        for doc in docs:
+            guid_docs.setdefault(doc.guid(), []).append(doc)
+        subdocs: dict[str, list[BaseDoc]] = {}
+        for guid, _subdocs in self._subdocs.items():
+            _docs = guid_docs.get(guid, [])
+            _subdocs = [
+                _subdoc for _subdoc in _subdocs if any(_subdoc._doc.is_same(doc) for doc in _docs)
+            ]
+            if _subdocs:
+                subdocs[guid] = _subdocs
+        self._subdocs = subdocs
+        self._subdoc_nb = sum(len(_subdocs) for _subdocs in subdocs.values())
+        self._subdoc_limit = max(16, 2 * self._subdoc_nb)
 
 
 class BaseType(ABC):

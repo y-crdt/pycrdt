@@ -1,5 +1,6 @@
 import gc
 import weakref
+from contextlib import nullcontext
 
 import pytest
 from anyio import fail_after
@@ -234,21 +235,22 @@ def test_observed_subdoc_is_collected_with_its_document():
     assert subdoc_ref() is None
 
 
-@pytest.mark.parametrize("remove", [False, True])
-def test_removed_subdocs_are_collected(remove):
+@pytest.mark.parametrize("how", ["replace", "delete", "delete-in-same-transaction"])
+def test_removed_subdocs_are_collected(how):
     doc = Doc({"map": Map()})
     refs = []
     for _ in range(100):
         subdoc = Doc()
-        doc["map"]["subdoc"] = subdoc
-        if remove:
-            del doc["map"]["subdoc"]
+        with doc.transaction() if how == "delete-in-same-transaction" else nullcontext():
+            doc["map"]["subdoc"] = subdoc
+            if how != "replace":
+                del doc["map"]["subdoc"]
         refs.append(weakref.ref(subdoc))
         del subdoc
     gc.collect()
 
     assert sum(ref() is not None for ref in refs) < len(refs) // 2
-    if not remove:
+    if how == "replace":
         assert doc["map"]["subdoc"] is refs[-1]()
 
 

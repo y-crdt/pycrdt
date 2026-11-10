@@ -135,12 +135,10 @@ impl Doc {
         _Doc::ptr_eq(&self.doc, &other.doc)
     }
 
-    fn is_subdoc_of(&self, parent: &Doc) -> bool {
-        // A transaction in progress means that the document is still in use.
-        let Ok(txn) = self.doc.try_transact() else {
-            return true;
-        };
-        txn.parent_doc().is_some_and(|doc| _Doc::ptr_eq(&doc, &parent.doc))
+    fn subdocs(&self) -> Option<Vec<Doc>> {
+        // The subdocuments are only known once the transactions are committed.
+        let txn = self.doc.try_transact().ok()?;
+        Some(txn.subdocs().map(|doc| Doc::from(doc.clone())).collect())
     }
 
     fn get_or_insert_text(

@@ -97,6 +97,8 @@ class Transaction:
                 self._txn.drop()
                 self._txn = None
                 self._doc._txn = None
+                if not isinstance(self, ReadTransaction):
+                    self._doc._forget_removed_subdocs()
 
     async def __aenter__(self, _acquire_transaction: bool = True) -> Self:
         if self._leases == 0:
