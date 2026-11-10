@@ -1,4 +1,7 @@
+import subprocess
+import sys
 import threading
+from textwrap import dedent
 
 import pytest
 from pycrdt import Array, Doc, IdSet, Map, StackItem, Text, UndoManager
@@ -703,6 +706,65 @@ def test_undo_while_another_thread_holds_transaction():
     assert len(undo_manager.undo_stack) == 1
     assert undo_manager.undo()
     assert str(text) == ""
+
+
+def test_clear_in_transaction():
+    # A deadlock can hold the GIL, so enforce the timeout from another process.
+    code = dedent(
+        """
+        import threading
+
+        import pytest
+        from pycrdt import Doc, Text, UndoManager
+
+        doc = Doc(allow_multithreading=True)
+        doc["text"] = text = Text()
+        undo_manager = UndoManager(scopes=[text], capture_timeout_millis=0)
+        with doc.transaction():
+            undo_manager.clear()  # nothing to clear
+        text += "Hello"
+
+        with doc.transaction():
+            with pytest.raises(RuntimeError, match="Cannot acquire transaction"):
+                undo_manager.clear()
+
+        errors = []
+
+        def callback(event):
+            try:
+                undo_manager.clear()
+            except RuntimeError as exc:
+                errors.append(str(exc))
+
+        sub = text.observe(callback)
+        text += ", World!"
+        text.unobserve(sub)
+        assert errors == ["Cannot acquire transaction"]
+
+        in_transaction = threading.Event()
+        done = threading.Event()
+
+        def hold_transaction():
+            with doc.new_transaction():
+                in_transaction.set()
+                done.wait()
+
+        thread = threading.Thread(target=hold_transaction)
+        thread.start()
+        in_transaction.wait()
+        try:
+            with pytest.raises(RuntimeError, match="Cannot acquire transaction"):
+                undo_manager.clear()
+        finally:
+            done.set()
+            thread.join()
+
+        assert len(undo_manager.undo_stack) == 2
+        undo_manager.clear()
+        assert len(undo_manager.undo_stack) == 0
+        """
+    )
+    subprocess.run([sys.executable, "-c", code], check=True, timeout=10)
 
 
 def test_expand_scope_in_transaction():

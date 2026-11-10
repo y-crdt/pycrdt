@@ -137,6 +137,9 @@ class UndoManager:
         """
         Clears all [StackItem][pycrdt.StackItem]s stored in this undo manager,
         effectively resetting its state.
+
+        Raises:
+            RuntimeError: A transaction is in progress on a tracked document.
         """
         self._undo_manager.clear_all()
 
