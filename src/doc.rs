@@ -3,9 +3,11 @@ use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::types::{PyBool, PyBytes, PyDict, PyInt, PyList, PyString};
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, Mutex};
 use yrs::{
-    ClientID, Doc as _Doc, Options, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
+    ClientID, Doc as _Doc, Uuid, Options, ReadTxn, StateVector, SubdocsEvent as _SubdocsEvent, Transact, TransactionCleanupEvent, TransactionMut, Update, WriteTxn
 };
 use yrs::updates::encoder::{Encode, Encoder};
 use yrs::updates::decoder::Decode;
@@ -13,7 +15,7 @@ use crate::text::Text;
 use crate::array::Array;
 use crate::map::Map;
 use crate::transaction::Transaction;
-use crate::subscription::Subscription;
+use crate::subscription::{Subscription, NEXT_KEY};
 use crate::type_conversions::ToPython;
 use crate::xml::XmlFragment;
 
@@ -135,10 +137,39 @@ impl Doc {
         _Doc::ptr_eq(&self.doc, &other.doc)
     }
 
-    fn subdocs(&self) -> Option<Vec<Doc>> {
+    fn contains_subdocs(&self, docs: Vec<PyRef<'_, Doc>>) -> Option<Vec<bool>> {
         // The subdocuments are only known once the transactions are committed.
         let txn = self.doc.try_transact().ok()?;
-        Some(txn.subdocs().map(|doc| Doc::from(doc.clone())).collect())
+        let mut indices: HashMap<Uuid, Vec<usize>> = HashMap::new();
+        for (index, doc) in docs.iter().enumerate() {
+            indices.entry(doc.doc.guid()).or_default().push(index);
+        }
+        let mut found = vec![false; docs.len()];
+        for subdoc in txn.subdocs() {
+            for &index in indices.get(&subdoc.guid()).into_iter().flatten() {
+                found[index] |= _Doc::ptr_eq(&docs[index].doc, subdoc);
+            }
+        }
+        Some(found)
+    }
+
+    fn track_subdocs(&self) -> Option<SubdocChanges> {
+        let changes = Arc::new(Mutex::new((Vec::new(), Vec::new())));
+        let weak = Arc::downgrade(&changes);
+        let key = NEXT_KEY.fetch_add(1, Ordering::Relaxed);
+        self.doc
+            .observe_subdocs(key, move |txn, event: &_SubdocsEvent| {
+                let Some(changes) = weak.upgrade() else {
+                    // the changes could not be unobserved when they were dropped
+                    txn.unobserve_subdocs(key);
+                    return;
+                };
+                let mut changes = changes.lock().unwrap();
+                changes.0.extend(event.added().cloned());
+                changes.1.extend(event.removed().cloned());
+            })
+            .ok()?;
+        Some(SubdocChanges { doc: self.doc.clone(), key, changes })
     }
 
     fn get_or_insert_text(
@@ -303,6 +334,33 @@ impl Doc {
             })?;
         let s: Py<Subscription> = Py::new(py, sub)?;
         Ok(s)
+    }
+}
+
+/// The subdocuments added to and removed from a document by the transactions,
+/// since they were last taken.
+#[pyclass]
+pub struct SubdocChanges {
+    doc: _Doc,
+    key: u64,
+    changes: Arc<Mutex<(Vec<_Doc>, Vec<_Doc>)>>,
+}
+
+#[pymethods]
+impl SubdocChanges {
+    fn take(&self) -> (Vec<Doc>, Vec<Doc>) {
+        let (added, removed) = std::mem::take(&mut *self.changes.lock().unwrap());
+        (
+            added.into_iter().map(Doc::from).collect(),
+            removed.into_iter().map(Doc::from).collect(),
+        )
+    }
+}
+
+impl Drop for SubdocChanges {
+    fn drop(&mut self) {
+        // If a transaction is in progress, the observer unobserves itself when it is called.
+        let _ = self.doc.unobserve_subdocs(self.key);
     }
 }
 

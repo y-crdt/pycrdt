@@ -249,9 +249,69 @@ def test_removed_subdocs_are_collected(how):
         del subdoc
     gc.collect()
 
-    assert sum(ref() is not None for ref in refs) < len(refs) // 2
     if how == "replace":
+        assert [ref() for ref in refs[:-1]] == [None] * (len(refs) - 1)
         assert doc["map"]["subdoc"] is refs[-1]()
+    else:
+        assert [ref() for ref in refs] == [None] * len(refs)
+
+
+def test_subdocs_in_document_are_kept():
+    doc = Doc({"map": Map({f"subdoc{i}": Doc() for i in range(100)})})
+    remote_doc = Doc()
+    remote_doc.apply_update(doc.get_update())
+    remote_map = remote_doc.get("map", type=Map)
+    subdoc_ids = [id(remote_map[f"subdoc{i}"]) for i in range(100)]
+    calls = []
+    remote_map["subdoc0"].get("text", type=Text).observe(lambda event: calls.append(True))
+    for _ in range(100):
+        remote_map["subdoc"] = Doc()
+    gc.collect()
+
+    assert [id(remote_map[f"subdoc{i}"]) for i in range(100)] == subdoc_ids
+    remote_map["subdoc0"].get("text", type=Text).insert(0, "a")
+    assert calls == [True]
+
+
+def test_replacing_subdocs_does_not_check_the_other_subdocs(monkeypatch):
+    doc = Doc({"map": Map({f"subdoc{i}": Doc() for i in range(100)})})
+    remote_doc = Doc()
+    remote_doc.apply_update(doc.get_update())
+    remote_map = remote_doc.get("map", type=Map)
+    remote_map["subdoc"] = Doc()
+    checks = []
+    check_new_subdocs = Doc._check_new_subdocs
+
+    def check(doc):
+        checks.append(True)
+        check_new_subdocs(doc)
+
+    monkeypatch.setattr(Doc, "_check_new_subdocs", check)
+    for _ in range(100):
+        remote_map["subdoc"] = Doc()
+
+    assert checks == []
+    # the subdocuments that are accessed for the first time are checked
+    for i in range(100):
+        remote_map[f"subdoc{i}"]
+    assert checks
+
+
+def test_subdocs_are_forgotten_while_holding_the_transaction_lock(monkeypatch):
+    doc = Doc(allow_multithreading=True)
+    locked = []
+    forget_removed_subdocs = Doc._forget_removed_subdocs
+
+    def forget(doc):
+        locked.append(doc._txn_lock.locked())
+        forget_removed_subdocs(doc)
+
+    monkeypatch.setattr(Doc, "_forget_removed_subdocs", forget)
+    doc["map"] = Map({"subdoc": Doc()})
+    del doc["map"]["subdoc"]
+
+    assert locked
+    assert all(locked)
 
 
 @pytest.mark.parametrize("method", ["observe", "observe_deep"])

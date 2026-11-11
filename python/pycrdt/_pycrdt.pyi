@@ -34,8 +34,12 @@ class Doc:
     def is_same(self, other: Doc) -> bool:
         """Returns True if the other document is the same document."""
 
-    def subdocs(self) -> list[Doc] | None:
-        """Returns the subdocuments, or None if a transaction is in progress."""
+    def contains_subdocs(self, docs: list[Doc]) -> list[bool] | None:
+        """Returns whether each document is a subdocument, or None if a transaction
+        is in progress."""
+
+    def track_subdocs(self) -> SubdocChanges | None:
+        """Tracks the subdocument changes, or returns None if a transaction is in progress."""
 
     def create_transaction(self) -> Transaction:
         """Create a document transaction."""
@@ -103,6 +107,12 @@ class TransactionEvent:
     @property
     def update(self) -> bytes:
         """The emitted binary update."""
+
+class SubdocChanges:
+    """The subdocuments added and removed since they were last taken."""
+
+    def take(self) -> tuple[list[Doc], list[Doc]]:
+        """Returns the added and removed subdocuments, and forgets them."""
 
 class SubdocsEvent:
     """

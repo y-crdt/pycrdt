@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 // Keys wrap after 2^64 registrations, potentially colliding with a still-active
 // subscription on the same observer. Reaching that limit is impractical.
-static NEXT_KEY: AtomicU64 = AtomicU64::new(0);
+pub(crate) static NEXT_KEY: AtomicU64 = AtomicU64::new(0);
 
 /// The observer owns only a lifetime token, not the Python callback.
 pub struct Callback {

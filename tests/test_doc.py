@@ -134,16 +134,27 @@ def test_subdoc_is_always_the_same_object():
     doc["array"] = array0 = Array()
     events = []
     sub = array0.observe(partial(callback, events))  # noqa: F841
-    array0.append(Doc())
+    array0.append(array_subdoc := Doc())
 
     assert map0["subdoc"] is subdoc
     assert list(map0.values()) == [subdoc]
-    assert events[0].delta[0]["insert"][0] is array0[0]
+    assert array0[0] is array_subdoc
+    assert events[0].delta[0]["insert"][0] is array_subdoc
     remote_doc = Doc()
     remote_doc.apply_update(doc.get_update())
     remote_map = remote_doc.get("map", type=Map)
     assert remote_map["subdoc"] is remote_map["subdoc"]
     assert remote_map["subdoc"] is not subdoc
+
+
+def test_subdocs_with_the_same_guid():
+    doc = Doc()
+    subdoc0 = Doc(guid="subdoc")
+    subdoc1 = Doc(guid="subdoc")
+    doc["map"] = map0 = Map({"subdoc0": subdoc0, "subdoc1": subdoc1})
+
+    assert map0["subdoc0"] is subdoc0
+    assert map0["subdoc1"] is subdoc1
 
 
 def test_subdoc_transaction_origin():
