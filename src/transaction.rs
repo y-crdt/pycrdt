@@ -113,7 +113,7 @@ impl Transaction {
 
 #[pymethods]
 impl Transaction {
-    pub fn commit(&mut self, py: Python<'_>) -> PyResult<()> {
+    pub fn commit(&self, py: Python<'_>) -> PyResult<()> {
         self.transaction()?.as_mut().unwrap().as_mut().commit();
         // Check if any Python exception was raised during commit (e.g., in callbacks)
         if let Some(err) = pyo3::PyErr::take(py) {

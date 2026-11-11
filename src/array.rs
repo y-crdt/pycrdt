@@ -41,7 +41,7 @@ impl Array {
 
 #[pymethods]
 impl Array {
-    fn len(&self, txn: &mut Transaction) -> PyResult<u32> {
+    fn len(&self, txn: &Transaction) -> PyResult<u32> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
@@ -49,7 +49,7 @@ impl Array {
         Ok(len)
     }
 
-    fn insert(&self, txn: &mut Transaction, index: u32, value: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn insert(&self, txn: &Transaction, index: u32, value: &Bound<'_, PyAny>) -> PyResult<()> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let v = py_to_any(value)?;
@@ -57,7 +57,7 @@ impl Array {
         Ok(())
     }
 
-    fn insert_text_prelim(&self, txn: &mut Transaction, index: u32) -> PyResult<Text> {
+    fn insert_text_prelim(&self, txn: &Transaction, index: u32) -> PyResult<Text> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated = self.array.insert(&mut t, index, TextPrelim::new(""));
@@ -65,7 +65,7 @@ impl Array {
         Ok(shared)
     }
 
-    fn insert_array_prelim(&self, txn: &mut Transaction, index: u32) -> PyResult<Array> {
+    fn insert_array_prelim(&self, txn: &Transaction, index: u32) -> PyResult<Array> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated = self.array.insert(&mut t, index, ArrayPrelim::default());
@@ -73,7 +73,7 @@ impl Array {
         Ok(shared)
     }
 
-    fn insert_map_prelim(&self, txn: &mut Transaction, index: u32) -> PyResult<Map> {
+    fn insert_map_prelim(&self, txn: &Transaction, index: u32) -> PyResult<Map> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated = self.array.insert(&mut t, index, MapPrelim::default());
@@ -83,7 +83,7 @@ impl Array {
 
     fn insert_xmlfragment_prelim(
         &self,
-        txn: &mut Transaction,
+        txn: &Transaction,
         index: u32,
     ) -> PyResult<XmlFragment> {
         let mut _t = txn.transaction()?;
@@ -95,17 +95,17 @@ impl Array {
         Ok(shared)
     }
 
-    fn insert_xmlelement_prelim(&self, _txn: &mut Transaction, _index: u32) -> PyResult<Py<PyAny>> {
+    fn insert_xmlelement_prelim(&self, _txn: &Transaction, _index: u32) -> PyResult<Py<PyAny>> {
         Err(PyTypeError::new_err("Cannot insert an XmlElement into an array - insert it into an XmlFragment and insert that into the array"))
     }
 
-    fn insert_xmltext_prelim(&self, _txn: &mut Transaction, _index: u32) -> PyResult<Py<PyAny>> {
+    fn insert_xmltext_prelim(&self, _txn: &Transaction, _index: u32) -> PyResult<Py<PyAny>> {
         Err(PyTypeError::new_err("Cannot insert an XmlText into an array - insert it into an XmlFragment and insert that into the array"))
     }
 
     fn insert_doc(
         &self,
-        txn: &mut Transaction,
+        txn: &Transaction,
         index: u32,
         doc: &Bound<'_, PyAny>,
     ) -> PyResult<()> {
@@ -118,7 +118,7 @@ impl Array {
         Ok(())
     }
 
-    fn remove_range(&self, txn: &mut Transaction, index: u32, len: u32) -> PyResult<()> {
+    fn remove_range(&self, txn: &Transaction, index: u32, len: u32) -> PyResult<()> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         self.array.remove_range(&mut t, index, len);
@@ -128,7 +128,7 @@ impl Array {
     fn get<'py>(
         &self,
         py: Python<'py>,
-        txn: &mut Transaction,
+        txn: &Transaction,
         index: u32,
     ) -> PyResult<Bound<'py, PyAny>> {
         let mut t0 = txn.transaction()?;
@@ -143,9 +143,9 @@ impl Array {
     }
 
     fn to_json<'py>(
-        &mut self,
+        &self,
         py: Python<'py>,
-        txn: &mut Transaction,
+        txn: &Transaction,
     ) -> PyResult<Bound<'py, PyString>> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
@@ -158,7 +158,7 @@ impl Array {
     fn sticky_index<'py>(
         &self,
         py: Python<'py>,
-        txn: &mut Transaction,
+        txn: &Transaction,
         index: u32,
         assoc: i8,
     ) -> PyResult<Py<StickyIndex>> {
@@ -174,7 +174,7 @@ impl Array {
         Ok(s)
     }
 
-    pub fn observe(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
+    pub fn observe(&self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let target = self.array.clone();
         let (sub, callback) = Subscription::new(f, move |key| {
             let _ = target.unobserve(key);
@@ -195,7 +195,7 @@ impl Array {
         Ok(s)
     }
 
-    pub fn observe_deep(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
+    pub fn observe_deep(&self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let target = self.array.clone();
         let (sub, callback) = Subscription::new(f, move |key| {
             let _ = target.unobserve_deep(key);

@@ -32,7 +32,7 @@ impl Map {
 
 #[pymethods]
 impl Map {
-    fn len(&self, txn: &mut Transaction) -> PyResult<u32> {
+    fn len(&self, txn: &Transaction) -> PyResult<u32> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
@@ -40,7 +40,7 @@ impl Map {
         Ok(len)
     }
 
-    fn insert(&self, txn: &mut Transaction, key: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn insert(&self, txn: &Transaction, key: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let v = py_to_any(value)?;
@@ -48,7 +48,7 @@ impl Map {
         Ok(())
     }
 
-    fn insert_text_prelim(&self, txn: &mut Transaction, key: &str) -> PyResult<Text> {
+    fn insert_text_prelim(&self, txn: &Transaction, key: &str) -> PyResult<Text> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated = self.map.insert(&mut t, key, TextPrelim::new(""));
@@ -56,7 +56,7 @@ impl Map {
         Ok(shared)
     }
 
-    fn insert_array_prelim(&self, txn: &mut Transaction, key: &str) -> PyResult<Array> {
+    fn insert_array_prelim(&self, txn: &Transaction, key: &str) -> PyResult<Array> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated = self.map.insert(&mut t, key, ArrayPrelim::default());
@@ -64,7 +64,7 @@ impl Map {
         Ok(shared)
     }
 
-    fn insert_map_prelim(&self, txn: &mut Transaction, key: &str) -> PyResult<Map> {
+    fn insert_map_prelim(&self, txn: &Transaction, key: &str) -> PyResult<Map> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated = self.map.insert(&mut t, key, MapPrelim::default());
@@ -72,7 +72,7 @@ impl Map {
         Ok(shared)
     }
 
-    fn insert_xmlfragment_prelim(&self, txn: &mut Transaction, key: &str) -> PyResult<XmlFragment> {
+    fn insert_xmlfragment_prelim(&self, txn: &Transaction, key: &str) -> PyResult<XmlFragment> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated = self.map.insert(&mut t, key, XmlFragmentPrelim::default());
@@ -80,15 +80,15 @@ impl Map {
         Ok(shared)
     }
 
-    fn insert_xmlelement_prelim(&self, _txn: &mut Transaction, _key: &str) -> PyResult<Py<PyAny>> {
+    fn insert_xmlelement_prelim(&self, _txn: &Transaction, _key: &str) -> PyResult<Py<PyAny>> {
         Err(PyTypeError::new_err("Cannot insert an XmlElement into a map - insert it into an XmlFragment and insert that into the map"))
     }
 
-    fn insert_xmltext_prelim(&self, _txn: &mut Transaction, _key: &str) -> PyResult<Py<PyAny>> {
+    fn insert_xmltext_prelim(&self, _txn: &Transaction, _key: &str) -> PyResult<Py<PyAny>> {
         Err(PyTypeError::new_err("Cannot insert an XmlText into a map - insert it into an XmlFragment and insert that into the map"))
     }
 
-    fn insert_doc(&self, txn: &mut Transaction, key: &str, doc: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn insert_doc(&self, txn: &Transaction, key: &str, doc: &Bound<'_, PyAny>) -> PyResult<()> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let d1: Doc = doc
@@ -100,7 +100,7 @@ impl Map {
         Ok(())
     }
 
-    fn remove(&self, txn: &mut Transaction, key: &str) -> PyResult<()> {
+    fn remove(&self, txn: &Transaction, key: &str) -> PyResult<()> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         self.map.remove(&mut t, key);
@@ -110,7 +110,7 @@ impl Map {
     fn get<'py>(
         &self,
         py: Python<'py>,
-        txn: &mut Transaction,
+        txn: &Transaction,
         key: &str,
     ) -> PyResult<Bound<'py, PyAny>> {
         let mut t0 = txn.transaction()?;
@@ -124,7 +124,7 @@ impl Map {
         }
     }
 
-    fn keys<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> PyResult<Bound<'py, PyList>> {
+    fn keys<'py>(&self, py: Python<'py>, txn: &Transaction) -> PyResult<Bound<'py, PyList>> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
@@ -136,7 +136,7 @@ impl Map {
         Ok(PyList::new(py, v).unwrap())
     }
 
-    fn values<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> PyResult<Bound<'py, PyList>> {
+    fn values<'py>(&self, py: Python<'py>, txn: &Transaction) -> PyResult<Bound<'py, PyList>> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
@@ -147,7 +147,7 @@ impl Map {
         Ok(result)
     }
 
-    fn items<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> PyResult<Bound<'py, PyList>> {
+    fn items<'py>(&self, py: Python<'py>, txn: &Transaction) -> PyResult<Bound<'py, PyList>> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
@@ -158,7 +158,7 @@ impl Map {
         Ok(result)
     }
 
-    fn to_json(&mut self, txn: &mut Transaction) -> PyResult<Py<PyAny>> {
+    fn to_json(&self, txn: &Transaction) -> PyResult<Py<PyAny>> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
@@ -168,14 +168,14 @@ impl Map {
     }
 
     /// Returns true if the given key exists in the map.
-    fn has(&self, txn: &mut Transaction, key: &str) -> PyResult<bool> {
+    fn has(&self, txn: &Transaction, key: &str) -> PyResult<bool> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
         Ok(self.map.get(t, key).is_some())
     }
 
-    pub fn observe(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
+    pub fn observe(&self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let target = self.map.clone();
         let (sub, callback) = Subscription::new(f, move |key| {
             let _ = target.unobserve(key);
@@ -197,7 +197,7 @@ impl Map {
     }
 
     pub fn observe_deep<'py>(
-        &mut self,
+        &self,
         py: Python<'py>,
         f: Py<PyAny>,
     ) -> PyResult<Py<Subscription>> {

@@ -133,9 +133,9 @@ impl Doc {
     }
 
     fn get_or_insert_text(
-        &mut self,
+        &self,
         py: Python<'_>,
-        txn: &mut Transaction,
+        txn: &Transaction,
         name: &str,
     ) -> PyResult<Py<Text>> {
         let mut _t = txn.transaction()?;
@@ -146,9 +146,9 @@ impl Doc {
     }
 
     fn get_or_insert_array(
-        &mut self,
+        &self,
         py: Python<'_>,
-        txn: &mut Transaction,
+        txn: &Transaction,
         name: &str,
     ) -> PyResult<Py<Array>> {
         let mut _t = txn.transaction()?;
@@ -159,9 +159,9 @@ impl Doc {
     }
 
     fn get_or_insert_map(
-        &mut self,
+        &self,
         py: Python<'_>,
-        txn: &mut Transaction,
+        txn: &Transaction,
         name: &str,
     ) -> PyResult<Py<Map>> {
         let mut _t = txn.transaction()?;
@@ -172,8 +172,8 @@ impl Doc {
     }
 
     fn get_or_insert_xml_fragment(
-        &mut self,
-        txn: &mut Transaction,
+        &self,
+        txn: &Transaction,
         name: &str,
     ) -> PyResult<XmlFragment> {
         let mut _t = txn.transaction()?;
@@ -219,7 +219,7 @@ impl Doc {
         Ok(PyBytes::new(py, &update).into())
     }
 
-    fn apply_update(&self, py: Python<'_>, txn: &mut Transaction, update: &Bound<'_, PyBytes>) -> PyResult<()> {
+    fn apply_update(&self, py: Python<'_>, txn: &Transaction, update: &Bound<'_, PyBytes>) -> PyResult<()> {
         let bytes: &[u8] = update.as_bytes();
         let mut _t = txn.transaction()?;
         let t = _t.as_mut().unwrap().as_mut();
@@ -234,7 +234,7 @@ impl Doc {
         })
     }
 
-    fn roots(&self, py: Python<'_>, txn: &mut Transaction) -> PyResult<Py<PyAny>> {
+    fn roots(&self, py: Python<'_>, txn: &Transaction) -> PyResult<Py<PyAny>> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
@@ -245,7 +245,7 @@ impl Doc {
         Ok(result.into())
     }
 
-    pub fn observe(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
+    pub fn observe(&self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let target = self.doc.clone();
         let (sub, callback) = Subscription::new(f, move |key| {
             let _ = target.unobserve_transaction_cleanup(key);
@@ -276,7 +276,7 @@ impl Doc {
         Ok(s)
     }
 
-    pub fn observe_subdocs(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
+    pub fn observe_subdocs(&self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let target = self.doc.clone();
         let (sub, callback) = Subscription::new(f, move |key| {
             let _ = target.unobserve_subdocs(key);
