@@ -332,27 +332,22 @@ pub(crate) fn any_to_value(any: &Any) -> Value {
     match any {
         Any::Null | Any::Undefined | Any::Buffer(_) => Value::Null,
         Any::Bool(b) => Value::Bool(*b),
-        Any::Number(Number::Int(i))
-            if !(Number::I64_MIN_SAFE_INTEGER..=Number::I64_MAX_SAFE_INTEGER).contains(i) =>
-        {
-            Value::Number((*i).into())
-        },
-        // Yrs may encode exactly representable large integers as floats. Keep their
-        // canonical JSON identical after decoding, including in nested attributes.
+        Any::Number(Number::Int(i)) => Value::Number((*i).into()),
+        // A whole float is a JSON integer too. It then has the same canonical JSON as the
+        // integer, also after yrs encoded a large integer as a float, and yrs encodes it the
+        // way lib0 does (a varint up to 31 bits). An integer cannot retain the sign of
+        // negative zero.
         Any::Number(Number::Float(f))
             if f.fract() == 0.0
-                && (*f < Number::F64_MIN_SAFE_INTEGER || *f > Number::F64_MAX_SAFE_INTEGER)
                 && *f >= i64::MIN as f64
-                && *f < -(i64::MIN as f64) =>
+                && *f < -(i64::MIN as f64)
+                && !(*f == 0.0 && f.is_sign_negative()) =>
         {
             Value::Number((*f as i64).into())
         },
-        Any::Number(n) => serde_json::Number::from_f64(match n {
-            Number::Int(i) => *i as f64,
-            Number::Float(f) => *f,
-        })
-        .map(Value::Number)
-        .unwrap_or(Value::Null),
+        Any::Number(Number::Float(f)) => serde_json::Number::from_f64(*f)
+            .map(Value::Number)
+            .unwrap_or(Value::Null),
         Any::String(s) => Value::String(s.to_string()),
         Any::Array(items) => Value::Array(items.iter().map(any_to_value).collect()),
         Any::Map(map) => Value::Object(map.iter().map(|(k, v)| (k.clone(), any_to_value(v))).collect()),
