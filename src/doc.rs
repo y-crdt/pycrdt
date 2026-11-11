@@ -15,7 +15,7 @@ use crate::map::Map;
 use crate::transaction::Transaction;
 use crate::subscription::Subscription;
 use crate::type_conversions::ToPython;
-use crate::update::detach_if_large;
+use crate::update::{detach_if, encode_work, DETACH_MIN_SIZE, ENCODE_DETACH_MIN_WORK};
 use crate::xml::XmlFragment;
 
 
@@ -207,15 +207,15 @@ impl Doc {
     fn get_update(&self, py: Python<'_>, txn: &Transaction, state: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
         let mut _t = txn.transaction()?;
         let t = _t.as_mut().unwrap().as_mut();
-        let state: &[u8] = state.as_bytes();
+        let Ok(state_vector) = StateVector::decode_v1(state.as_bytes()) else {
+            return Err(PyValueError::new_err("Cannot decode state"));
+        };
         // Encoding is pure Rust over the transaction's store: release the GIL so
         // other Python threads keep running while a large document is encoded.
-        // Unlike apply_update, no input size predicts the work, so every call releases.
         // The transaction (and so the store's write lock) stays held by this thread.
         // `move` hands the closure the `&mut` (TransactionMut is Send, not Sync).
-        let update = py
-            .detach(move || StateVector::decode_v1(state).map(|sv| t.encode_diff_v1(&sv)))
-            .map_err(|_| PyValueError::new_err("Cannot decode state"))?;
+        let detach = encode_work(&t.state_vector(), &state_vector) >= ENCODE_DETACH_MIN_WORK;
+        let update = detach_if(py, detach, move || t.encode_diff_v1(&state_vector));
         Ok(PyBytes::new(py, &update).into())
     }
 
@@ -226,7 +226,7 @@ impl Doc {
         // Decoding and integrating an update is pure Rust and fires no callbacks
         // (observers run at commit): release the GIL for it if the update is large.
         // `bytes` borrows an immutable `bytes` object kept alive by `update`.
-        detach_if_large(py, bytes.len(), || match Update::decode_v1(bytes) {
+        detach_if(py, bytes.len() >= DETACH_MIN_SIZE, || match Update::decode_v1(bytes) {
             Err(e) => Err(PyValueError::new_err(format!("Cannot decode update: {}", e))),
             Ok(u) => t
                 .apply_update(u)

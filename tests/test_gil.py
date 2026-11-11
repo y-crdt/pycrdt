@@ -13,6 +13,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 # The same value as DETACH_MIN_SIZE in src/update.rs.
+# test_encode_releases_gil_from_threshold uses ENCODE_DETACH_MIN_WORK (16,384).
 DETACH_MIN_SIZE = 64 * 1024
 
 
@@ -130,9 +131,32 @@ def test_releases_gil_from_threshold(operation, size, releases):
         assert probe_during_call(calls[operation]) is releases
 
 
+# Each map entry is one clock unit. The work is the number of entries missing from
+# the remote state, plus one eighth of the entries in the document: 14,563 + 1,820
+# and 131,071 // 8 are 16,383, while 14,564 + 1,820 and 131,072 // 8 are 16,384.
+@pytest.mark.parametrize(
+    "entries,up_to_date,releases",
+    [
+        (14_563, False, False),
+        (14_564, False, True),
+        (131_071, True, False),
+        (131_072, True, True),
+    ],
+)
+def test_encode_releases_gil_from_threshold(entries, up_to_date, releases):
+    doc = Doc()
+    map0 = doc.get("map", type=Map)
+    with doc.transaction():
+        for i in range(entries):
+            map0[str(i)] = i
+    state = doc.get_state() if up_to_date else b"\x00"
+    with doc.transaction() as txn:
+        assert probe_during_call(partial(doc._doc.get_update, txn._txn, state)) is releases
+
+
 def test_error_without_gil(update):
-    # The truncated update is larger than the threshold, so each error is raised
-    # while the GIL is released.
+    # The truncated update is larger than the threshold, so these calls raise from
+    # the code that runs without the GIL. The errors are the same as with the GIL.
     truncated = update[:-1]
     with pytest.raises(ValueError, match="Cannot decode update"):
         Doc().apply_update(truncated)
