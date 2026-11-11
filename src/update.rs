@@ -13,6 +13,12 @@ use yrs::{diff_updates_v1, encode_state_vector_from_update_v1, merge_updates_v1,
 /// other threads little. CPython's hashlib and zlib use a threshold for the same reason.
 pub const DETACH_MIN_SIZE: usize = 64 * 1024;
 
+/// Smallest number of updates for which `merge_updates` releases the GIL, whatever their size.
+///
+/// The merge time grows with the square of the number of updates: 512 keystroke
+/// updates (13 KB) take about 1 ms, and 2,500 of them (63 KB) take 20 to 40 ms.
+pub const MERGE_DETACH_MIN_COUNT: usize = 512;
+
 /// Smallest `encode_work`, in clock units, for which `Doc.get_update` releases the GIL.
 ///
 /// Below it, encoding a map of small values or a text takes up to about 1.5 ms.
@@ -56,9 +62,11 @@ where
 #[pyfunction]
 pub fn merge_updates<'py>(py: Python<'py>, updates: &Bound<'_, PyTuple>) -> PyResult<Bound<'py, PyBytes>> {
     let updates: Vec<Vec<u8>> = updates.extract()?;
-    // Pure byte-to-byte work over owned buffers: release the GIL for large inputs.
+    // Pure byte-to-byte work over owned buffers: release the GIL for large inputs,
+    // or for many updates, since the merge time grows with their number squared.
     let size: usize = updates.iter().map(Vec::len).sum();
-    let Ok(update) = detach_if(py, size >= DETACH_MIN_SIZE, || merge_updates_v1(&updates)) else {
+    let detach = size >= DETACH_MIN_SIZE || updates.len() >= MERGE_DETACH_MIN_COUNT;
+    let Ok(update) = detach_if(py, detach, || merge_updates_v1(&updates)) else {
         return Err(PyValueError::new_err("Cannot merge updates"));
     };
     Ok(PyBytes::new(py, &update))

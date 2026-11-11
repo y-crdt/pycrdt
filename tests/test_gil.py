@@ -5,16 +5,17 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 import pytest
-from pycrdt import Doc, Map, _pycrdt, get_state, get_update, merge_updates
+from pycrdt import Doc, Map, Text, _pycrdt, get_state, get_update, merge_updates
 
 pytestmark = pytest.mark.skipif(
     hasattr(sys, "_is_gil_enabled") and not sys._is_gil_enabled(),
     reason="These tests verify GIL release and require the GIL to be enabled",
 )
 
-# The same value as DETACH_MIN_SIZE in src/update.rs.
+# The same values as DETACH_MIN_SIZE and MERGE_DETACH_MIN_COUNT in src/update.rs.
 # test_encode_releases_gil_from_threshold uses ENCODE_DETACH_MIN_WORK (16,384).
 DETACH_MIN_SIZE = 64 * 1024
+MERGE_DETACH_MIN_COUNT = 512
 
 
 @pytest.fixture(scope="module")
@@ -129,6 +130,21 @@ def test_releases_gil_from_threshold(operation, size, releases):
             "diff": partial(_pycrdt.get_update, update, b"\x00"),
         }
         assert probe_during_call(calls[operation]) is releases
+
+
+@pytest.mark.parametrize(
+    "count,releases", [(MERGE_DETACH_MIN_COUNT - 1, False), (MERGE_DETACH_MIN_COUNT, True)]
+)
+def test_merge_releases_gil_from_count(count, releases):
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    updates = []
+    doc.observe(lambda event: updates.append(event.update))
+    for _ in range(count):
+        text += "x"
+    # The updates are far smaller than DETACH_MIN_SIZE, so their number decides.
+    assert sum(map(len, updates)) < DETACH_MIN_SIZE // 2
+    assert probe_during_call(partial(_pycrdt.merge_updates, tuple(updates))) is releases
 
 
 # Each map entry is one clock unit. The work is the number of entries missing from
