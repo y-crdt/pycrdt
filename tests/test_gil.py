@@ -185,38 +185,46 @@ def test_error_without_gil(update):
 
 
 @pytest.mark.parametrize("operation", ["apply", "encode"])
-def test_concurrent_transaction_access(update, operation):
+def test_second_thread_waits_for_call(update, operation):
     doc = Doc()
+    map0 = doc.get("map", type=Map)
     if operation == "encode":
         doc.apply_update(update)
     expected_metadata = doc.client_id, doc.guid
+    calls = 0
 
     with doc.transaction() as txn:
         raw_txn = txn._txn
+        if operation == "apply":
+            native_call = partial(doc._doc.apply_update, raw_txn, update)
+        else:
+            native_call = partial(doc._doc.get_update, raw_txn, b"\x00")
+
+        def call():
+            nonlocal calls
+            calls += 1
+            native_call()
 
         def probe():
+            started = calls
             assert (doc.client_id, doc.guid) == expected_metadata
-            # apply_update holds a mutable PyO3 borrow of the transaction;
-            # get_update instead rejects access through its transaction mutex.
-            message = "Already mutably borrowed|Transaction already borrowed"
-            with pytest.raises(RuntimeError, match=message):
-                raw_txn.origin()
+            # These calls use the transaction that the main thread has open. They
+            # wait for the native call to end, as they waited for the GIL when the
+            # native call held it. They then see the whole update.
+            assert len(map0) == 100_000
+            assert map0["99999"] == 99999
+            map0["from worker"] = "ok"
+            assert raw_txn.origin() is None
+            # The native call returns only after this thread has taken the GIL.
+            assert calls == started
             with pytest.raises(RuntimeError, match="Already in a transaction"):
                 doc._doc.create_transaction()
 
-        if operation == "apply":
-            call = partial(doc._doc.apply_update, raw_txn, update)
-        else:
-            call = partial(doc._doc.get_update, raw_txn, b"\x00")
         assert probe_during_call(call, probe), "Worker did not run during the native call"
         assert raw_txn.origin() is None
 
-    # Failed concurrent access must leave the transaction and store usable.
-    map0 = doc.get("map", type=Map)
-    assert len(map0) == 100_000
-    assert map0["99999"] == 99999
-    map0["after"] = "ok"
-    assert map0["after"] == "ok"
+    assert len(map0) == 100_001
+    assert map0["from worker"] == "ok"
     restored = Doc()
     restored.apply_update(doc.get_update())
-    assert restored.get("map", type=Map)["after"] == "ok"
+    assert restored.get("map", type=Map)["from worker"] == "ok"

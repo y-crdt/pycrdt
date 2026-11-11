@@ -172,8 +172,6 @@ t0.join()
 t1.join()
 ```
 
-Every thread that uses the document must do so inside `new_transaction()`. The `transaction()` method, and the methods that call it for you (such as `apply_update()`, or reading a shared type), reuse a transaction that another thread has open. If that thread is inside a call that releases the GIL, such as applying or encoding a large update, the call in this thread raises a `RuntimeError`.
-
 #### Asynchronous programming
 
 When used with an async context manager, the `new_transaction()` method will yield to the event loop until a transaction is acquired:
