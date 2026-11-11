@@ -229,6 +229,28 @@ def test_encode_decode_multiple_clients_and_attrs():
     assert IdMap.decode(m.encode()) == m
 
 
+@pytest.mark.parametrize(
+    "value, encoded",
+    [
+        (3, b"\x7d\x03"),
+        (-3, b"\x7d\x43"),
+        (14.0, b"\x7d\x0e"),
+        (2**31 - 1, b"\x7d\xbf\xff\xff\xff\x0f"),
+        (2**31, b"\x7c\x4f\x00\x00\x00"),
+        (0.5, b"\x7c\x3f\x00\x00\x00"),
+        (-0.0, b"\x7c\x80\x00\x00\x00"),
+    ],
+)
+def test_attribute_numbers_encode_as_lib0(value, encoded):
+    # lib0 Any tags: 125 integer (varint), 124 float32. Yjs writes every whole number
+    # up to 31 bits as an integer, whether it was written as 3 or 3.0.
+    m = IdMap()
+    m.insert(1, 0, 5, [ContentAttribute("n", value)])
+    data = m.encode()
+    assert data.endswith(b"\x01n" + encoded)
+    assert IdMap.decode(data) == m
+
+
 def test_decode_invalid_bytes_raises():
     with pytest.raises(ValueError):
         IdMap.decode(b"\xff\xff\xff\xff\xff")
