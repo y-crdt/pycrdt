@@ -25,7 +25,7 @@ from anyio.abc import TaskGroup
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 
 from ._pycrdt import Doc as _Doc
-from ._pycrdt import Subscription
+from ._pycrdt import SubdocChanges, Subscription
 from ._pycrdt import Transaction as _Transaction
 from ._sticky_index import Assoc, StickyIndex
 from ._transaction import ReadTransaction, Transaction
@@ -55,6 +55,11 @@ class BaseDoc:
     _subscriptions: list[Subscription]
     _origins: dict[int, Any]
     _task_group: TaskGroup | None
+    _subdocs: dict[str, list[BaseDoc]]
+    _subdoc_nb: int
+    _new_subdocs: dict[int, BaseDoc]
+    _inserted_subdocs: list[BaseDoc]
+    _subdoc_changes: SubdocChanges | None
 
     def __init__(
         self,
@@ -80,6 +85,92 @@ class BaseDoc:
         self._origins = {}
         self._allow_multithreading = allow_multithreading
         self._task_group = None
+        self._subdocs = {}
+        self._subdoc_nb = 0
+        self._new_subdocs = {}
+        self._inserted_subdocs = []
+        self._subdoc_changes = None
+
+    def _get_subdoc(self, doc: _Doc) -> BaseDoc:
+        # A subdocument is always accessed through the same object, so that its transactions
+        # and observers are shared, and kept alive as long as it is in this document.
+        subdoc = self._find_subdoc(doc)
+        if subdoc is None:
+            doc_type = cast(Type[BaseDoc], base_types[_Doc])
+            subdoc = doc_type(doc=doc)
+            self._keep_subdoc(subdoc)
+        return subdoc
+
+    def _add_subdoc(self, subdoc: BaseDoc) -> None:
+        # called when the subdocument is inserted in this document
+        if self._find_subdoc(subdoc._doc) is None:
+            self._keep_subdoc(subdoc)
+            self._inserted_subdocs.append(subdoc)
+
+    def _find_subdoc(self, doc: _Doc) -> BaseDoc | None:
+        for subdoc in self._subdocs.get(doc.guid(), []):
+            if subdoc._doc.is_same(doc):
+                return subdoc
+        return None
+
+    def _keep_subdoc(self, subdoc: BaseDoc) -> None:
+        self._subdocs.setdefault(subdoc._doc.guid(), []).append(subdoc)
+        self._subdoc_nb += 1
+        self._new_subdocs[id(subdoc)] = subdoc
+
+    def _forget_subdoc(self, doc: _Doc) -> None:
+        guid = doc.guid()
+        subdocs = self._subdocs.get(guid, [])
+        for index, subdoc in enumerate(subdocs):
+            if subdoc._doc.is_same(doc):
+                del subdocs[index]
+                if not subdocs:
+                    del self._subdocs[guid]
+                self._subdoc_nb -= 1
+                self._new_subdocs.pop(id(subdoc), None)
+                return
+
+    def _forget_removed_subdocs(self) -> None:
+        # Called after a commit, while holding the transaction lock. Yrs destroys
+        # the subdocuments that are removed, with their observers.
+        if self._subdoc_changes is None:
+            if not self._new_subdocs:
+                return
+            # The changes are tracked from the first kept subdocument. The changes that
+            # were committed before cannot be known, so check the subdocuments instead.
+            self._subdoc_changes = self._doc.track_subdocs()
+            if self._subdoc_changes is not None:
+                self._check_new_subdocs()
+            return
+        added, removed = self._subdoc_changes.take()
+        for doc in removed:
+            self._forget_subdoc(doc)
+        for doc in added:
+            subdoc = self._find_subdoc(doc)
+            if subdoc is not None:
+                self._new_subdocs.pop(id(subdoc), None)
+        for subdoc in self._inserted_subdocs:
+            if id(subdoc) in self._new_subdocs:
+                # inserted and removed in the same transaction
+                self._forget_subdoc(subdoc._doc)
+        self._inserted_subdocs.clear()
+        # The other new subdocuments were accessed, which happens when they were already in
+        # this document, unless they were also added and removed by the same transaction.
+        # Check them when there are as many as the other kept subdocuments.
+        if len(self._new_subdocs) >= max(16, self._subdoc_nb - len(self._new_subdocs)):
+            self._check_new_subdocs()
+
+    def _check_new_subdocs(self) -> None:
+        subdocs = list(self._new_subdocs.values())
+        found = self._doc.contains_subdocs([subdoc._doc for subdoc in subdocs])
+        if found is None:  # pragma: no cover
+            # a transaction is in progress outside of the transaction lock, check them later
+            return
+        for subdoc, in_doc in zip(subdocs, found):
+            if not in_doc:
+                self._forget_subdoc(subdoc._doc)
+        self._new_subdocs.clear()
+        self._inserted_subdocs.clear()
 
 
 class BaseType(ABC):
@@ -142,8 +233,7 @@ class BaseType(ABC):
         for k, v in base_types.items():
             if isinstance(obj, k):
                 if issubclass(v, BaseDoc):
-                    # create a BaseDoc
-                    return v(doc=obj)
+                    return self.doc._get_subdoc(obj)
                 # create a BaseType
                 return v(_doc=self.doc, _integrated=obj)
         # that was a primitive value, just return it
@@ -361,8 +451,7 @@ def process_event(value: Any, doc: Doc) -> Any:
         val_type = type(value)
         if val_type in base_types:
             if val_type is _Doc:
-                doc_type: type[BaseDoc] = cast(Type[BaseDoc], base_types[val_type])
-                value = doc_type(doc=value)
+                value = doc._get_subdoc(value)
             else:
                 base_type = cast(Type[BaseType], base_types[val_type])
                 value = base_type(_integrated=value, _doc=doc)

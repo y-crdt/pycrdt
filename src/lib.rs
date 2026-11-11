@@ -20,6 +20,7 @@ mod snapshot;
 use crate::doc::Doc;
 use crate::doc::TransactionEvent;
 use crate::doc::SubdocsEvent;
+use crate::doc::SubdocChanges;
 use crate::text::{Text, TextEvent};
 use crate::array::{Array, ArrayEvent};
 use crate::map::{Map, MapEvent};
@@ -36,6 +37,7 @@ fn _pycrdt(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Doc>()?;
     m.add_class::<TransactionEvent>()?;
     m.add_class::<SubdocsEvent>()?;
+    m.add_class::<SubdocChanges>()?;
     m.add_class::<Text>()?;
     m.add_class::<TextEvent>()?;
     m.add_class::<Array>()?;

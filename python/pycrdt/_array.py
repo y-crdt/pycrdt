@@ -57,6 +57,7 @@ class Array(Sequence, Generic[T]):
             if isinstance(value, BaseDoc):
                 # subdoc
                 self.integrated.insert_doc(txn._txn, index, value._doc)
+                self.doc._add_subdoc(value)
             elif isinstance(value, BaseType):
                 # shared type
                 assert txn._txn is not None
