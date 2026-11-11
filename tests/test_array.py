@@ -324,6 +324,26 @@ def test_to_py():
     assert array.to_py() == [0, [1, {"foo": "bar"}]]
 
 
+def test_prelim_to_py():
+    nested_text = Text("bar")
+    nested_items = [nested_text]
+    items = [Text("foo"), Array([0]), Map({"key": Array(nested_items)})]
+    array = Array(items)
+
+    for _ in range(2):
+        assert array.to_py() == ["foo", [0], {"key": ["bar"]}]
+    assert isinstance(items[0], Text)
+    assert nested_items[0] is nested_text
+    doc = Doc()
+    doc["array"] = array
+    assert isinstance(array[0], Text)
+    assert isinstance(array[1], Array)
+    assert isinstance(array[2], Map)
+    assert isinstance(array[2]["key"], Array)
+    assert isinstance(array[2]["key"][0], Text)
+    assert str(array[2]["key"][0]) == "bar"
+
+
 async def test_iterate_events():
     doc = Doc()
     array0 = doc.get("array0", type=Array)
@@ -366,6 +386,12 @@ async def test_iterate_events():
         await done_event.wait()
         array1.append("bye.")
 
+    # Shared-type event streams detach closed receivers on the next change.
+    # Close any remaining senders before discarding the observed array.
+    for send_streams in array0._send_streams.values():
+        for send_stream in send_streams:
+            send_stream.close()
+
     assert len(deltas) == 2
     assert deltas[0] == [{"insert": ["Hello"]}]
     assert paths[0] == []
@@ -406,6 +432,21 @@ def test_sticky_index(serialize: str):
     assert array1.to_py() in (first + second, second + first)
     new_idx = sticky_index.get_index()
     assert array1[new_idx] == "*"
+
+
+def test_sticky_index_in_observer():
+    doc = Doc()
+    array = doc.get("array", type=Array)
+    sticky_indices = []
+
+    def callback(event):
+        sticky_indices.append(array.sticky_index(1, Assoc.AFTER))
+
+    sub = array.observe(callback)  # noqa: F841
+    array += ["a", "b"]
+    array.insert(0, "x")
+
+    assert array[sticky_indices[0].get_index()] == "b"
 
 
 def test_observer_exceptions():

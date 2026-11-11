@@ -197,6 +197,26 @@ def test_prelim():
     assert map1.to_py() is None
 
 
+def test_prelim_to_py():
+    nested_text = Text("bar")
+    nested_items = [nested_text]
+    items = {"text": Text("foo"), "array": Array([0]), "map": Map({"key": Array(nested_items)})}
+    map0 = Map(items)
+
+    for _ in range(2):
+        assert map0.to_py() == {"text": "foo", "array": [0], "map": {"key": ["bar"]}}
+    assert isinstance(items["text"], Text)
+    assert nested_items[0] is nested_text
+    doc = Doc()
+    doc["map0"] = map0
+    assert isinstance(map0["text"], Text)
+    assert isinstance(map0["array"], Array)
+    assert isinstance(map0["map"], Map)
+    assert isinstance(map0["map"]["key"], Array)
+    assert isinstance(map0["map"]["key"][0], Text)
+    assert str(map0["map"]["key"][0]) == "bar"
+
+
 def test_observe():
     doc = Doc()
     doc["map0"] = map0 = Map()

@@ -465,14 +465,19 @@ class XmlChildrenView:
         """
         Args:
             key: The child index (`int`) or children `slice` to remove.
+
+        Raises:
+            IndexError: Index out of bounds.
         """
         with self.inner.doc.transaction() as txn:
             self.inner._forbid_read_transaction(txn)
             if isinstance(key, int):
+                if key >= len(self):
+                    raise IndexError(key)
                 self.inner.integrated.remove_range(txn._txn, key, 1)
             elif isinstance(key, slice):
                 start, stop = _check_slice(self, key)
-                length = stop - start
+                length = min(stop, len(self)) - start
                 if length > 0:
                     self.inner.integrated.remove_range(txn._txn, start, length)
             else:
@@ -480,15 +485,21 @@ class XmlChildrenView:
 
     def __setitem__(self, key: int, value: str | XmlText | XmlElement):
         """
-        Replaces a child. Equivalent to deleting the index and then inserting the new value.
+        Replaces the child at the given index with the new value.
 
         Args:
             key: The index of the child to replace.
             value: The new value at the index.
+
+        Raises:
+            IndexError: Index out of bounds.
         """
         with self.inner.doc.transaction():
-            del self[key]
+            if key >= len(self):
+                raise IndexError(key)
+            # insert before deleting, so that the child is kept if the value cannot be inserted
             self.insert(key, value)
+            del self[key + 1]
 
     def __iter__(self) -> Iterator[XmlText | XmlElement | XmlFragment]:
         """

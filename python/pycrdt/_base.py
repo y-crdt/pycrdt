@@ -87,7 +87,6 @@ class BaseType(ABC):
     _prelim: Any | None
     _integrated: Any
     _type_name: str
-    _subscriptions: list[Subscription]
 
     def __init__(
         self,
@@ -97,7 +96,6 @@ class BaseType(ABC):
         _integrated: Any = None,
     ) -> None:
         self._type_name = self.__class__.__name__.lower()
-        self._subscriptions = []
         self._send_streams: dict[bool, set[MemoryObjectSendStream[BaseEvent | list[BaseEvent]]]] = {
             False: set(),
             True: set(),
@@ -189,7 +187,7 @@ class BaseType(ABC):
         param_nb = len(signature(callback).parameters)
         _callback = partial(observe_callback, callback, self.doc, param_nb)
         subscription = self.integrated.observe(_callback)
-        self._subscriptions.append(subscription)
+        self.doc._subscriptions.append(subscription)
         return subscription
 
     def observe_deep(self, callback: Callable[[list[BaseEvent]], None]) -> Subscription:
@@ -202,7 +200,7 @@ class BaseType(ABC):
         param_nb = len(signature(callback).parameters)
         _callback = partial(observe_deep_callback, callback, self.doc, param_nb)
         subscription = self.integrated.observe_deep(_callback)
-        self._subscriptions.append(subscription)
+        self.doc._subscriptions.append(subscription)
         return subscription
 
     def unobserve(self, subscription: Subscription) -> None:
@@ -212,7 +210,7 @@ class BaseType(ABC):
         Args:
             subscription: The subscription to unregister.
         """
-        self._subscriptions.remove(subscription)
+        self.doc._subscriptions.remove(subscription)
         subscription.drop()
 
     @overload

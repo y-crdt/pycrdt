@@ -199,23 +199,30 @@ impl Doc {
 
     fn get_state(&self, txn: &Transaction) -> PyResult<Py<PyAny>> {
         let mut _t = txn.transaction()?;
-        let t = _t.as_mut().unwrap().as_mut();
+        let t1 = _t.as_mut().unwrap();
+        let t = t1.as_ref();
         let state = t.state_vector().encode_v1();
         Ok(Python::attach(|py| PyBytes::new(py, &state).into()))
     }
 
     fn get_update(&self, py: Python<'_>, txn: &Transaction, state: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
-        let mut t = txn.transaction()?;
+        let t = txn.transaction()?;
         let Ok(state_vector) = StateVector::decode_v1(state.as_bytes()) else {
             return Err(PyValueError::new_err("Cannot decode state"));
         };
+        let cell = t.as_ref().unwrap();
         // Encoding is pure Rust over the transaction's store: release the GIL so
         // other Python threads keep running while a large document is encoded.
         // The transaction (and so the store's write lock) stays held by this thread.
-        // The closure gets the `&mut` (TransactionMut is Send, not Sync).
-        let local = t.as_mut().unwrap().as_mut().state_vector();
-        let detach = encode_work(&local, &state_vector) >= ENCODE_DETACH_MIN_WORK;
-        let update = t.detach_if(py, detach, move |t| t.encode_diff_v1(&state_vector));
+        // The transaction of an observer callback is read-only and keeps the GIL.
+        let detach = matches!(cell, crate::transaction::Cell::Owned(_))
+            && encode_work(&cell.as_ref().state_vector(), &state_vector) >= ENCODE_DETACH_MIN_WORK;
+        let update = if detach {
+            // The closure gets the `&mut` (TransactionMut is Send, not Sync).
+            t.detach_if(py, true, move |t| t.encode_diff_v1(&state_vector))
+        } else {
+            cell.as_ref().encode_diff_v1(&state_vector)
+        };
         Ok(PyBytes::new(py, &update).into())
     }
 

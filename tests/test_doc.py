@@ -1,4 +1,7 @@
+import subprocess
+import sys
 from functools import partial
+from textwrap import dedent
 
 import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group, sleep
@@ -136,6 +139,36 @@ def test_doc_in_event():
     assert isinstance(events[0].delta[0]["insert"][0], Doc)
 
 
+def test_insert_doc_in_transaction():
+    # A deadlock can hold the GIL, so enforce the timeout from another process.
+    code = dedent(
+        """
+        import pytest
+        from pycrdt import Array, Doc, Map
+
+        doc = Doc()
+        array = doc.get("array", type=Array)
+        map0 = doc.get("map", type=Map)
+        subdoc = Doc()
+        message = "Cannot insert a document that has an active transaction"
+        with subdoc.transaction():
+            with pytest.raises(RuntimeError, match=message):
+                array.append(subdoc)
+            with pytest.raises(RuntimeError, match=message):
+                map0["subdoc"] = subdoc
+        with pytest.raises(RuntimeError, match=message):
+            array.append(doc)
+        with pytest.raises(RuntimeError, match=message):
+            map0["doc"] = doc
+        array.append(subdoc)
+        map0["subdoc"] = Doc()
+        assert len(array) == 1
+        assert len(map0) == 1
+        """
+    )
+    subprocess.run([sys.executable, "-c", code], check=True, timeout=10)
+
+
 def test_transaction_event():
     doc = Doc()
     events = []
@@ -254,6 +287,50 @@ def test_get_update_exception():
     with pytest.raises(ValueError) as excinfo:
         doc.get_update(b"\x12")
     assert str(excinfo.value) == "Cannot decode state"
+
+
+def test_get_state_and_update_in_observer():
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    states = []
+    updates = []
+
+    def callback(event):
+        states.append(doc.get_state())
+        updates.append(doc.get_update())
+
+    sub = text.observe(callback)  # noqa: F841
+    text += "hello"
+
+    assert states == [doc.get_state()]
+    remote_doc = Doc()
+    remote_doc.apply_update(updates[0])
+    assert str(remote_doc.get("text", type=Text)) == "hello"
+
+
+def test_document_update_emitted_after_reading_update_in_shared_observer():
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    snapshots = []
+    updates = []
+
+    def on_text_change(event):
+        snapshots.append(doc.get_update())
+
+    def on_document_change(event):
+        updates.append(event.update)
+
+    text_sub = text.observe(on_text_change)  # noqa: F841
+    doc_sub = doc.observe(on_document_change)  # noqa: F841
+    remote_doc = Doc()
+    remote_text = remote_doc.get("text", type=Text)
+
+    for index, chunk in enumerate(["hello", " world"], start=1):
+        text += chunk
+        assert len(snapshots) == index
+        assert len(updates) == index
+        remote_doc.apply_update(updates[-1])
+        assert str(remote_text) == str(text)
 
 
 def test_apply_update_exception():

@@ -227,7 +227,8 @@ impl Text {
         assoc: i8,
     ) -> PyResult<Py<StickyIndex>> {
         let mut _t = txn.transaction()?;
-        let t = _t.as_mut().unwrap().as_mut();
+        let t1 = _t.as_mut().unwrap();
+        let t = t1.as_ref();
         let _assoc: Assoc;
         match assoc {
             0 => _assoc = Assoc::After,

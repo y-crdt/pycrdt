@@ -298,6 +298,21 @@ def test_sticky_index(serialize: str):
     assert text1[new_idx] == "*"
 
 
+def test_sticky_index_in_observer():
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    sticky_indices = []
+
+    def callback(event):
+        sticky_indices.append(text.sticky_index(1, Assoc.AFTER))
+
+    sub = text.observe(callback)  # noqa: F841
+    text += "ab"
+    text.insert(0, "x")
+
+    assert text[sticky_indices[0].get_index()] == "b"
+
+
 def test_sticky_index_transaction():
     doc = Doc()
     text = doc.get("text", type=Text)

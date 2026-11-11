@@ -299,6 +299,78 @@ def test_awareness_observes():
     assert len(changes2) == 0
 
 
+def test_awareness_unobserve_in_callback():
+    ydoc = Doc()
+    awareness = Awareness(ydoc)
+    changes1 = []
+    changes2 = []
+
+    def callback1(topic, value):
+        changes1.append(topic)
+        awareness.unobserve(sub1)
+
+    def callback2(topic, value):
+        changes2.append(topic)
+
+    sub1 = awareness.observe(callback1)
+    awareness.observe(callback2)
+    awareness.set_local_state_field("new_field", "new_value")
+
+    assert changes1 == ["change"]
+    assert changes2 == ["change", "update"]
+
+
+def test_awareness_observe_in_callback():
+    awareness = Awareness(Doc())
+    calls = []
+    added = []
+
+    def callback2(topic, value):
+        calls.append(("second", topic))
+
+    def callback1(topic, value):
+        calls.append(("first", topic))
+        if topic == "change" and not added:
+            added.append(awareness.observe(callback2))
+
+    awareness.observe(callback1)
+    awareness.set_local_state_field("field", "first")
+    assert calls == [("first", "change"), ("first", "update"), ("second", "update")]
+
+    calls.clear()
+    awareness.set_local_state_field("field", "second")
+    assert calls == [
+        ("first", "change"),
+        ("second", "change"),
+        ("first", "update"),
+        ("second", "update"),
+    ]
+
+
+def test_awareness_unobserve_another_callback():
+    awareness = Awareness(Doc())
+    calls = []
+    removed = []
+
+    def callback1(topic, value):
+        calls.append(("first", topic))
+        if topic == "change" and not removed:
+            awareness.unobserve(sub2)
+            removed.append(True)
+
+    def callback2(topic, value):
+        calls.append(("second", topic))
+
+    awareness.observe(callback1)
+    sub2 = awareness.observe(callback2)
+    awareness.set_local_state_field("field", "first")
+    assert calls == [("first", "change"), ("second", "change"), ("first", "update")]
+
+    calls.clear()
+    awareness.set_local_state_field("field", "second")
+    assert calls == [("first", "change"), ("first", "update")]
+
+
 def test_awareness_observes_local_change():
     ydoc = Doc()
     awareness = Awareness(ydoc)
