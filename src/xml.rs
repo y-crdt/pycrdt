@@ -56,14 +56,14 @@ macro_rules! impl_xml_methods {
                 }
             }
 
-            fn get_string(&self, txn: &mut Transaction) -> PyResult<String> {
+            fn get_string(&self, txn: &Transaction) -> PyResult<String> {
                 let mut t0 = txn.transaction()?;
                 let t1 = t0.as_mut().unwrap();
                 let t = t1.as_ref();
                 Ok(self.$inner.get_string(t))
             }
 
-            fn len(&self, txn: &mut Transaction) -> PyResult<u32> {
+            fn len(&self, txn: &Transaction) -> PyResult<u32> {
                 let mut t0 = txn.transaction()?;
                 let t1 = t0.as_mut().unwrap();
                 let t = t1.as_ref();
@@ -74,7 +74,7 @@ macro_rules! impl_xml_methods {
                 fn get<'py>(
                     &self,
                     py: Python<'py>,
-                    txn: &mut Transaction,
+                    txn: &Transaction,
                     index: u32,
                 ) -> PyResult<Bound<'py, PyAny>> {
                     let mut t0 = txn.transaction()?;
@@ -86,7 +86,7 @@ macro_rules! impl_xml_methods {
                 fn children<'py>(
                     &self,
                     py: Python<'py>,
-                    txn: &mut Transaction,
+                    txn: &Transaction,
                 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
                     let _t = txn.transaction()?;
                     let t = _t.as_ref().unwrap();
@@ -97,14 +97,14 @@ macro_rules! impl_xml_methods {
                         .collect())
                 }
 
-                fn remove_range(&self, txn: &mut Transaction, index: u32, len: u32) -> PyResult<()> {
+                fn remove_range(&self, txn: &Transaction, index: u32, len: u32) -> PyResult<()> {
                     let mut _t = txn.transaction()?;
                     let mut t = _t.as_mut().unwrap().as_mut();
                     self.$finner.remove_range(&mut t, index, len);
                     Ok(())
                 }
 
-                fn insert_str(&self, txn: &mut Transaction, index: u32, text: &str) -> PyResult<XmlText> {
+                fn insert_str(&self, txn: &Transaction, index: u32, text: &str) -> PyResult<XmlText> {
                     let mut _t = txn.transaction()?;
                     let mut t = _t.as_mut().unwrap().as_mut();
                     Ok(self
@@ -115,7 +115,7 @@ macro_rules! impl_xml_methods {
 
                 fn insert_element_prelim(
                     &self,
-                    txn: &mut Transaction,
+                    txn: &Transaction,
                     index: u32,
                     tag: &str,
                 ) -> PyResult<XmlElement> {
@@ -132,7 +132,7 @@ macro_rules! impl_xml_methods {
                 fn attributes<'py>(
                     &self,
                     py: Python<'py>,
-                    txn: &mut Transaction,
+                    txn: &Transaction,
                 ) -> PyResult<Vec<(String, Bound<'py, PyAny>)>> {
                     let mut t0 = txn.transaction()?;
                     let t1 = t0.as_mut().unwrap();
@@ -147,7 +147,7 @@ macro_rules! impl_xml_methods {
                 fn attribute<'py>(
                     &self,
                     py: Python<'py>,
-                    txn: &mut Transaction,
+                    txn: &Transaction,
                     name: &str,
                 ) -> PyResult<Option<Bound<'py, PyAny>>> {
                     let mut t0 = txn.transaction()?;
@@ -161,7 +161,7 @@ macro_rules! impl_xml_methods {
 
                 fn insert_attribute(
                     &self,
-                    txn: &mut Transaction,
+                    txn: &Transaction,
                     name: &str,
                     value: Bound<'_, PyAny>,
                 ) -> PyResult<()> {
@@ -173,7 +173,7 @@ macro_rules! impl_xml_methods {
                     Ok(())
                 }
 
-                fn remove_attribute(&self, txn: &mut Transaction, name: &str) -> PyResult<()> {
+                fn remove_attribute(&self, txn: &Transaction, name: &str) -> PyResult<()> {
                     let mut _t = txn.transaction()?;
                     let mut t = _t.as_mut().unwrap().as_mut();
                     self.$xinner.remove_attribute(&mut t, &name);
@@ -183,7 +183,7 @@ macro_rules! impl_xml_methods {
                 fn siblings<'py>(
                     &self,
                     py: Python<'py>,
-                    txn: &mut Transaction,
+                    txn: &Transaction,
                 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
                     let mut t0 = txn.transaction()?;
                     let t1 = t0.as_mut().unwrap();
@@ -347,7 +347,7 @@ impl From<XmlTextRef> for XmlText {
 
 impl_xml_methods!(XmlText[text, xml: text] {
     #[pyo3(signature = (txn, index, text, attrs=None))]
-    fn insert(&self, txn: &mut Transaction, index: u32, text: &str, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<()> {
+    fn insert(&self, txn: &Transaction, index: u32, text: &str, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<()> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         if let Some(attrs) = attrs {
@@ -360,7 +360,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
     }
 
     #[pyo3(signature = (txn, index, embed, attrs=None))]
-    fn insert_embed<'py>(&self, txn: &mut Transaction, index: u32, embed: Bound<'py, PyAny>, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<()> {
+    fn insert_embed<'py>(&self, txn: &Transaction, index: u32, embed: Bound<'py, PyAny>, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<()> {
         let embed = py_to_any(&embed)?;
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
@@ -374,7 +374,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
     }
 
     #[pyo3(signature = (txn, index, attrs=None))]
-    fn insert_array_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Array> {
+    fn insert_array_prelim<'py>(&self, txn: &Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Array> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated;
@@ -389,7 +389,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
     }
 
     #[pyo3(signature = (txn, index, attrs=None))]
-    fn insert_map_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Map> {
+    fn insert_map_prelim<'py>(&self, txn: &Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Map> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated;
@@ -404,7 +404,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
     }
 
     #[pyo3(signature = (txn, index, attrs=None))]
-    fn insert_text_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Text> {
+    fn insert_text_prelim<'py>(&self, txn: &Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<Text> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated;
@@ -419,7 +419,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
     }
 
     #[pyo3(signature = (txn, index, attrs=None))]
-    fn insert_xmltext_prelim<'py>(&self, txn: &mut Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<XmlText> {
+    fn insert_xmltext_prelim<'py>(&self, txn: &Transaction, index: u32, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<XmlText> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated;
@@ -434,7 +434,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
     }
 
     #[pyo3(signature = (txn, index, tag, attrs=None))]
-    fn insert_xmlelement_prelim<'py>(&self, txn: &mut Transaction, index: u32, tag: &str, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<XmlElement> {
+    fn insert_xmlelement_prelim<'py>(&self, txn: &Transaction, index: u32, tag: &str, attrs: Option<Bound<'_, PyIterator>>) -> PyResult<XmlElement> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let integrated;
@@ -448,14 +448,14 @@ impl_xml_methods!(XmlText[text, xml: text] {
         Ok(shared)
     }
 
-    fn remove_range(&self, txn: &mut Transaction, index: u32, len: u32) -> PyResult<()> {
+    fn remove_range(&self, txn: &Transaction, index: u32, len: u32) -> PyResult<()> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         self.text.remove_range(&mut t, index, len);
         Ok(())
     }
 
-    fn format(&self, txn: &mut Transaction, index: u32, len: u32, attrs: Bound<'_, PyIterator>) -> PyResult<()> {
+    fn format(&self, txn: &Transaction, index: u32, len: u32, attrs: Bound<'_, PyIterator>) -> PyResult<()> {
         let attrs = py_to_attrs(attrs)?;
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
@@ -463,7 +463,7 @@ impl_xml_methods!(XmlText[text, xml: text] {
         Ok(())
     }
 
-    fn diff<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> PyResult<Bound<'py, PyList>> {
+    fn diff<'py>(&self, py: Python<'py>, txn: &Transaction) -> PyResult<Bound<'py, PyList>> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();

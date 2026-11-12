@@ -15,6 +15,7 @@ use crate::map::Map;
 use crate::transaction::Transaction;
 use crate::subscription::Subscription;
 use crate::type_conversions::ToPython;
+use crate::update::{encode_work, DETACH_MIN_SIZE, ENCODE_DETACH_MIN_WORK};
 use crate::xml::XmlFragment;
 
 
@@ -123,18 +124,18 @@ impl Doc {
         Py::new(py, restored)
     }
 
-    fn guid(&mut self) -> String {
+    fn guid(&self) -> String {
         self.doc.guid().to_string()
     }
 
-    fn client_id(&mut self) -> u64 {
+    fn client_id(&self) -> u64 {
         self.doc.client_id().get()
     }
 
     fn get_or_insert_text(
-        &mut self,
+        &self,
         py: Python<'_>,
-        txn: &mut Transaction,
+        txn: &Transaction,
         name: &str,
     ) -> PyResult<Py<Text>> {
         let mut _t = txn.transaction()?;
@@ -145,9 +146,9 @@ impl Doc {
     }
 
     fn get_or_insert_array(
-        &mut self,
+        &self,
         py: Python<'_>,
-        txn: &mut Transaction,
+        txn: &Transaction,
         name: &str,
     ) -> PyResult<Py<Array>> {
         let mut _t = txn.transaction()?;
@@ -158,9 +159,9 @@ impl Doc {
     }
 
     fn get_or_insert_map(
-        &mut self,
+        &self,
         py: Python<'_>,
-        txn: &mut Transaction,
+        txn: &Transaction,
         name: &str,
     ) -> PyResult<Py<Map>> {
         let mut _t = txn.transaction()?;
@@ -171,8 +172,8 @@ impl Doc {
     }
 
     fn get_or_insert_xml_fragment(
-        &mut self,
-        txn: &mut Transaction,
+        &self,
+        txn: &Transaction,
         name: &str,
     ) -> PyResult<XmlFragment> {
         let mut _t = txn.transaction()?;
@@ -204,29 +205,42 @@ impl Doc {
         Ok(Python::attach(|py| PyBytes::new(py, &state).into()))
     }
 
-    fn get_update(&self, txn: &Transaction, state: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
-        let mut _t = txn.transaction()?;
-        let t1 = _t.as_mut().unwrap();
-        let t = t1.as_ref();
-        let state: &[u8] = state.extract()?;
-        let Ok(state_vector) = StateVector::decode_v1(&state) else {
+    fn get_update(&self, py: Python<'_>, txn: &Transaction, state: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
+        let t = txn.transaction()?;
+        let Ok(state_vector) = StateVector::decode_v1(state.as_bytes()) else {
             return Err(PyValueError::new_err("Cannot decode state"));
         };
-        let update = t.encode_diff_v1(&state_vector);
-        let bytes: Py<PyAny> = Python::attach(|py| PyBytes::new(py, &update).into());
-        Ok(bytes)
+        let cell = t.as_ref().unwrap();
+        // Encoding is pure Rust over the transaction's store: release the GIL so
+        // other Python threads keep running while a large document is encoded.
+        // The transaction (and so the store's write lock) stays held by this thread.
+        // The transaction of an observer callback is read-only and keeps the GIL.
+        let detach = matches!(cell, crate::transaction::Cell::Owned(_))
+            && encode_work(&cell.as_ref().state_vector(), &state_vector) >= ENCODE_DETACH_MIN_WORK;
+        let update = if detach {
+            // The closure gets the `&mut` (TransactionMut is Send, not Sync).
+            t.detach_if(py, true, move |t| t.encode_diff_v1(&state_vector))
+        } else {
+            cell.as_ref().encode_diff_v1(&state_vector)
+        };
+        Ok(PyBytes::new(py, &update).into())
     }
 
-    fn apply_update(&mut self, txn: &mut Transaction, update: &Bound<'_, PyBytes>) -> PyResult<()> {
-        let u = Update::decode_v1(update.as_bytes())
-            .map_err(|e| PyValueError::new_err(format!("Cannot decode update: {}", e)))?;
-        let mut _t = txn.transaction()?;
-        let t = _t.as_mut().unwrap().as_mut();
-        t.apply_update(u)
-            .map_err(|e| PyRuntimeError::new_err(format!("Cannot apply update: {}", e)))
+    fn apply_update(&self, py: Python<'_>, txn: &Transaction, update: &Bound<'_, PyBytes>) -> PyResult<()> {
+        let bytes: &[u8] = update.as_bytes();
+        let t = txn.transaction()?;
+        // Decoding and integrating an update is pure Rust and fires no callbacks
+        // (observers run at commit): release the GIL for it if the update is large.
+        // `bytes` borrows an immutable `bytes` object kept alive by `update`.
+        t.detach_if(py, bytes.len() >= DETACH_MIN_SIZE, |t| match Update::decode_v1(bytes) {
+            Err(e) => Err(PyValueError::new_err(format!("Cannot decode update: {}", e))),
+            Ok(u) => t
+                .apply_update(u)
+                .map_err(|e| PyRuntimeError::new_err(format!("Cannot apply update: {}", e))),
+        })
     }
 
-    fn roots(&self, py: Python<'_>, txn: &mut Transaction) -> PyResult<Py<PyAny>> {
+    fn roots(&self, py: Python<'_>, txn: &Transaction) -> PyResult<Py<PyAny>> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
@@ -237,7 +251,7 @@ impl Doc {
         Ok(result.into())
     }
 
-    pub fn observe(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
+    pub fn observe(&self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let target = self.doc.clone();
         let (sub, callback) = Subscription::new(f, move |key| {
             let _ = target.unobserve_transaction_cleanup(key);
@@ -268,7 +282,7 @@ impl Doc {
         Ok(s)
     }
 
-    pub fn observe_subdocs(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
+    pub fn observe_subdocs(&self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let target = self.doc.clone();
         let (sub, callback) = Subscription::new(f, move |key| {
             let _ = target.unobserve_subdocs(key);
