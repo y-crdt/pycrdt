@@ -19,7 +19,10 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu, macos, windows]
-    runs-on: ${{ matrix.os }}-latest
+        include:
+          - os: windows-arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner || format('{0}-latest', matrix.os) }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -50,8 +53,11 @@ jobs:
             release-artifact: wheels-macos
           - os: windows
             release-artifact: wheels-windows-x64
+          - os: windows-arm64
+            runner: windows-11-arm
+            release-artifact: wheels-windows-aarch64
         python: ['3.11', '3.12', '3.13', '3.14', '3.15']
-    runs-on: ${{ matrix.platform.os }}-latest
+    runs-on: ${{ matrix.platform.runner || format('{0}-latest', matrix.platform.os) }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
