@@ -45,19 +45,21 @@ jobs:
           path: dist
 
   windows:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.platform.runner }}
     name: windows (${{ matrix.platform.target }})
     strategy:
       matrix:
         platform:
-          - target: x64
+          - runner: windows-latest
+            target: x64
+          - runner: windows-11-arm
+            target: aarch64
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           allow-prereleases: true
-          architecture: ${{ matrix.platform.target }}
       - uses: dtolnay/rust-toolchain@stable
       - name: Build wheels
         uses: PyO3/maturin-action@v1
