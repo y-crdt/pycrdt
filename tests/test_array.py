@@ -4,7 +4,7 @@ from functools import partial
 import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group
 from anyio.abc import TaskStatus
-from pycrdt import Array, Assoc, Doc, Map, StickyIndex, Text
+from pycrdt import Array, Assoc, Doc, Map, StickyIndex, Text, XmlElement
 
 pytestmark = pytest.mark.anyio
 
@@ -304,6 +304,99 @@ def test_unsupported_value(action, value, exception):
             array[0] = value
 
     assert array.to_py() == [0]
+
+
+@pytest.mark.parametrize(
+    "insert",
+    [
+        lambda array: array.extend([1, object(), 3]),
+        lambda array: array.insert(0, Array([1, object()])),
+        lambda array: array.append(Map({"key": Array([object()])})),
+        lambda array: array.append(Map({"key": 1, 2: 3})),
+        lambda array: array.append(Text(1)),
+        lambda array: array.append(Map({"key": 1, "\ud800": 2})),
+    ],
+    ids=["extend", "nested-array", "nested-map", "non-str-key", "non-str-text", "surrogate-key"],
+)
+def test_unsupported_item_inserts_nothing(insert):
+    doc = Doc()
+    doc["array"] = array = Array([0])
+
+    with pytest.raises((TypeError, UnicodeEncodeError)):
+        insert(array)
+
+    assert array.to_py() == [0]
+
+
+def test_unsupported_item_after_unchecked_item():
+    doc = Doc()
+    doc["array"] = array = Array([0])
+
+    # the items that are not checked are inserted first, so their error is raised first
+    with pytest.raises(TypeError, match="Cannot insert an XmlElement into an array"):
+        array.extend([XmlElement("p"), object()])
+
+
+def test_insert_iterator():
+    doc = Doc()
+    doc["array"] = array = Array([0])
+
+    array.extend(value for value in [1, 2])
+    array.append(Array(value for value in [3, 4]))
+    # the items are inserted as they are produced
+    array.extend(len(array) for _ in range(2))
+
+    assert array.to_py() == [0, 1, 2, [3, 4], 4, 5]
+
+
+def test_insert_unsupported_value_in_observer():
+    doc = Doc()
+    doc["array"] = array = Array([0])
+    doc["map"] = map0 = Map()
+    doc["text"] = text = Text()
+    errors = []
+
+    def callback(event):
+        for insert in (
+            lambda: array.extend([1, object()]),
+            lambda: map0.update({"key": object()}),
+            lambda: map0.__setitem__("key", Map({"key": object()})),
+        ):
+            try:
+                insert()
+            except Exception as exception:
+                errors.append(type(exception))
+
+    sub = text.observe(callback)  # noqa: F841
+    text += "a"
+
+    # inserting in a read-only transaction fails first
+    assert errors == [RuntimeError, RuntimeError, RuntimeError]
+
+
+def test_insert_self_referential_prelim():
+    doc = Doc()
+    doc["array"] = array = Array()
+    items = []
+    nested_array = Array(items)
+    items.append(nested_array)
+    entries = {}
+    nested_map = Map(entries)
+    entries["map"] = nested_map
+
+    array.append(nested_array)
+    array.append(nested_map)
+
+    assert array.to_py() == [[[]], {"map": {}}]
+
+
+def test_root_with_unsupported_item():
+    doc = Doc()
+
+    with pytest.raises(TypeError):
+        doc["array"] = Array([1, object()])
+
+    assert doc.get("array", type=Array).to_py() == []
 
 
 def test_getitem_wrong_type():

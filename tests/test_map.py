@@ -1,5 +1,6 @@
 import json
 from functools import partial
+from types import MappingProxyType
 
 import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group
@@ -306,6 +307,35 @@ def test_unsupported_value(value, exception):
         map0["key"] = value
 
     assert map0.to_py() == {}
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        {"key1": 1, "key2": object()},
+        {"key1": 1, 2: 3},
+        {"key1": 1, "\ud800": 2},
+        {"key1": Map({"key": object()})},
+    ],
+    ids=["unsupported", "non-str-key", "surrogate-key", "nested-unsupported"],
+)
+def test_update_unsupported_value(value):
+    doc = Doc()
+    doc["map0"] = map0 = Map({"key0": "val0"})
+
+    with pytest.raises((TypeError, UnicodeEncodeError)):
+        map0.update(value)
+
+    assert map0.to_py() == {"key0": "val0"}
+
+
+def test_update_mapping():
+    doc = Doc()
+    doc["map0"] = map0 = Map()
+
+    map0.update(MappingProxyType({"key0": "val0"}))
+
+    assert map0.to_py() == {"key0": "val0"}
 
 
 def test_tuple_handling():
