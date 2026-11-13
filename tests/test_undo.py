@@ -1,4 +1,5 @@
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from pycrdt import Array, Doc, IdSet, Map, StackItem, Text, UndoManager
@@ -205,6 +206,148 @@ def test_timestamp():
     undo_manager.undo()
     assert str(text) == "a"
     assert timestamp_called == 4
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("async_transaction", [False, True])
+async def test_timestamp_exceptions(async_transaction):
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    error = ValueError("clock failed")
+    fail = True
+
+    def clock():
+        if fail:
+            raise error
+        return 1
+
+    manager = UndoManager(timestamp=clock)
+    manager.expand_scope(text)
+    observed = []
+
+    def observer(event):
+        observed.append(event)
+        raise RuntimeError("observer failed")
+
+    subscription = doc.observe(observer)
+    with pytest.RaisesGroup(ValueError, RuntimeError) as exc_info:
+        if async_transaction:
+            async with doc.transaction():
+                text += "a"
+                assert not observed
+        else:
+            with doc.transaction():
+                text += "a"
+                assert not observed
+
+    assert exc_info.group_contains(ValueError, match="clock failed")
+    assert len(observed) == 1
+    assert exc_info.group_contains(RuntimeError, match="observer failed")
+    assert str(text) == "a"
+    assert doc._txn is None
+    assert not doc._exceptions
+    doc.unobserve(subscription)
+    fail = False
+    text += "b"
+    assert str(text) == "ab"
+    assert manager.undo()
+    assert str(text) == "a"
+
+
+def test_timestamp_exceptions_multiple_docs():
+    docs = [Doc(), Doc()]
+    texts = [doc.get("text", type=Text) for doc in docs]
+
+    def clock():
+        raise ValueError("clock failed")
+
+    manager = UndoManager(scopes=texts, timestamp=clock)
+    with docs[0].transaction():
+        with pytest.RaisesGroup(ValueError):
+            texts[1] += "a"
+        assert not docs[0]._exceptions
+    with pytest.RaisesGroup(ValueError):
+        texts[0] += "b"
+    assert manager.can_undo()
+
+
+def test_timestamp_exceptions_nested_commits():
+    docs = [Doc(), Doc()]
+    texts = [doc.get("text", type=Text) for doc in docs]
+
+    def clock():
+        raise ValueError("clock failed")
+
+    manager = UndoManager(scopes=texts, timestamp=clock)
+    inner_errors = []
+
+    def observer(event):
+        outer_errors = list(docs[0]._exceptions)
+        with pytest.RaisesGroup(ValueError) as exc_info:
+            texts[1] += "inner"
+        inner_errors.append(exc_info.value)
+        assert docs[0]._exceptions == outer_errors
+
+    docs[0].observe(observer)
+    with pytest.RaisesGroup(ValueError):
+        texts[0] += "outer"
+    assert len(inner_errors) == 1
+    assert all(not doc._exceptions for doc in docs)
+    assert [str(text) for text in texts] == ["outer", "inner"]
+    assert manager.can_undo()
+
+
+def test_timestamp_exceptions_concurrent_commits():
+    barrier = threading.Barrier(2, timeout=5)
+    docs = [Doc(), Doc()]
+    texts = [doc.get("text", type=Text) for doc in docs]
+
+    def clock(index):
+        barrier.wait()
+        raise ValueError(f"clock {index} failed")
+
+    managers = [
+        UndoManager(scopes=[text], timestamp=lambda index=index: clock(index))
+        for index, text in enumerate(texts)
+    ]
+
+    def edit(index):
+        with pytest.RaisesGroup(ValueError) as exc_info:
+            texts[index] += "a"
+        return exc_info.value
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(edit, index) for index in range(2)]
+        errors = [future.result(timeout=10) for future in futures]
+
+    for index, error in enumerate(errors):
+        assert str(error.exceptions[0]) == f"clock {index} failed"
+        assert not docs[index]._exceptions
+        assert managers[index].can_undo()
+
+
+def test_timestamp_exceptions_undo_redo():
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    fail = False
+
+    def clock():
+        if fail:
+            raise ValueError("clock failed")
+        return 10
+
+    manager = UndoManager(scopes=[text], timestamp=clock)
+    text += "a"
+    fail = True
+    with pytest.RaisesGroup(ValueError, match="Timestamp callback error"):
+        manager.undo()
+    assert str(text) == ""
+    with pytest.RaisesGroup(ValueError, match="Timestamp callback error"):
+        manager.redo()
+    assert str(text) == "a"
+    fail = False
+    assert manager.undo()
+    assert str(text) == ""
 
 
 def test_reset():
