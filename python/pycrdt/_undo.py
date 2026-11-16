@@ -10,7 +10,7 @@ from ._pycrdt import (
 from ._pycrdt import (
     UndoManager as _UndoManager,
 )
-from ._transaction import hash_origin
+from ._transaction import _callback_exceptions, hash_origin
 
 
 def timestamp() -> int:
@@ -39,15 +39,29 @@ class UndoManager:
             scopes: A list of shared types the undo manager will work with.
             capture_timeout_millis: A time interval for grouping changes that will be undone/redone.
             timestamp: A function that returns a timestamp as an integer number of milli-seconds.
+                Exceptions are collected and raised after the transaction. If it fails, the
+                last successful timestamp (initially zero) is used.
             undo_stack: Pre-filled undo stack items.
             redo_stack: Pre-filled redo stack items.
 
         Raises:
             RuntimeError: A transaction is in progress on the document of a scope.
         """
+        self._exceptions: list[Exception] = []
+        exceptions = self._exceptions
+        last_timestamp = 0
+
+        def timestamp_callback() -> int:
+            nonlocal last_timestamp
+            try:
+                last_timestamp = timestamp()
+            except Exception as exc:
+                _callback_exceptions.get(exceptions).append(exc)
+            return last_timestamp
+
         self._undo_manager = _UndoManager(
             capture_timeout_millis,
-            timestamp,
+            timestamp_callback,
             undo_stack or [],
             redo_stack or [],
         )
@@ -112,7 +126,13 @@ class UndoManager:
         Returns:
             True if some changes were undone.
         """
-        return self._undo_manager.undo()
+        token = _callback_exceptions.set(self._exceptions)
+        try:
+            result = self._undo_manager.undo()
+        finally:
+            _callback_exceptions.reset(token)
+        self._raise_exceptions()
+        return result
 
     def can_redo(self) -> bool:
         """
@@ -131,7 +151,19 @@ class UndoManager:
         Returns:
             True if some changes were redone.
         """
-        return self._undo_manager.redo()
+        token = _callback_exceptions.set(self._exceptions)
+        try:
+            result = self._undo_manager.redo()
+        finally:
+            _callback_exceptions.reset(token)
+        self._raise_exceptions()
+        return result
+
+    def _raise_exceptions(self) -> None:
+        if self._exceptions:
+            exceptions = tuple(self._exceptions)
+            self._exceptions.clear()
+            raise ExceptionGroup("Timestamp callback error", exceptions)
 
     def clear(self) -> None:
         """

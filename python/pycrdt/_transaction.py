@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextvars import ContextVar
 from functools import partial
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self
@@ -10,6 +11,9 @@ from ._pycrdt import Transaction as _Transaction
 
 if TYPE_CHECKING:
     from ._doc import Doc
+
+
+_callback_exceptions: ContextVar[list[Exception]] = ContextVar("callback_exceptions")
 
 
 class Transaction:
@@ -80,7 +84,11 @@ class Transaction:
             try:
                 if not isinstance(self, ReadTransaction):
                     try:
-                        self._txn.commit()
+                        token = _callback_exceptions.set(self._doc._exceptions)
+                        try:
+                            self._txn.commit()
+                        finally:
+                            _callback_exceptions.reset(token)
                     finally:
                         # release the transaction even if an observer callback raised
                         # an exception that is not caught (e.g. KeyboardInterrupt)
