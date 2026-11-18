@@ -39,9 +39,7 @@ impl Doc {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let txn_orig = t1.as_ref();
-        // Create a new Doc with the same options as the original, except for the client ID:
-        // the restored document's clock starts back at the snapshot, so reusing the original's
-        // client ID would give its new changes the same IDs as the original's later changes
+        // Create a new Doc with the same options as the original, but a new client ID
         let mut options = yrs::Options::default();
         options.skip_gc = original.doc.skip_gc();
         if let Some(collection_id) = original.doc.collection_id() {
