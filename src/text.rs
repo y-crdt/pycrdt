@@ -38,7 +38,7 @@ impl Text {
 
 #[pymethods]
 impl Text {
-    fn len(&self, txn: &mut Transaction) -> PyResult<u32> {
+    fn len(&self, txn: &Transaction) -> PyResult<u32> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
@@ -49,7 +49,7 @@ impl Text {
     #[pyo3(signature = (txn, index, chunk, attrs=None))]
     fn insert(
         &self,
-        txn: &mut Transaction,
+        txn: &Transaction,
         index: u32,
         chunk: &str,
         attrs: Option<Bound<'_, PyIterator>>,
@@ -69,7 +69,7 @@ impl Text {
     #[pyo3(signature = (txn, index, embed, attrs=None))]
     fn insert_embed(
         &self,
-        txn: &mut Transaction,
+        txn: &Transaction,
         index: u32,
         embed: Bound<'_, PyAny>,
         attrs: Option<Bound<'_, PyIterator>>,
@@ -90,7 +90,7 @@ impl Text {
     #[pyo3(signature = (txn, index, attrs=None))]
     fn insert_array_prelim<'py>(
         &self,
-        txn: &mut Transaction,
+        txn: &Transaction,
         index: u32,
         attrs: Option<Bound<'_, PyIterator>>,
     ) -> PyResult<Array> {
@@ -117,7 +117,7 @@ impl Text {
     #[pyo3(signature = (txn, index, attrs=None))]
     fn insert_map_prelim<'py>(
         &self,
-        txn: &mut Transaction,
+        txn: &Transaction,
         index: u32,
         attrs: Option<Bound<'_, PyIterator>>,
     ) -> PyResult<Map> {
@@ -139,7 +139,7 @@ impl Text {
     #[pyo3(signature = (txn, index, attrs=None))]
     fn insert_text_prelim<'py>(
         &self,
-        txn: &mut Transaction,
+        txn: &Transaction,
         index: u32,
         attrs: Option<Bound<'_, PyIterator>>,
     ) -> PyResult<Text> {
@@ -160,7 +160,7 @@ impl Text {
 
     fn format(
         &self,
-        txn: &mut Transaction,
+        txn: &Transaction,
         index: u32,
         len: u32,
         attrs: Bound<'_, PyIterator>,
@@ -172,7 +172,7 @@ impl Text {
         Ok(())
     }
 
-    fn remove_range(&self, txn: &mut Transaction, index: u32, len: u32) -> PyResult<()> {
+    fn remove_range(&self, txn: &Transaction, index: u32, len: u32) -> PyResult<()> {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         self.text.remove_range(&mut t, index, len);
@@ -180,9 +180,9 @@ impl Text {
     }
 
     fn get_string<'py>(
-        &mut self,
+        &self,
         py: Python<'py>,
-        txn: &mut Transaction,
+        txn: &Transaction,
     ) -> PyResult<Bound<'py, PyString>> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
@@ -191,7 +191,7 @@ impl Text {
         Ok(PyString::new(py, &s))
     }
 
-    fn diff<'py>(&self, py: Python<'py>, txn: &mut Transaction) -> PyResult<Bound<'py, PyList>> {
+    fn diff<'py>(&self, py: Python<'py>, txn: &Transaction) -> PyResult<Bound<'py, PyList>> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
@@ -222,7 +222,7 @@ impl Text {
     fn sticky_index<'py>(
         &self,
         py: Python<'py>,
-        txn: &mut Transaction,
+        txn: &Transaction,
         index: u32,
         assoc: i8,
     ) -> PyResult<Py<StickyIndex>> {
@@ -239,7 +239,7 @@ impl Text {
         Ok(s)
     }
 
-    fn observe(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
+    fn observe(&self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let target = self.text.clone();
         let (sub, callback) = Subscription::new(f, move |key| {
             let _ = target.unobserve(key);
@@ -260,7 +260,7 @@ impl Text {
         Ok(s)
     }
 
-    pub fn observe_deep(&mut self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
+    pub fn observe_deep(&self, py: Python<'_>, f: Py<PyAny>) -> PyResult<Py<Subscription>> {
         let target = self.text.clone();
         let (sub, callback) = Subscription::new(f, move |key| {
             let _ = target.unobserve_deep(key);

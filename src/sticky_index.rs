@@ -34,7 +34,7 @@ impl From<&str> for StickyIndex {
 
 #[pymethods]
 impl StickyIndex {
-    pub fn get_offset(&self, txn: &mut Transaction) -> PyResult<u32> {
+    pub fn get_offset(&self, txn: &Transaction) -> PyResult<u32> {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let t = t1.as_ref();
