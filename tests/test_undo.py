@@ -169,8 +169,8 @@ def test_origin_in_observer_during_undo_redo():
     assert other_manager.origin != origin
     origins = []
 
-    def callback(event, txn):
-        origins.append(txn.origin)
+    def callback(event):
+        origins.append(event.transaction.origin)
 
     text.observe(callback)
     text += "Hello"

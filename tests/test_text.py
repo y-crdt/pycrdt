@@ -1,7 +1,7 @@
 import pytest
 from anyio import TASK_STATUS_IGNORED, Event, create_task_group
 from anyio.abc import TaskStatus
-from pycrdt import Array, Assoc, Doc, Map, StickyIndex, Text
+from pycrdt import Array, Assoc, Doc, Map, ReadTransaction, StickyIndex, Text
 
 pytestmark = pytest.mark.anyio
 
@@ -220,12 +220,10 @@ def test_observe():
     doc = Doc()
     doc["text"] = text = Text()
     event = None
-    txn = None
 
-    def callback(_event, _txn):
-        nonlocal event, text, txn
+    def callback(_event):
+        nonlocal event, text
         event = _event
-        txn = _txn
         with pytest.raises(RuntimeError) as excinfo:
             text += world
         assert (
@@ -236,7 +234,7 @@ def test_observe():
     sub = text.observe(callback)  # noqa: F841
     text += hello
     assert str(event).startswith("""{target: Hello, delta: [{'insert': 'Hello'}], path: [],""")
-    assert event.transaction is txn
+    assert isinstance(event.transaction, ReadTransaction)
 
 
 async def test_iterate_events():

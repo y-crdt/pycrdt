@@ -4,7 +4,7 @@ from functools import partial
 
 import pytest
 from anyio import Event, create_task_group, fail_after, sleep, to_thread
-from pycrdt import Array, Doc, Map, ReadTransaction, Text, XmlFragment
+from pycrdt import Array, Doc, Map, ReadTransaction, Text, TextEvent, XmlFragment
 
 pytestmark = pytest.mark.anyio
 
@@ -58,9 +58,9 @@ def test_origin():
     origin0 = Origin()
     origin1 = None
 
-    def callback(event, txn):
+    def callback(event):
         nonlocal origin1
-        origin1 = txn.origin
+        origin1 = event.transaction.origin
 
     text.observe(callback)
 
@@ -106,60 +106,41 @@ def test_origin():
     assert str(excinfo.value) == "Nested transactions must have same origin as root transaction"
 
 
-def test_observe_callback_params():
+@pytest.mark.parametrize("method", ["observe", "observe_deep"])
+def test_observe_callback_params(method):
     doc = Doc()
     doc["text"] = text = Text()
+    calls = []
 
-    cb0_called = False
-    cb1_called = False
-    cb2_called = False
+    def callback(event, *args, **kwargs):
+        calls.append((event, args, kwargs))
 
-    def callback0():
-        nonlocal cb0_called
-        cb0_called = True
+    sub = getattr(text, method)(callback)  # noqa: F841
+    text += "Hello"
 
-    def callback1(event):
-        nonlocal cb1_called
-        cb1_called = True
-
-    def callback2(event, txn):
-        nonlocal cb2_called
-        cb2_called = True
-
-    text.observe(callback0)
-    text.observe(callback1)
-    text.observe(callback2)
-
-    with doc.transaction():
-        text += "Hello, World!"
-
-    assert cb0_called
-    assert cb1_called
-    assert cb2_called
+    assert len(calls) == 1
+    event, args, kwargs = calls[0]
+    assert args == ()
+    assert kwargs == {}
+    if method == "observe_deep":
+        assert len(event) == 1
+        event = event[0]
+    assert isinstance(event, TextEvent)
+    assert isinstance(event.transaction, ReadTransaction)
 
 
 @pytest.mark.parametrize("method", ["observe", "observe_deep"])
-def test_observe_callback_keyword_params(method):
+def test_observe_callback_with_transaction_param(method):
     doc = Doc()
     doc["text"] = text = Text()
-    # observers are not called in a particular order
-    calls0 = []
-    calls1 = []
 
-    def callback0(event, *, option=None):
-        calls0.append(option)
+    # the transaction is available as event.transaction
+    sub = getattr(text, method)(lambda event, txn: None)  # noqa: F841
+    with pytest.raises(ExceptionGroup) as excinfo:
+        text += "Hello"
 
-    def callback1(event, txn, **kwargs):
-        calls1.append((txn, kwargs))
-
-    sub0 = getattr(text, method)(callback0)  # noqa: F841
-    sub1 = getattr(text, method)(callback1)  # noqa: F841
-    text += "Hello"
-
-    assert calls0 == [None]
-    assert len(calls1) == 1
-    assert isinstance(calls1[0][0], ReadTransaction)
-    assert calls1[0][1] == {}
+    assert len(excinfo.value.exceptions) == 1
+    assert isinstance(excinfo.value.exceptions[0], TypeError)
 
 
 def create_new_transaction(map0: Map, key: str, val: str) -> None:

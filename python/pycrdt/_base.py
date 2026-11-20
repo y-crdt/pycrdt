@@ -3,7 +3,6 @@ from __future__ import annotations
 import threading
 from abc import ABC, abstractmethod
 from functools import partial
-from inspect import signature
 from types import UnionType
 from typing import (
     TYPE_CHECKING,
@@ -184,8 +183,7 @@ class BaseType(ABC):
         return self._type_name
 
     def observe(self, callback: Callable[[BaseEvent], None]) -> Subscription:
-        param_nb = count_parameters(callback)
-        _callback = partial(observe_callback, callback, self.doc, param_nb)
+        _callback = partial(observe_callback, callback, self.doc)
         subscription = self.integrated.observe(_callback)
         self.doc._subscriptions.append(subscription)
         return subscription
@@ -197,8 +195,7 @@ class BaseType(ABC):
         Args:
             callback: The callback to call with the list of events.
         """
-        param_nb = count_parameters(callback)
-        _callback = partial(observe_deep_callback, callback, self.doc, param_nb)
+        _callback = partial(observe_deep_callback, callback, self.doc)
         subscription = self.integrated.observe_deep(_callback)
         self.doc._subscriptions.append(subscription)
         return subscription
@@ -296,37 +293,23 @@ class Sequence(BaseType):
         return StickyIndex.new(self, index, assoc)
 
 
-def count_parameters(callback: Callable[..., Any]) -> int:
-    # the event and the transaction are passed positionally
-    return len(
-        [
-            param
-            for param in signature(callback).parameters.values()
-            if param.kind not in (param.KEYWORD_ONLY, param.VAR_KEYWORD)
-        ]
-    )
-
-
 def observe_callback(
-    callback: Callable[[], None] | Callable[[Any], None] | Callable[[Any, ReadTransaction], None],
+    callback: Callable[[Any], None],
     doc: Doc,
-    param_nb: int,
     event: Any,
 ):
     with doc._read_transaction(event.transaction) as txn:
         _event = event_types[type(event)](event, doc)
         _event.transaction = txn
-        params = (_event, txn)
         try:
-            callback(*params[:param_nb])  # type: ignore[arg-type]
+            callback(_event)
         except Exception as exc:
             doc._exceptions.append(exc)
 
 
 def observe_deep_callback(
-    callback: Callable[[], None] | Callable[[Any], None] | Callable[[Any, ReadTransaction], None],
+    callback: Callable[[list[Any]], None],
     doc: Doc,
-    param_nb: int,
     events: list[Any],
 ):
     with doc._read_transaction(events[0].transaction) as txn:
@@ -334,9 +317,8 @@ def observe_deep_callback(
             _event = event_types[type(event)](event, doc)
             _event.transaction = txn
             events[idx] = _event
-        params = (events, txn)
         try:
-            callback(*params[:param_nb])  # type: ignore[arg-type]
+            callback(events)
         except Exception as exc:
             doc._exceptions.append(exc)
 
