@@ -9,6 +9,7 @@
       - Array
       - ArrayEvent
       - Assoc
+      - AsyncDoc
       - Awareness
       - Channel
       - Decoder

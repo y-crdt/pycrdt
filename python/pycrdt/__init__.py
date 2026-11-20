@@ -5,6 +5,7 @@ __path__ = extend_path(__path__, __name__)
 from ._array import Array as Array
 from ._array import ArrayEvent as ArrayEvent
 from ._array import TypedArray as TypedArray
+from ._async_doc import AsyncDoc as AsyncDoc
 from ._awareness import Awareness as Awareness
 from ._awareness import is_awareness_disconnect_message as is_awareness_disconnect_message
 from ._doc import Doc as Doc

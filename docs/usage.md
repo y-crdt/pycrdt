@@ -393,3 +393,35 @@ from pycrdt import Doc, Map
 untyped_doc: Doc = doc._
 untyped_map: Map = doc.map0._
 ```
+
+## Async worker access
+
+`AsyncDoc` lets you offload document operations to worker threads:
+
+```py
+from pycrdt import AsyncDoc, Text
+
+doc = await AsyncDoc.create({"text": Text("Hello")})
+
+
+def edit(doc, suffix):
+    with doc.transaction(origin="edit"):
+        doc["text"] += suffix
+        return str(doc["text"])
+
+
+text = await doc.run_sync(edit, ", World")
+update = await doc.get_update()
+state = await doc.get_state()
+await doc.apply_update(update)
+```
+
+Subscribe to update bytes before making changes:
+
+```py
+async with doc.updates() as updates:
+    await doc.run_sync(edit, "!")
+    update = await updates.receive()
+```
+
+Access the underlying `Doc` and its shared types only inside `run_sync` callbacks.
