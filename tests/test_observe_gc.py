@@ -1,5 +1,7 @@
 import gc
 import weakref
+from contextlib import nullcontext
+from threading import Thread
 
 import pytest
 from anyio import fail_after
@@ -201,6 +203,99 @@ def test_temporary_wrapper_subscription_survives_gc(method):
     gc.collect()
     change_target(doc["text"])
     assert calls == [True]
+
+
+@pytest.mark.parametrize("method", ["observe", "observe_text"])
+def test_temporary_subdoc_wrapper_subscription_survives_gc(method):
+    doc = Doc({"map": Map({"subdoc": Doc()})})
+    calls = []
+
+    def callback(event):
+        calls.append(True)
+
+    if method == "observe":
+        doc["map"]["subdoc"].observe(callback)
+    else:
+        doc["map"]["subdoc"].get("text", type=Text).observe(callback)
+    gc.collect()
+    gc.collect()
+    doc["map"]["subdoc"].get("text", type=Text).insert(0, "a")
+    assert calls == [True]
+
+
+def test_observed_subdoc_is_collected_with_its_document():
+    doc = Doc({"map": Map({"subdoc": Doc()})})
+    doc["map"]["subdoc"].observe(lambda event: None)
+    doc["map"]["subdoc"].get("text", type=Text).observe(lambda event: None)
+    doc_ref = weakref.ref(doc)
+    subdoc_ref = weakref.ref(doc["map"]["subdoc"])
+    del doc
+    gc.collect()
+    gc.collect()
+    assert doc_ref() is None
+    assert subdoc_ref() is None
+
+
+@pytest.mark.parametrize("how", ["replace", "delete", "delete-in-same-transaction"])
+def test_removed_subdocs_are_collected(how):
+    doc = Doc({"map": Map()})
+    refs = []
+    for _ in range(100):
+        subdoc = Doc()
+        with doc.transaction() if how == "delete-in-same-transaction" else nullcontext():
+            doc["map"]["subdoc"] = subdoc
+            if how != "replace":
+                del doc["map"]["subdoc"]
+        refs.append(weakref.ref(subdoc))
+        del subdoc
+    gc.collect()
+
+    if how == "replace":
+        assert [ref() for ref in refs[:-1]] == [None] * (len(refs) - 1)
+        assert doc["map"]["subdoc"] is refs[-1]()
+    else:
+        assert [ref() for ref in refs] == [None] * len(refs)
+
+
+def test_subdocs_in_document_are_kept():
+    doc = Doc({"map": Map({f"subdoc{i}": Doc() for i in range(100)})})
+    remote_doc = Doc()
+    remote_doc.apply_update(doc.get_update())
+    remote_map = remote_doc.get("map", type=Map)
+    subdoc_ids = [id(remote_map[f"subdoc{i}"]) for i in range(100)]
+    calls = []
+    remote_map["subdoc0"].get("text", type=Text).observe(lambda event: calls.append(True))
+    for _ in range(100):
+        remote_map["subdoc"] = Doc()
+    gc.collect()
+
+    assert [id(remote_map[f"subdoc{i}"]) for i in range(100)] == subdoc_ids
+    remote_map["subdoc0"].get("text", type=Text).insert(0, "a")
+    assert calls == [True]
+
+
+def test_subdocs_are_forgotten_while_holding_the_transaction_lock():
+    doc = Doc({"map": Map({"subdoc": Doc()})}, allow_multithreading=True)
+    results = []
+
+    def new_transaction():
+        try:
+            with doc.new_transaction(timeout=0.1):
+                results.append("acquired")  # pragma: no cover
+        except TimeoutError:
+            results.append("timeout")
+
+    def on_collect(ref):
+        # another thread cannot start a transaction while the subdocument is forgotten
+        thread = Thread(target=new_transaction)
+        thread.start()
+        thread.join()
+
+    subdoc_ref = weakref.ref(doc["map"]["subdoc"], on_collect)
+    del doc["map"]["subdoc"]
+
+    assert subdoc_ref() is None
+    assert results == ["timeout"]
 
 
 @pytest.mark.parametrize("method", ["observe", "observe_deep"])

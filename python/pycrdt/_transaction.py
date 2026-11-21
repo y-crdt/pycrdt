@@ -77,8 +77,9 @@ class Transaction:
         # since nested transactions reuse the root transaction
         if self._leases == 0:
             assert self._txn is not None
+            read_only = isinstance(self, ReadTransaction)
             try:
-                if not isinstance(self, ReadTransaction):
+                if not read_only:
                     try:
                         self._txn.commit()
                     finally:
@@ -87,16 +88,21 @@ class Transaction:
                         origin_hash = self._txn.origin()
                         if origin_hash is not None:
                             del self._doc._origins[origin_hash]
-                        if self._doc._allow_multithreading:
-                            self._doc._txn_lock.release()
                     if self._doc._exceptions:
                         exceptions = tuple(self._doc._exceptions)
                         self._doc._exceptions.clear()
                         raise ExceptionGroup("Observer callback error", exceptions)
             finally:
-                self._txn.drop()
-                self._txn = None
-                self._doc._txn = None
+                try:
+                    self._txn.drop()
+                    self._txn = None
+                    self._doc._txn = None
+                    if not read_only:
+                        # before another thread can access the subdocuments
+                        self._doc._forget_removed_subdocs()
+                finally:
+                    if not read_only and self._doc._allow_multithreading:
+                        self._doc._txn_lock.release()
 
     async def __aenter__(self, _acquire_transaction: bool = True) -> Self:
         if self._leases == 0:
