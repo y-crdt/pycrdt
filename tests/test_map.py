@@ -189,6 +189,25 @@ def test_iteration_shared_types_and_subdocs(method: str):
     assert str(subdoc["text"]) == "subdoc!"
 
 
+def test_bytes():
+    doc = Doc()
+    doc["map"] = map0 = Map()
+    map0["bytes"] = b"\x00\x01"
+    value = map0["bytes"]
+    assert isinstance(value, bytearray)
+
+    map0["copy"] = value
+    map0["nested"] = {"list": [value]}
+
+    remote_doc = Doc()
+    remote_doc.apply_update(doc.get_update())
+    assert remote_doc.get("map", type=Map).to_py() == {
+        "bytes": b"\x00\x01",
+        "copy": b"\x00\x01",
+        "nested": {"list": [b"\x00\x01"]},
+    }
+
+
 def test_prelim():
     map0 = Map({"0": 1})
     assert map0.to_py() == {"0": 1}

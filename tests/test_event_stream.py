@@ -1,5 +1,12 @@
 import pytest
-from anyio import EndOfStream, Event, create_task_group, fail_after, wait_all_tasks_blocked
+from anyio import (
+    EndOfStream,
+    Event,
+    WouldBlock,
+    create_task_group,
+    fail_after,
+    wait_all_tasks_blocked,
+)
 from anyio.streams.memory import MemoryObjectReceiveStream
 from pycrdt import Doc, Text
 
@@ -78,3 +85,24 @@ async def test_unsubscribe_drains_waiting_async_producer():
                 await done.wait()
         with pytest.raises(EndOfStream):
             await events.receive()
+
+
+@pytest.mark.parametrize("source", ["doc", "text"])
+def test_full_buffer_does_not_block_other_streams(source):
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    target = doc if source == "doc" else text
+    full_stream = target.events(max_buffer_size=1)
+    # many streams, so that some of them come after the full stream
+    streams = [target.events() for _ in range(100)]
+
+    text += "a"
+    with pytest.RaisesGroup(WouldBlock, match="Observer callback error"):
+        text += "b"
+
+    assert full_stream.statistics().current_buffer_used == 1
+    assert [stream.statistics().current_buffer_used for stream in streams] == [2] * len(streams)
+    for stream in (full_stream, *streams):
+        stream.close()
+    for send_stream in target._send_streams[False]:
+        send_stream.close()

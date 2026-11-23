@@ -39,9 +39,8 @@ impl Doc {
         let mut t0 = txn.transaction()?;
         let t1 = t0.as_mut().unwrap();
         let txn_orig = t1.as_ref();
-        // Create a new Doc with the same options as the original
+        // Create a new Doc with the same options as the original, but a new client ID
         let mut options = yrs::Options::default();
-        options.client_id = original.doc.client_id();
         options.skip_gc = original.doc.skip_gc();
         if let Some(collection_id) = original.doc.collection_id() {
             options.collection_id = Some(collection_id);

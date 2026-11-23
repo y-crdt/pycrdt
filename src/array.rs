@@ -1,7 +1,7 @@
 use crate::thread_affinity::{CallbackPtr, CallbackRef, CallbackScope, CallbackLifetime, ThreadAffinity};
 use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
-use pyo3::exceptions::{PyValueError, PyTypeError};
+use pyo3::exceptions::{PyRuntimeError, PyValueError, PyTypeError};
 use pyo3::types::{PyList, PyString};
 use yrs::{
     Array as _Array,
@@ -11,6 +11,7 @@ use yrs::{
     Doc as _Doc,
     IndexedSequence,
     Observable,
+    Transact,
     TransactionMut,
     XmlFragmentPrelim,
 };
@@ -113,6 +114,13 @@ impl Array {
         let mut t = _t.as_mut().unwrap().as_mut();
         let d1: Doc = doc.extract().unwrap();
         let d2: _Doc = d1.doc;
+        // Yrs acquires a transaction on the inserted document, which blocks forever if a
+        // transaction is in progress on it, e.g. when inserting a document into itself.
+        if d2.try_transact_mut().is_err() {
+            return Err(PyRuntimeError::new_err(
+                "Cannot insert a document that has an active transaction",
+            ));
+        }
         let doc_ref = self.array.insert(&mut t, index, d2);
         doc_ref.load(t);
         Ok(())

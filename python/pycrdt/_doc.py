@@ -18,7 +18,7 @@ from typing import (
     overload,
 )
 
-from anyio import BrokenResourceError, ClosedResourceError, create_memory_object_stream
+from anyio import BrokenResourceError, ClosedResourceError, WouldBlock, create_memory_object_stream
 from anyio.streams.memory import MemoryObjectSendStream
 
 from ._base import BaseDoc, BaseType, Typed, base_types, forbid_read_transaction
@@ -215,7 +215,7 @@ class Doc(BaseDoc, Generic[T]):
             snapshot: The Snapshot to restore to.
             doc: The original Doc to use for options/state.
         Returns:
-            A new Doc instance restored to the snapshot state.
+            A new Doc instance restored to the snapshot state, with a new client ID.
         Raises:
             ValueError: The original Doc was not created with `skip_gc=True`.
         """
@@ -466,14 +466,20 @@ class Doc(BaseDoc, Generic[T]):
 
     def _send_event(self, subdocs: bool, event: TransactionEvent | SubdocsEvent):
         to_remove: list[MemoryObjectSendStream[TransactionEvent | SubdocsEvent]] = []
+        would_block: WouldBlock | None = None
         send_streams = self._send_streams[subdocs]
         for send_stream in send_streams:
             try:
                 send_stream.send_nowait(event)
             except BrokenResourceError:
                 to_remove.append(send_stream)
+            except WouldBlock as exc:
+                # a full buffer must not prevent sending the event to the other streams
+                would_block = exc
         for send_stream in to_remove:
             self._unsubscribe_events(subdocs, send_stream)
+        if would_block is not None:
+            raise would_block
 
     async def _async_send_event(self, subdocs: bool, event: TransactionEvent | SubdocsEvent):
         to_remove: list[MemoryObjectSendStream[TransactionEvent | SubdocsEvent]] = []
