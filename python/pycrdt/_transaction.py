@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ._doc import Doc
 
 
-_callback_exceptions: ContextVar[list[Exception]] = ContextVar("callback_exceptions")
+_callback_exceptions: ContextVar[list[BaseException]] = ContextVar("callback_exceptions")
 
 
 class Transaction:
@@ -100,7 +100,7 @@ class Transaction:
                     if self._doc._exceptions:
                         exceptions = tuple(self._doc._exceptions)
                         self._doc._exceptions.clear()
-                        raise ExceptionGroup("Observer callback error", exceptions)
+                        raise BaseExceptionGroup("Observer callback error", exceptions)
             finally:
                 self._txn.drop()
                 self._txn = None

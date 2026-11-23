@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from operator import index
 from time import time_ns
 from typing import Any, Callable
 
@@ -38,25 +39,29 @@ class UndoManager:
         Args:
             scopes: A list of shared types the undo manager will work with.
             capture_timeout_millis: A time interval for grouping changes that will be undone/redone.
-            timestamp: A function that returns a timestamp as an integer number of milli-seconds.
-                Exceptions are collected and raised after the transaction. If it fails, the
-                last successful timestamp (initially zero) is used.
+            timestamp: A function that returns a timestamp in milliseconds as an unsigned
+                64-bit integer. Callback errors are collected and raised after the transaction.
+                On failure, the last successful timestamp (initially zero) is used.
             undo_stack: Pre-filled undo stack items.
             redo_stack: Pre-filled redo stack items.
 
         Raises:
             RuntimeError: A transaction is in progress on the document of a scope.
         """
-        self._exceptions: list[Exception] = []
+        self._exceptions: list[BaseException] = []
         exceptions = self._exceptions
         last_timestamp = 0
 
         def timestamp_callback() -> int:
             nonlocal last_timestamp
             try:
-                last_timestamp = timestamp()
-            except Exception as exc:
+                value = index(timestamp())
+                if not 0 <= value < 2**64:
+                    raise OverflowError("Timestamp must fit in an unsigned 64-bit integer")
+            except BaseException as exc:
                 _callback_exceptions.get(exceptions).append(exc)
+            else:
+                last_timestamp = value
             return last_timestamp
 
         self._undo_manager = _UndoManager(
@@ -122,6 +127,8 @@ class UndoManager:
 
         Raises:
             RuntimeError: A transaction is in progress on a tracked document.
+            BaseExceptionGroup: Timestamp callback errors, raised as an ExceptionGroup
+                when all errors are Exceptions.
 
         Returns:
             True if some changes were undone.
@@ -147,6 +154,8 @@ class UndoManager:
 
         Raises:
             RuntimeError: A transaction is in progress on a tracked document.
+            BaseExceptionGroup: Timestamp callback errors, raised as an ExceptionGroup
+                when all errors are Exceptions.
 
         Returns:
             True if some changes were redone.
@@ -163,7 +172,7 @@ class UndoManager:
         if self._exceptions:
             exceptions = tuple(self._exceptions)
             self._exceptions.clear()
-            raise ExceptionGroup("Timestamp callback error", exceptions)
+            raise BaseExceptionGroup("Timestamp callback error", exceptions)
 
     def clear(self) -> None:
         """

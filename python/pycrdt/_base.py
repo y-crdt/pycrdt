@@ -47,7 +47,7 @@ class BaseDoc:
     _doc: _Doc
     _twin_doc: BaseDoc | None
     _txn: Transaction | None
-    _exceptions: list[Exception]
+    _exceptions: list[BaseException]
     _txn_lock: threading.Lock
     _txn_async_lock: anyio.Lock
     _allow_multithreading: bool

@@ -3,6 +3,7 @@ use std::pin::pin;
 use std::task::{Context, Poll};
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::types::{PyList, PyBytes};
@@ -73,12 +74,25 @@ impl IdSet {
 
 struct PythonClock {
     timestamp: Py<PyAny>,
+    last_timestamp: AtomicU64,
 }
 
 impl Clock for PythonClock {
     fn now(&self) -> Timestamp {
         Python::attach(|py| {
-            self.timestamp.call0(py).expect("Error getting timestamp").extract(py).expect("Could not convert timestamp to int")
+            // A previous observer can leave an exception pending until commit returns.
+            let pending = PyErr::take(py);
+            let result = self.timestamp.call0(py).and_then(|value| value.extract(py));
+            if let Some(err) = pending {
+                err.restore(py);
+            }
+            match result {
+                Ok(value) => {
+                    self.last_timestamp.store(value, Ordering::Relaxed);
+                    value
+                }
+                Err(_) => self.last_timestamp.load(Ordering::Relaxed),
+            }
         })
     }
 }
@@ -107,7 +121,10 @@ impl UndoManager {
             capture_timeout_millis,
             tracked_origins: HashSet::new(),
             capture_transaction: None,
-            timestamp: Arc::new(PythonClock {timestamp}),
+            timestamp: Arc::new(PythonClock {
+                timestamp,
+                last_timestamp: AtomicU64::new(0),
+            }),
             init_undo_stack,
             init_redo_stack,
         };

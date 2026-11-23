@@ -254,6 +254,48 @@ async def test_timestamp_exceptions(async_transaction):
     assert str(text) == "a"
 
 
+@pytest.mark.parametrize(
+    ("invalid", "error_type"),
+    [(1.5, TypeError), (-1, OverflowError), (2**64, OverflowError), (None, KeyboardInterrupt)],
+)
+def test_timestamp_invalid_result_or_interrupt(invalid, error_type):
+    doc = Doc()
+    text = doc.get("text", type=Text)
+    timestamps = iter([1, invalid, 2])
+
+    def clock():
+        value = next(timestamps)
+        if value is None:
+            raise KeyboardInterrupt
+        return value
+
+    manager = UndoManager(scopes=[text], timestamp=clock)
+    observed = []
+    doc.observe(observed.append)
+    text += "a"
+    with pytest.RaisesGroup(error_type):
+        text += "b"
+    text += "c"
+    assert len(observed) == 3
+    assert len(manager.undo_stack) == 1
+
+
+def test_timestamp_preserves_pending_observer_interrupt():
+    doc = Doc()
+    text = doc.get("text", type=Text)
+
+    def interrupt(event):
+        raise KeyboardInterrupt
+
+    subscription = text.observe(interrupt)
+    manager = UndoManager(scopes=[text])
+    with pytest.raises(KeyboardInterrupt):
+        text += "a"
+    text.unobserve(subscription)
+    text += "b"
+    assert manager.can_undo()
+
+
 def test_timestamp_exceptions_multiple_docs():
     docs = [Doc(), Doc()]
     texts = [doc.get("text", type=Text) for doc in docs]
