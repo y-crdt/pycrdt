@@ -283,18 +283,22 @@ def test_timestamp_invalid_result_or_interrupt(invalid, error_type):
     assert len(manager.undo_stack) == 1
 
 
-def test_timestamp_preserves_pending_observer_interrupt():
+@pytest.mark.parametrize("first_timestamp", [1, 1.5])
+def test_timestamp_preserves_pending_observer_interrupt(first_timestamp):
     doc = Doc()
     text = doc.get("text", type=Text)
+    timestamps = iter([first_timestamp, 2])
 
     def interrupt(event):
         raise KeyboardInterrupt
 
     subscription = text.observe(interrupt)
-    manager = UndoManager(scopes=[text])
+    manager = UndoManager(scopes=[text], timestamp=lambda: next(timestamps))
     with pytest.raises(KeyboardInterrupt):
         text += "a"
     text.unobserve(subscription)
+    with doc.transaction():
+        pass
     text += "b"
     assert manager.can_undo()
 

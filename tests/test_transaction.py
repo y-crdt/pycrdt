@@ -444,6 +444,23 @@ def raise_once(exception, raised, event):
         raise exception
 
 
+def test_observer_errors_do_not_leak_after_keyboard_interrupt():
+    doc = Doc()
+    map0 = doc.get("map0", type=Map)
+    raised = []
+    map_subscription = map0.observe(partial(raise_once, ZeroDivisionError(), raised))
+    doc_subscription = doc.observe(partial(raise_once, KeyboardInterrupt(), []))
+
+    with pytest.raises(KeyboardInterrupt):
+        map0["key"] = "value"
+    assert raised
+
+    map0.unobserve(map_subscription)
+    doc.unobserve(doc_subscription)
+    with doc.transaction():
+        pass
+
+
 @pytest.mark.parametrize("origin", [None, "test-origin"])
 def test_new_transaction_after_commit_error_multithreading(origin):
     doc = Doc(allow_multithreading=True)

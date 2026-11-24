@@ -89,6 +89,10 @@ class Transaction:
                             self._txn.commit()
                         finally:
                             _callback_exceptions.reset(token)
+                            # Drain errors before releasing the transaction, even
+                            # when commit propagates an uncaught callback error.
+                            exceptions = tuple(self._doc._exceptions)
+                            self._doc._exceptions.clear()
                     finally:
                         # release the transaction even if an observer callback raised
                         # an exception that is not caught (e.g. KeyboardInterrupt)
@@ -97,9 +101,7 @@ class Transaction:
                             del self._doc._origins[origin_hash]
                         if self._doc._allow_multithreading:
                             self._doc._txn_lock.release()
-                    if self._doc._exceptions:
-                        exceptions = tuple(self._doc._exceptions)
-                        self._doc._exceptions.clear()
+                    if exceptions:
                         raise BaseExceptionGroup("Observer callback error", exceptions)
             finally:
                 self._txn.drop()
