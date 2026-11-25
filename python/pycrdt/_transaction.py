@@ -10,6 +10,7 @@ from anyio import create_task_group, to_thread
 from ._pycrdt import Transaction as _Transaction
 
 if TYPE_CHECKING:
+    from ._base import BaseDoc
     from ._doc import Doc
 
 
@@ -81,8 +82,9 @@ class Transaction:
         # since nested transactions reuse the root transaction
         if self._leases == 0:
             assert self._txn is not None
+            read_only = isinstance(self, ReadTransaction)
             try:
-                if not isinstance(self, ReadTransaction):
+                if not read_only:
                     try:
                         token = _callback_exceptions.set(self._doc._exceptions)
                         try:
@@ -94,19 +96,27 @@ class Transaction:
                             exceptions = tuple(self._doc._exceptions)
                             self._doc._exceptions.clear()
                     finally:
-                        # release the transaction even if an observer callback raised
+                        # unregister the origin even if an observer callback raised
                         # an exception that is not caught (e.g. KeyboardInterrupt)
                         origin_hash = self._txn.origin()
                         if origin_hash is not None:
                             del self._doc._origins[origin_hash]
-                        if self._doc._allow_multithreading:
-                            self._doc._txn_lock.release()
                     if exceptions:
                         raise BaseExceptionGroup("Observer callback error", exceptions)
             finally:
-                self._txn.drop()
-                self._txn = None
-                self._doc._txn = None
+                evicted: list[BaseDoc] = []
+                try:
+                    self._txn.drop()
+                    self._txn = None
+                    self._doc._txn = None
+                    if not read_only:
+                        # before another thread can access the subdocuments
+                        self._doc._forget_removed_subdocs(evicted)
+                finally:
+                    if not read_only and self._doc._allow_multithreading:
+                        self._doc._txn_lock.release()
+                    # Weakref callbacks and finalizers can open another transaction.
+                    evicted.clear()
 
     async def __aenter__(self, _acquire_transaction: bool = True) -> Self:
         if self._leases == 0:
