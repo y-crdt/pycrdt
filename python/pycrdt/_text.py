@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Iterator, cast
 
-from ._base import BaseEvent, BaseType, Sequence, base_types, event_types
+from ._base import BaseEvent, BaseType, Sequence, base_types, check_str, event_types
 from ._pycrdt import Subscription
 from ._pycrdt import Text as _Text
 from ._pycrdt import TextEvent as _TextEvent
@@ -46,6 +46,11 @@ class Text(Sequence):
             return
         with self.doc.transaction() as txn:
             self.integrated.insert(txn._txn, 0, value)
+
+    def _check_prelim(self, seen: set[int]) -> bool:
+        if self._prelim is not None:
+            check_str(self._prelim)
+        return True
 
     def _get_or_insert(self, name: str, doc: Doc) -> _Text:
         assert doc._txn is not None
